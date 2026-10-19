@@ -139,9 +139,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
 .ph small{position:absolute;left:8px;bottom:6px;color:#fff;text-shadow:0 1px 3px #000}
 .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
 .timer{font-size:64px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums;color:var(--blue-dd)}.timer.warn{color:var(--red);animation:bl .6s infinite}@keyframes bl{50%{opacity:.3}}
-.sess{display:grid;grid-template-columns:1.4fr 1fr;gap:24px}
-video{width:100%;border-radius:18px;background:#000}
-.strip{display:flex;gap:6px;overflow-x:auto;margin-top:8px}.th{position:relative;flex:0 0 72px}.th img{width:72px;height:54px;object-fit:cover;border-radius:8px}
+.sess{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:24px}.sess>*,.sdet>*,.home>*,.adm>*{min-width:0}
+video{display:block;width:100%;max-width:100%;max-height:70vh;border-radius:18px;background:#000}
+.strip{display:flex;gap:6px;overflow-x:auto;max-width:100%;margin-top:8px}.th{position:relative;flex:0 0 72px}.th img{width:72px;height:54px;object-fit:cover;border-radius:8px}
 .th button{position:absolute;right:0;top:0;border:0;background:#000a;color:#fff;border-radius:8px;padding:0 5px}
 
 /* ---------- auth ---------- */
@@ -172,7 +172,7 @@ video{width:100%;border-radius:18px;background:#000}
 /* ---------- responsive ---------- */
 @media (max-width:1000px){
   .grid3{grid-template-columns:repeat(2,1fr)}.sdet{grid-template-columns:1fr}.sdet .left,.filter{position:static}
-  .home{grid-template-columns:1fr}.bk{grid-template-columns:1fr;gap:24px}.sess{grid-template-columns:1fr}
+  .home{grid-template-columns:1fr}.bk{grid-template-columns:1fr;gap:24px}.sess{grid-template-columns:minmax(0,1fr)}
   .adm{grid-template-columns:1fr;padding:12px}.side{position:static;display:flex;gap:6px;overflow-x:auto;padding:10px;align-items:center}.side h3,.side .foot{display:none}.side button{width:auto;white-space:nowrap;font-size:13px;padding:8px 14px}
   .acc .body{grid-template-columns:1fr}.search{width:100%}
 }
