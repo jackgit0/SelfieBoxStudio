@@ -53,5 +53,5 @@ Halaman utama satu halaman gulir dengan navbar (Home, About, Fasilitas, Keterang
 (AKUN ADMIN
 
 id : adminstudio
-pw : admin4869
+pw : admin123
 )
