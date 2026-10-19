@@ -1,0 +1,300 @@
+{
+ "PKG": [
+  {
+   "id": 1,
+   "name": "Basic",
+   "price": 50000,
+   "photo_count": 4,
+   "strip_size": "2x6",
+   "strip_material": "Glossy",
+   "dur": 10
+  },
+  {
+   "id": 2,
+   "name": "Standard",
+   "price": 90000,
+   "photo_count": 8,
+   "strip_size": "4x6",
+   "strip_material": "Glossy",
+   "dur": 15
+  },
+  {
+   "id": 3,
+   "name": "Premium",
+   "price": 150000,
+   "photo_count": 12,
+   "strip_size": "4x6",
+   "strip_material": "Laminasi",
+   "dur": 20
+  },
+  {
+   "id": 4,
+   "name": "Group",
+   "price": 220000,
+   "photo_count": 16,
+   "strip_size": "6x8",
+   "strip_material": "Laminasi",
+   "dur": 25
+  }
+ ],
+ "PEOPLE": [
+  {
+   "id": 1,
+   "range": "1-2"
+  },
+  {
+   "id": 2,
+   "range": "3-4"
+  },
+  {
+   "id": 3,
+   "range": "5+"
+  }
+ ],
+ "BUDGET": [
+  {
+   "id": 1,
+   "budget": "< 100rb"
+  },
+  {
+   "id": 2,
+   "budget": "100-200rb"
+  },
+  {
+   "id": 3,
+   "budget": "> 200rb"
+  }
+ ],
+ "STUDIOS": [
+  {
+   "id": 1,
+   "name": "Studio Mawar",
+   "description": "Intim, cocok 1-2 orang",
+   "people_range_id": 1,
+   "budget_range_id": 1
+  },
+  {
+   "id": 2,
+   "name": "Studio Melati",
+   "description": "Lega untuk 3-4 orang",
+   "people_range_id": 2,
+   "budget_range_id": 2
+  },
+  {
+   "id": 3,
+   "name": "Studio Anggrek",
+   "description": "Besar untuk rombongan",
+   "people_range_id": 3,
+   "budget_range_id": 3
+  }
+ ],
+ "VIBES": [
+  {
+   "id": 1,
+   "name": "Classic",
+   "e": "🎞️"
+  },
+  {
+   "id": 2,
+   "name": "Retro",
+   "e": "📻"
+  },
+  {
+   "id": 3,
+   "name": "Y2K",
+   "e": "💿"
+  },
+  {
+   "id": 4,
+   "name": "Minimalis",
+   "e": "🤍"
+  },
+  {
+   "id": 5,
+   "name": "Garden",
+   "e": "🌿"
+  }
+ ],
+ "PROP": [
+  {
+   "id": 1,
+   "vibe_id": 1,
+   "type": "background",
+   "name": "Tirai Hitam",
+   "price": 0,
+   "bg": "#222,#666"
+  },
+  {
+   "id": 2,
+   "vibe_id": 1,
+   "type": "background",
+   "name": "Panggung Sepia",
+   "price": 10000,
+   "bg": "#a38060,#5a3f2b"
+  },
+  {
+   "id": 3,
+   "vibe_id": 1,
+   "type": "accessory",
+   "name": "Topi Fedora",
+   "price": 5000,
+   "e": "🎩"
+  },
+  {
+   "id": 4,
+   "vibe_id": 1,
+   "type": "accessory",
+   "name": "Kacamata Bulat",
+   "price": 0,
+   "e": "🕶️"
+  },
+  {
+   "id": 5,
+   "vibe_id": 2,
+   "type": "background",
+   "name": "Diner 70s",
+   "price": 0,
+   "bg": "#e9a23b,#c0522d"
+  },
+  {
+   "id": 6,
+   "vibe_id": 2,
+   "type": "background",
+   "name": "Kamar Kaset",
+   "price": 10000,
+   "bg": "#6d4c8f,#2c1a47"
+  },
+  {
+   "id": 7,
+   "vibe_id": 2,
+   "type": "accessory",
+   "name": "Radio Vintage",
+   "price": 5000,
+   "e": "📻"
+  },
+  {
+   "id": 8,
+   "vibe_id": 2,
+   "type": "accessory",
+   "name": "Bunga Daisy",
+   "price": 0,
+   "e": "🌼"
+  },
+  {
+   "id": 9,
+   "vibe_id": 3,
+   "type": "background",
+   "name": "Holografik",
+   "price": 0,
+   "bg": "#ff7ad9,#7a5cff"
+  },
+  {
+   "id": 10,
+   "vibe_id": 3,
+   "type": "background",
+   "name": "Cyber Pink",
+   "price": 10000,
+   "bg": "#ff3d81,#2a0f4d"
+  },
+  {
+   "id": 11,
+   "vibe_id": 3,
+   "type": "accessory",
+   "name": "Kupu-kupu",
+   "price": 0,
+   "e": "🦋"
+  },
+  {
+   "id": 12,
+   "vibe_id": 3,
+   "type": "accessory",
+   "name": "Bintang Glitter",
+   "price": 5000,
+   "e": "✨"
+  },
+  {
+   "id": 13,
+   "vibe_id": 4,
+   "type": "background",
+   "name": "Putih Polos",
+   "price": 0,
+   "bg": "#fafafa,#e5e0d8"
+  },
+  {
+   "id": 14,
+   "vibe_id": 4,
+   "type": "background",
+   "name": "Krem Hangat",
+   "price": 5000,
+   "bg": "#f1e3cf,#d8bf9a"
+  },
+  {
+   "id": 15,
+   "vibe_id": 4,
+   "type": "accessory",
+   "name": "Hati Kecil",
+   "price": 0,
+   "e": "🤍"
+  },
+  {
+   "id": 16,
+   "vibe_id": 4,
+   "type": "accessory",
+   "name": "Pot Tanaman",
+   "price": 5000,
+   "e": "🪴"
+  },
+  {
+   "id": 17,
+   "vibe_id": 5,
+   "type": "background",
+   "name": "Taman Hijau",
+   "price": 0,
+   "bg": "#9bdba0,#2e7d4f"
+  },
+  {
+   "id": 18,
+   "vibe_id": 5,
+   "type": "background",
+   "name": "Lengkung Bunga",
+   "price": 15000,
+   "bg": "#ffc2d6,#7fc98a"
+  },
+  {
+   "id": 19,
+   "vibe_id": 5,
+   "type": "accessory",
+   "name": "Mahkota Bunga",
+   "price": 5000,
+   "e": "🌸"
+  },
+  {
+   "id": 20,
+   "vibe_id": 5,
+   "type": "accessory",
+   "name": "Kupu Taman",
+   "price": 0,
+   "e": "🦋"
+  }
+ ],
+ "POSES": {
+  "1": [
+   "Tatap kamera, dagu sedikit naik",
+   "Bersandar ke samping dengan senyum tipis",
+   "Tangan di pipi, tatap ke atas",
+   "Pose tertawa spontan"
+  ],
+  "2": [
+   "Saling berhadapan lalu tertawa",
+   "Rangkul bahu, tatap kamera",
+   "Berdiri bergantian depan-belakang",
+   "Pose peace bersama"
+  ],
+  "3": [
+   "Formasi segitiga, tinggi di belakang",
+   "Semua melompat bersama",
+   "Berjajar sambil rangkul",
+   "Pose lucu bebas ala grup"
+  ]
+ }
+}
