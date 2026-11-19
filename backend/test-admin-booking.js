@@ -63,11 +63,50 @@ const { DatabaseSync } = require('node:sqlite');
   ok((await st()).status === 'UNAVAILABLE' && (await det(k6.id)).j.studio_session.id === z1.id, 'detail booking menampilkan sesi studio yang tertaut');
   await bd(k6.id, '?confirm=1'); const z1b = await st(); ok(z1b.status === 'AVAILABLE' && z1b.booking === null, 'booking tertaut dihapus -> sesi studio kembali AVAILABLE');
 
+  // --- ubah booking: paket (SR-15-04) ---
+  const be = (id, b, tok = AD, c = call) => c('PATCH', `/admin/bookings/${id}`, b, tok), qt = async (package_id, studio_id, code) => (await call('POST', '/quote', { package_id, studio_id, code }, A)).j;
+  const m1 = await book(call, A, 3, far + ' 9:00');
+  ok((await be(9999, { status: 'Dibatalkan' })).s === 404 && (await be(m1.id, { package_id: 2 }, A)).s === 403 && (await be(m1.id, {})).s === 400, 'ubah booking: tidak ada -> 404, customer -> 403, tanpa perubahan -> 400');
+  await wait(100); mails.length = 0; const e1 = await be(m1.id, { package_id: 3 }), q3 = await qt(3, 3), d1 = (await det(m1.id)).j;
+  ok(e1.s === 200 && e1.j.package_id === 3 && e1.j.amount === q3.total && d1.payment.amount === q3.total && d1.subtotal === q3.subtotal && d1.package_name === 'Premium' && e1.j.status === 'Menunggu Pembayaran', 'ubah paket booking belum dibayar: total dihitung ulang seperti quote dan pembayaran ikut diperbarui');
+  await wait(500); const um = mails.map(decode).filter(m => /diperbarui/.test(m.subject)); ok(um.length === 1 && um[0].to.includes('ana@x.id') && um[0].text.includes('Premium') && um[0].text.includes('Rp' + q3.total.toLocaleString('id-ID')), 'customer menerima email perubahan paket dengan total baru');
+  ok((await be(m1.id, { package_id: 999 })).s === 400, 'paket yang tidak ada ditolak');
+  sql('a', 'UPDATE package SET active=0 WHERE id=4'); ok((await be(m1.id, { package_id: 4 })).s === 400, 'paket nonaktif ditolak'); sql('a', 'UPDATE package SET active=1 WHERE id=4');
+  const m2 = await book(call, Bt, 3, far + ' 10:00'); await pay(call, Bt, m2.id); ok((await be(m2.id, { package_id: 2 })).s === 409, 'ubah paket booking yang sudah dibayar ditolak');
+  sql('a', `INSERT INTO promo(code,kind,value,active) VALUES('HEMAT10','percent',10,1)`);
+  const m3 = await book(call, A, 3, far + ' 11:00', 1, 'HEMAT10'), e3 = await be(m3.id, { package_id: 2 }), q2p = await qt(2, 3, 'HEMAT10'); ok(m3.promo_code === 'HEMAT10' && e3.s === 200 && e3.j.promo_code === 'HEMAT10' && e3.j.amount === q2p.total, 'kode promo yang masih berlaku dipertahankan saat paket diubah');
+  sql('a', `UPDATE promo SET active=0 WHERE code='HEMAT10'`); const e3b = await be(m3.id, { package_id: 3 }), q3n = await qt(3, 3);
+  ok(e3b.s === 200 && e3b.j.promo_code === null && e3b.j.promo_disc === 0 && e3b.j.amount === q3n.total, 'kode promo yang tidak berlaku lagi dilepas dan total dihitung tanpa promo');
+
+  // --- ubah booking: status (SR-15-05, SR-15-06) ---
+  ok((await be(m1.id, { status: 'Terbayar' })).s === 409 && (await be(m1.id, { status: 'Selesai' })).s === 409 && (await be(m1.id, { status: 'Sesi Berjalan' })).s === 409, 'status lunas pada booking belum dibayar ditolak');
+  ok((await be(m2.id, { status: 'Menunggu Pembayaran' })).s === 409 && (await be(m2.id, { status: 'Hangus' })).s === 400, 'kembali ke Menunggu Pembayaran ditolak; status tidak dikenal -> 400');
+  await wait(100); mails.length = 0; const c1 = await be(m1.id, { status: 'Dibatalkan' }), c1b = await mine(A, m1.id);
+  ok(c1.s === 200 && c1b.status === 'Dibatalkan' && c1b.cancel_reason === 'Dibatalkan admin' && c1b.pay_status === 'batal' && (await call('GET', `/availability?studio_id=3&date=${far}`)).j.free.includes(9), 'Menunggu Pembayaran -> Dibatalkan: dibatalkan tanpa refund, slot dibuka kembali');
+  await wait(500); ok(mails.map(decode).filter(m => /dibatalkan/.test(m.subject) && m.to.includes('ana@x.id')).length === 1 && !mails.map(decode).some(m => /diperbarui/.test(m.subject)), 'pembatalan oleh admin memakai email pembatalan');
+  ok((await be(m1.id, { status: 'Terbayar' })).s === 409 && (await be(m1.id, { package_id: 2 })).s === 409, 'booking Dibatalkan tidak dapat diubah lagi');
+  const z2 = (await call('POST', '/admin/studios/3/sessions', { date: far, start: '10:00', end: '10:50' }, AD)).j.created[0]; sql('a', 'UPDATE booking SET studio_session_id=? WHERE id=?', z2.id, m2.id);
+  const c2 = await be(m2.id, { status: 'Dibatalkan' }), c2b = await mine(Bt, m2.id), z2b = (await call('GET', `/admin/studios/3/sessions?date=${far}`, null, AD)).j.find(x => x.id === z2.id);
+  ok(c2.s === 200 && c2b.status === 'Dibatalkan' && c2b.pay_status === 'refunded' && c2.j.payment.status === 'refunded' && z2b.status === 'AVAILABLE', 'Terbayar -> Dibatalkan: refund 100% dan sesi studio dibuka kembali');
+  const m4 = await book(call, A, 3, far + ' 12:00'); await pay(call, A, m4.id); const s4 = await be(m4.id, { status: 'Sesi Berjalan' }), rs = (await call('GET', '/sessions', null, A)).j.find(x => x.booking_id === m4.id);
+  ok(s4.s === 200 && s4.j.status === 'Sesi Berjalan' && rs && rs.status === 'Aktif' && rs.left > 0, 'Terbayar -> Sesi Berjalan: sesi foto dimulai');
+  ok((await be(m4.id, { status: 'Terbayar' })).s === 409 && (await be(m4.id, { status: 'Dibatalkan' })).s === 409, 'Sesi Berjalan tidak dapat kembali ke Terbayar atau dibatalkan');
+  const f4 = await be(m4.id, { status: 'Selesai' }), rf = (await call('GET', '/sessions', null, A)).j.find(x => x.booking_id === m4.id); ok(f4.s === 200 && f4.j.status === 'Selesai' && rf.status === 'Selesai' && JSON.stringify(f4.j.allowed) === '[]', 'Sesi Berjalan -> Selesai: sesi foto diakhiri');
+  ok((await be(m4.id, { status: 'Sesi Berjalan' })).s === 409 && (await be(m4.id, { status: 'Terbayar' })).s === 409, 'Selesai tidak dapat diubah kembali');
+  const m5 = await book(call, Bt, 3, far + ' 13:00'); await pay(call, Bt, m5.id); await wait(400); mails.length = 0; const f5 = await be(m5.id, { status: 'Selesai' });
+  await wait(500); ok(f5.s === 200 && f5.j.status === 'Selesai' && mails.map(decode).some(m => /diperbarui/.test(m.subject) && m.to.includes('budi@x.id') && m.text.includes('Selesai')), 'Terbayar -> Selesai, customer menerima email perubahan status');
+  const m6 = await book(call, A, 3, far + ' 14:00'), b6 = await be(m6.id, { package_id: 2, status: 'Dibatalkan' }), b6b = await mine(A, m6.id); ok(b6.s === 200 && b6b.package_id === 2 && b6b.amount === (await qt(2, 3)).total && b6b.status === 'Dibatalkan', 'paket dan status dalam satu permintaan: paket dulu, lalu status');
+  const m7 = await book(call, A, 3, far + ' 15:00'), b7 = await be(m7.id, { package_id: 2, status: 'Selesai' }); ok(b7.s === 409 && (await mine(A, m7.id)).package_id === 1, 'permintaan dengan status tidak sah tidak mengubah paket');
+  const b8 = await be(m7.id, { package_id: 1, status: 'Menunggu Pembayaran' }); ok(b8.s === 200 && b8.j.notified === false, 'nilai yang sama dengan sekarang: tidak ada perubahan dan tidak ada email');
+
   // --- server kedua: REFUND_SIMULATE_FAIL=1 ---
   const C2 = await reg(call2, 'Cici', 'cici@x.id', '0833333333'), AD2 = await admin(call2), f1 = await book(call2, C2, 1, far + ' 9:00'); await pay(call2, C2, f1.id); await wait(400); mails.length = 0;
   const g1 = await bd(f1.id, '?confirm=1', call2, AD2), gb = await mine(C2, f1.id, call2); ok(g1.s === 200 && g1.j.ok === false && g1.j.kept === true && g1.j.refund === 'failed' && gb.status === 'Dibatalkan' && gb.pay_status === 'refund_failed' && gb.cancel_reason === 'Dihapus admin', 'refund gagal: booking dipertahankan sebagai Dibatalkan dengan refund gagal');
   await wait(500); ok(mails.map(decode).some(m => m.to.includes('cici@x.id') && /gagal/.test(m.text)), 'email ke customer menyebut refund gagal');
   const g2 = await bd(f1.id, '?confirm=1', call2, AD2); ok(g2.s === 409 && /Refund gagal/.test(g2.j.error) && (await det2(f1.id)).j.delete_block, 'booking dengan refund gagal tidak dapat dihapus sebelum ditindaklanjuti');
+
+  const f2 = await book(call2, C2, 2, far + ' 10:00'); await pay(call2, C2, f2.id); const g3 = await be(f2.id, { status: 'Dibatalkan' }, AD2, call2);
+  ok(g3.s === 200 && g3.j.status === 'Dibatalkan' && g3.j.payment.status === 'refund_failed' && g3.j.refund.state === 'failed', 'Terbayar -> Dibatalkan saat refund gagal: booking dibatalkan, refund ditandai gagal');
 
   console.log(`\n${n} tes lulus`); stop(); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);
 })().catch(e => { console.error('✘ GAGAL:', e.message); stop(); process.exit(1); });
