@@ -74,6 +74,7 @@ const { DatabaseSync } = require('node:sqlite');
   { const k8 = await book(call, Bt, 2, far + ' 15:00'); await pay(call, Bt, k8.id); await call('POST', `/bookings/${k8.id}/cancel`, { reason: 'Tidak ada waktu' }, Bt); sql('a', `UPDATE payment SET status='refund_failed',refunded_at=NULL WHERE booking_id=?`, k8.id);
     const h8 = await bd(k8.id, '?confirm=1'); ok(h8.s === 409 && /pendapatan/.test(h8.j.error), 'refund gagal karena pembatalan customer: tidak dapat dihapus, pesan menyebut dana tercatat sebagai pendapatan'); }
   { const z4 = (await call('POST', '/admin/studios/2/sessions', { date: far, start: '16:00', end: '16:50' }, AD)).j.created[0], k9 = await book(call, A, 2, far + ' 16:00'); await pay(call, A, k9.id); sql('a', 'UPDATE booking SET studio_session_id=? WHERE id=?', z4.id, k9.id); await call('POST', `/bookings/${k9.id}/start`, {}, A);
+    await call('GET', `/admin/studios/2/sessions?date=${far}`, null, AD); const u4 = sql('a', 'SELECT status FROM studio_session WHERE id=?', z4.id)[0].status; ok(u4 === 'UNAVAILABLE', 'sesi studio dengan booking yang sedang berlangsung tercatat UNAVAILABLE');
     sql('a', 'UPDATE session SET end_time=? WHERE booking_id=?', Date.now() - 1000, k9.id); const h9 = await bd(k9.id, '?confirm=1'), d9 = (await det(k9.id)).j;
     ok(h9.s === 409 && d9.status === 'Selesai' && JSON.stringify(d9.allowed) === '[]' && sql('a', 'SELECT status FROM studio_session WHERE id=?', z4.id)[0].status === 'AVAILABLE', 'sesi foto yang waktunya habis menjadi Selesai sebelum hapus/ubah, sesi studionya disinkronkan'); }
 
