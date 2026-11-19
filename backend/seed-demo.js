@@ -74,9 +74,9 @@ function seedData() {
   for (const [code, kind, value, max] of PROMOS) run(`INSERT INTO promo(code,kind,value,active,max_uses,expires_at) VALUES(?,?,?,1,?,?)
     ON CONFLICT(code) DO UPDATE SET kind=excluded.kind,value=excluded.value,active=1,max_uses=excluded.max_uses,expires_at=excluded.expires_at`, code, kind, value, max, now + 60 * D);
 
-  const studios = all('SELECT * FROM studio ORDER BY id'), pkgs = all('SELECT * FROM package WHERE COALESCE(active,1)=1 ORDER BY id');
+  const studios = all("SELECT * FROM studio WHERE COALESCE(status,'AVAILABLE')='AVAILABLE' AND deleted_at IS NULL ORDER BY id"), pkgs = all('SELECT * FROM package WHERE COALESCE(active,1)=1 ORDER BY id');
   const bgs = all("SELECT * FROM property WHERE type='background' AND COALESCE(qty,1)>0 ORDER BY id"), accs = all("SELECT * FROM property WHERE type='accessory' AND COALESCE(qty,1)>0 ORDER BY id");
-  if (!studios.length || !pkgs.length) throw new Error('Belum ada studio atau paket aktif');
+  if (!studios.length || !pkgs.length) throw new Error('Belum ada studio tersedia atau paket aktif');
   const pct = +(get("SELECT value FROM setting WHERE key='main_discount_pct'") || {}).value || 0, REFUND_H = +(process.env.REFUND_MIN_HOURS || 2);
   const taken = (sid, slot) => get("SELECT 1 FROM session WHERE studio_id=? AND slot=? AND status!='Dibatalkan'", sid, slot);
   const count = {}, skipped = [];

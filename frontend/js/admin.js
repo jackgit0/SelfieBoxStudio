@@ -18,6 +18,23 @@ async function aDo(fn, ok) { msg = err = ""; const sn = snap(); let failed = fal
 const snap = () => { const o = {}; document.querySelectorAll('.amain [id]').forEach(e => { if ('value' in e && e.type !== 'file') o[e.id] = e.value; }); return o; };
 const restore = o => Object.keys(o).forEach(id => { const e = document.getElementById(id); if (e && 'value' in e && e.type !== 'file') e.value = o[id]; });
 const val = id => ($("#" + id) || {}).value;
+// dialog konfirmasi (Figma "Konfirmasi Hapus …"): resolve true bila admin menekan tombol aksi; body berupa HTML yang sudah di-escape pemanggil
+function aModal(title, body, okLabel) {
+  return new Promise(res => { const d = document.createElement("div"), back = document.activeElement; d.className = "mdl";
+    d.innerHTML = `<div class="mbox" role="dialog" aria-modal="true" aria-labelledby="mdl-t"><h3 id="mdl-t">${esc(title)}</h3><p>${body}</p><div class="row"><button class="btn sm ghost" data-v="0">Kembali</button><button class="btn sm" data-v="1">${esc(okLabel)}</button></div></div>`;
+    const key = e => { if (e.key === "Escape") done(false); }, done = v => { d.remove(); document.removeEventListener("keydown", key); if (back && back.focus) back.focus(); res(v); };
+    d.onclick = e => { const b = e.target.closest("[data-v]"); if (b) done(b.dataset.v == "1"); else if (e.target === d) done(false); };
+    document.addEventListener("keydown", key); document.body.appendChild(d); d.querySelector('[data-v="0"]').focus(); });
+}
+// hapus dengan alur konfirmasi server: dialog memakai dampak yang sudah diketahui; bila server membalas 409 needs_confirm dengan dampak yang sama, ulangi dengan ?confirm=1,
+// bila dampaknya berubah (data lama), tampilkan dialog kedua dengan dampak terbaru. Mengembalikan hasil server, atau null bila dibatalkan.
+async function aConfirmDel(path, title, describe, okLabel, known) {
+  if (!await aModal(title, describe(known), okLabel)) return null;
+  try { return await API.del(path); } catch (e) {
+    if (e.status != 409 || !e.data || !e.data.needs_confirm) throw e; const im = e.data.impact;
+    if (JSON.stringify(im) !== JSON.stringify(known) && !await aModal(title, describe(im), okLabel)) return null;
+    return API.del(path + (path.includes("?") ? "&" : "?") + "confirm=1"); }
+}
 const wib = ms => ms ? new Date(ms).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) : "-";
 const match = (...f) => { const q = AD.q.trim().toLowerCase(); return !q || f.some(x => String(x ?? "").toLowerCase().includes(q)); };
 const loading = `<div class="card m">Memuat…</div>`;
@@ -86,7 +103,11 @@ V.astudio_after = () => aLoad("studios", () => API.get("/admin/studios"), []);
 const masterReload = async () => { const m = await API.get("/master"); STUDIOS = m.STUDIOS; ALLSTUDIOS = m.ALLSTUDIOS; };
 const studioSave = id => aDo(async () => { const k = "s" + (id || "N"), n = id || "N", b = { name: val(`st${n}n`), status: val(`st${n}s`), description: val(`st${n}d`), address: val(`st${n}a`), price: +val(`st${n}p`) || 0, people_range_id: +val(`st${n}r`), budget_range_id: +val(`st${n}b`) }; if (AD.imgs[k]) b.img = AD.imgs[k];
   if (id) await API.patch("/admin/studios/" + id, b); else await API.post("/admin/studios", b); delete AD.imgs[k]; AD.studios = null; await masterReload(); }, "Studio disimpan.");
-const studioDel = id => confirm("Hapus studio ini?") && aDo(async () => { await API.del("/admin/studios/" + id); AD.studios = null; await masterReload(); }, "Studio dihapus.");
+const studioImpactText = i => `Studio ini memiliki ${i.sessions} sesi dan ${i.active_bookings} booking aktif${i.paid_bookings ? ` (${i.paid_bookings} sudah dibayar, total refund ${rp(i.refund_total)})` : ""}. ${i.active_bookings ? "Setelah dikonfirmasi, seluruh booking aktif dibatalkan dan dana yang sudah dibayar dikembalikan 100% kepada pelanggan. " : ""}Studio beserta sesinya tidak lagi tampil, tetapi riwayat booking tetap tersimpan.`;
+const studioDel = id => { const s = (AD.studios || []).find(x => x.id == id); if (!s) return;
+  aDo(async () => { const r = await aConfirmDel("/admin/studios/" + id, `Hapus ${s.name}?`, studioImpactText, "Ya, Hapus Studio", s.impact); if (!r) return;
+    AD.studios = AD.books = AD.trx = AD.dash = AD.ops = null; delete AD.open[id]; await masterReload();
+    msg = `Studio "${s.name}" dihapus.` + (r.cancelled ? ` ${r.cancelled} booking dibatalkan${r.refunded ? `, ${r.refunded} di-refund` : ""}${r.refund_failed ? `, ${r.refund_failed} refund gagal (tindak lanjuti manual di menu Transaksi)` : ""}.` : ""); }); };
 
 // ---------- Booking ----------
 V.abook = () => {

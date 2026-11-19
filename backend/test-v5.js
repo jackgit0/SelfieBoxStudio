@@ -47,10 +47,39 @@ const stop = () => { srv.kill(); srv2.kill(); smtp.close(); };
   const L = (await call('GET', '/admin/studios', null, AD)).j, r2 = L.find(s => s.id === 2); ok(r2 && r2.status === 'AVAILABLE' && typeof r2.price === 'number' && r2.active_bookings === 1 && r2.sessions === 0, 'daftar studio admin: status, biaya, booking aktif, jumlah sesi');
   ok(L.some(s => s.id === U1 && s.status === 'UNAVAILABLE'), 'daftar studio admin memuat studio tidak tersedia');
 
+  // --- hapus studio: soft delete + batalkan & refund booking aktif + email (US-06) ---
+  const d1 = await book(call, A, 3, far + ' 13:00'), d2 = await book(call, Bt, 3, far + ' 14:00', 2); await pay(call, Bt, d2.id);
+  const del0 = await call('DELETE', '/admin/studios/3', null, AD), im = del0.j.impact || {}; ok(del0.s === 409 && del0.j.needs_confirm === true && im.active_bookings === 2 && im.paid_bookings === 1 && im.refund_total === d2.amount && im.sessions === 0, 'hapus studio berbooking aktif tanpa konfirmasi -> 409 + dampak (booking aktif, terbayar, total refund)');
+  ok((await call('GET', '/master')).j.STUDIOS.some(s => s.id === 3) && (await call('GET', '/admin/studios', null, AD)).j.find(s => s.id === 3).impact.refund_total === d2.amount, 'tanpa konfirmasi studio belum dihapus; dampak juga ada di daftar admin');
+  await wait(400); mails.length = 0; const del1 = await call('DELETE', '/admin/studios/3?confirm=1', null, AD); ok(del1.s === 200 && del1.j.cancelled === 2 && del1.j.refunded === 1 && del1.j.refund_failed === 0, 'dengan konfirmasi: 2 booking dibatalkan, 1 refund');
+  const ba = (await call('GET', '/bookings', null, A)).j.find(b => b.id === d1.id), bb = (await call('GET', '/bookings', null, Bt)).j.find(b => b.id === d2.id);
+  ok(ba.status === 'Dibatalkan' && ba.cancel_reason === 'Studio dihapus admin' && ba.studio === 3 && bb.status === 'Dibatalkan' && bb.pay_status === 'refunded', 'booking terdampak dibatalkan (alasan tercatat); yang terbayar di-refund 100%');
+  ms = (await call('GET', '/master')).j; ok(!ms.STUDIOS.some(s => s.id === 3) && ms.ALLSTUDIOS.some(s => s.id === 3 && s.deleted_at && s.status === 'UNAVAILABLE') && !(await call('GET', '/admin/studios', null, AD)).j.some(s => s.id === 3), 'studio terhapus hilang dari customer & daftar admin, tetap ada di ALLSTUDIOS untuk riwayat');
+  await wait(500); const dm = mails.map(decode), mb = dm.find(m => m.to.includes('budi@x.id'));
+  ok(dm.length === 2 && dm.some(m => m.to.includes('ana@x.id')) && mb && dm.every(m => /dibatalkan/.test(m.subject)), 'email pembatalan ke setiap customer terdampak');
+  ok(mb.text.includes('Studio Anggrek') && mb.text.includes('Rp' + d2.amount.toLocaleString('id-ID')), 'email memuat studio dan nominal refund');
+  ok((await call('PATCH', '/admin/studios/3', { name: 'X' }, AD)).s === 404 && (await call('DELETE', '/admin/studios/3', null, AD)).s === 404, 'studio terhapus: ubah/hapus -> 404');
+  ok((await call('POST', '/bookings', { package_id: 1, studio_id: 3, date: far + ' 15:00' }, A)).s === 400, 'studio terhapus tidak bisa dipesan');
+  ok((await call('POST', '/admin/studios', { ...nst, name: 'Studio Anggrek' }, AD)).s === 200, 'nama studio yang sudah dihapus boleh dipakai lagi');
+  // booking kedaluwarsa tidak ikut dihitung/dibatalkan sebagai "Studio dihapus admin"
+  const SD = (await call('GET', '/admin/studios', null, AD)).j.find(s => s.name === 'Studio Default').id, x1 = await book(call, A, SD, far + ' 9:00');
+  const { DatabaseSync } = require('node:sqlite'), D = new DatabaseSync(DB('a')); D.prepare('UPDATE payment SET expire_at=? WHERE booking_id=?').run(Date.now() - 1000, x1.id); D.close();
+  const dx = await call('DELETE', `/admin/studios/${SD}`, null, AD), bx = (await call('GET', '/bookings', null, A)).j.find(b => b.id === x1.id);
+  ok(dx.s === 200 && dx.j.cancelled === 0 && bx.status === 'Dibatalkan' && !bx.cancel_reason, 'studio tanpa booking aktif langsung dihapus; booking kedaluwarsa tidak dihitung sebagai dibatalkan admin');
+  // sesi berjalan memblokir penghapusan
+  const e1 = await book(call, A, 1, far + ' 15:00'); await pay(call, A, e1.id); await call('POST', `/bookings/${e1.id}/start`, {}, A);
+  const bl = await call('DELETE', '/admin/studios/1?confirm=1', null, AD); ok(bl.s === 409 && /sedang berlangsung/.test(bl.j.error) && (await call('GET', '/master')).j.STUDIOS.some(s => s.id === 1), 'studio dengan sesi berjalan tidak bisa dihapus');
+
   // --- server kedua: REFUND_SIMULATE_FAIL=1 membuat refund paksa (admin) gagal ---
   const C2 = await reg(call2, 'Cici', 'cici@x.id', '0833333333'), AD2 = await admin(call2);
   const f1 = await book(call2, C2, 1, far + ' 9:00'); await pay(call2, C2, f1.id);
   const fc = (await call2('POST', `/admin/bookings/${f1.id}/cancel`, {}, AD2)).j; ok(fc.refund && fc.refund.state === 'failed' && fc.booking.pay_status === 'refund_failed' && fc.booking.status === 'Dibatalkan', 'REFUND_SIMULATE_FAIL=1: pembatalan admin -> refund gagal, booking tetap dibatalkan');
+  const f2 = await book(call2, C2, 2, far + ' 10:00'); await pay(call2, C2, f2.id); await wait(400); mails.length = 0;
+  const fd = (await call2('DELETE', '/admin/studios/2?confirm=1', null, AD2)).j, fb = (await call2('GET', '/bookings', null, C2)).j.find(b => b.id === f2.id);
+  ok(fd.cancelled === 1 && fd.refund_failed === 1 && fd.refunded === 0 && fb.status === 'Dibatalkan' && fb.pay_status === 'refund_failed', 'hapus studio saat refund gagal: booking dibatalkan, pembayaran ditandai refund gagal');
+  await wait(500); ok(mails.map(decode).some(m => m.to.includes('cici@x.id') && /gagal/.test(m.text)), 'email ke customer menyebut refund gagal dan tindak lanjut admin');
+  ok((await call2('DELETE', '/admin/studios/3', null, AD2)).s === 200, 'studio lain tanpa booking aktif dihapus');
+  const last = await call2('DELETE', '/admin/studios/1', null, AD2); ok(last.s === 409 && /Minimal satu studio/.test(last.j.error), 'studio terakhir tidak bisa dihapus');
 
   console.log(`\n${n} tes lulus`); stop(); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);
 })().catch(e => { console.error('✘ GAGAL:', e.message); stop(); process.exit(1); });
