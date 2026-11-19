@@ -168,7 +168,7 @@ V.abook = () => {
 };
 function bookPanel(d) {
   const p = d.payment, ss = d.studio_session;
-  return `<aside class="card bdet" aria-label="Detail booking #${d.id}"><div class="row sp"><h3 class="h3">Detail Booking #${d.id}</h3><div class="row" style="gap:6px"><button class="ib" onclick="AD.bdet=null;render()" title="Tutup" aria-label="Tutup detail">✕</button></div></div>
+  return `<aside class="card bdet" aria-label="Detail booking #${d.id}"><div class="row sp"><h3 class="h3">Detail Booking #${d.id}</h3><div class="row" style="gap:6px">${d.delete_block ? "" : `<button class="ibtn del" onclick="bookDel(${d.id})" title="Hapus booking" aria-label="Hapus booking #${d.id}">${ic("trash", 18)}</button>`}<button class="ib" onclick="AD.bdet=null;render()" title="Tutup" aria-label="Tutup detail">✕</button></div></div>
 ${kvs([["Tanggal", d.slot.split(" ")[0]], ["Pelanggan", `${esc(d.customer.name)}<br><small class="m">${esc(d.customer.email)} · ${esc(d.customer.phone)}</small>`], ["Studio", esc(d.studio_name)], ["Sesi", slotHm(d.slot) + (ss ? `<br><small class="m">Sesi studio ${ss.date} ${ss.start} - ${ss.end}${ss.deleted ? " (dihapus)" : ""}</small>` : "")], ["Paket", esc(d.package_name)], ["Status", `<span class="tag ${btag(d.status)}">${d.status}</span>${d.cancel_reason ? `<br><small class="m">${esc(d.cancel_reason)}${d.cancel_detail ? ": " + esc(d.cancel_detail) : ""}</small>` : ""}`], ["Dipesan", fmtTime(d.created_at)]])}
 <h4 class="bh">Detail Pembayaran</h4>${kvs([["Invoice", esc(d.invoice)], ["Waktu", fmtTime(p.paid_at)], ["Status", PAYLBL[p.status] || esc(p.status)], ["Metode", esc(p.method || "-")], ...(p.refunded_at ? [["Refund", fmtTime(p.refunded_at)]] : []), ...(p.status == "pending" ? [["Batas bayar", fmtTime(p.expire_at)]] : []),
   ["Paket", rp(d.package_price)], ...(d.add_on ? [["Add-on", rp(d.add_on)]] : []), ["Biaya Studio", rp(d.studio_fee)], ...(d.main_disc ? [["Diskon utama", "-" + rp(d.main_disc), "disc"]] : []), ...(d.promo_disc ? [["Kode promo " + esc(d.promo_code), "-" + rp(d.promo_disc), "disc"]] : []), ["Total", rp(d.amount), "total"]])}
@@ -176,6 +176,13 @@ ${d.delete_block ? `<p class="sm m" style="margin-top:10px">${esc(d.delete_block
 }
 V.abook_after = () => aLoad("books", () => API.get("/admin/bookings?status=" + encodeURIComponent(AD.bstatus)), []);
 const openBook = id => aDo(async () => { AD.bdet = await API.get("/admin/bookings/" + id); if (innerWidth <= 1000) setTimeout(() => { const e = $(".bdet"); if (e) e.scrollIntoView({ behavior: "smooth", block: "start" }); }); });
+
+// hapus booking (US-16): dialog Figma "Konfirmasi Hapus Booking" berisi status dan dana yang dikembalikan
+const bookAfter = () => { AD.books = AD.dash = AD.ops = AD.trx = AD.studios = AD.cust = AD.cdet = null; AD.sess = {}; }; // sesi studio tertaut & ringkasan ikut berubah
+const bookDelText = d => i => `Booking ${esc(d.studio_name)} · ${d.slot.split(" ")[0]} · ${slotHm(d.slot)} atas nama ${esc(d.customer.name)}. Status booking: ${esc(i.status)} (${i.paid ? "sudah dibayar" : "belum dibayar"}). ${i.paid ? `Dana ${rp(i.refund_amount)} akan dikembalikan 100% lebih dulu, lalu booking dihapus dan sesinya dibuka kembali.` : i.status == "Dibatalkan" ? "Booking akan dihapus dari riwayat." : "Booking akan langsung dihapus dan sesinya dibuka kembali."}${["Menunggu Pembayaran", "Terbayar"].includes(i.status) ? " Pelanggan menerima email pemberitahuan." : ""} Tindakan ini tidak dapat dibatalkan.`;
+const bookDel = id => { const d = AD.bdet; if (!d || d.id != id) return;
+  aDo(async () => { const r = await aConfirmDel("/admin/bookings/" + id, "Hapus booking ini?", bookDelText(d), "Ya, Hapus Booking", d.impact); if (!r) return; bookAfter();
+    if (r.kept) { AD.bdet = await API.get("/admin/bookings/" + id).catch(() => null); err = r.message + "."; } else { AD.bdet = null; msg = r.refund == "refunded" ? `Booking dihapus. Dana ${rp(r.refund_amount)} dikembalikan 100%.` : "Booking dihapus."; } }); };
 
 // ---------- Properti ----------
 const CATS = ["Background", "Topi", "Rompi", "Kalung", "Kacamata", "Lainnya"];

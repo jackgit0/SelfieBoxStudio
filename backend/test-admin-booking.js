@@ -26,7 +26,7 @@ const { DatabaseSync } = require('node:sqlite');
   const sql = (k, q, ...a) => { const d = new DatabaseSync(DB(k)); try { return /^\s*SELECT/i.test(q) ? d.prepare(q).all(...a) : d.prepare(q).run(...a); } finally { d.close(); } }; // hanya untuk menyiapkan keadaan
   const A = await reg(call, 'Ana', 'ana@x.id', '0811111111'), Bt = await reg(call, 'Budi', 'budi@x.id', '0822222222'), AD = await admin(call);
   ok(A && Bt && AD, 'fixture: dua customer dan admin login');
-  const far = dayOf(5), det = id => call('GET', `/admin/bookings/${id}`, null, AD), lst = async (qs = '') => (await call('GET', '/admin/bookings' + qs, null, AD)).j;
+  const far = dayOf(5), det2 = id => call2('GET', `/admin/bookings/${id}`, null, AD2), det = id => call('GET', `/admin/bookings/${id}`, null, AD), lst = async (qs = '') => (await call('GET', '/admin/bookings' + qs, null, AD)).j;
 
   // --- filter status (SR-14-03) ---
   const k1 = await book(call, A, 1, far + ' 9:00'), k2 = await book(call, Bt, 2, far + ' 9:00', 2); await pay(call, Bt, k2.id); await wait(400);
@@ -40,6 +40,34 @@ const { DatabaseSync } = require('node:sqlite');
   ok(dt.payment.status === 'paid' && dt.payment.method === 'QRIS' && dt.payment.amount === k2.amount && dt.payment.paid_at > 0 && /^INV-\d{8}-\d{4}$/.test(dt.invoice), 'detail booking memuat status pembayaran dan nomor invoice');
   ok(dt.subtotal === k2.subtotal && dt.studio_fee === k2.studio_fee && dt.package_price + dt.add_on + dt.studio_fee === dt.subtotal && dt.amount === k2.amount, 'detail booking memuat rincian biaya');
   ok(JSON.stringify(dt.allowed) === JSON.stringify(['Sesi Berjalan', 'Selesai', 'Dibatalkan']) && JSON.stringify((await det(k1.id)).j.allowed) === JSON.stringify(['Dibatalkan']) && dt.impact.paid === true && dt.impact.refund_amount === k2.amount, 'detail booking memuat status tujuan yang diizinkan dan dampak hapus');
+
+  // --- hapus booking (US-16) ---
+  const bd = (id, qs = '', c = call, tok = AD) => c('DELETE', `/admin/bookings/${id}${qs}`, null, tok), mine = async (tok, id, c = call) => (await c('GET', '/bookings', null, tok)).j.find(b => b.id === id);
+  ok((await bd(9999)).s === 404 && (await bd(k1.id, '', call, A)).s === 403, 'hapus booking: tidak ada -> 404, customer -> 403');
+  const h0 = await bd(k1.id); ok(h0.s === 409 && h0.j.needs_confirm === true && h0.j.impact.status === 'Menunggu Pembayaran' && h0.j.impact.paid === false && h0.j.impact.refund_amount === 0 && await mine(A, k1.id), 'hapus booking tanpa konfirmasi -> 409 + status dan dana refund, booking belum dihapus');
+  mails.length = 0; const h1 = await bd(k1.id, '?confirm=1'), fr = (await call('GET', `/availability?studio_id=1&date=${far}`)).j.free;
+  ok(h1.s === 200 && h1.j.ok === true && h1.j.deleted === true && h1.j.refund === 'none' && !(await lst()).some(b => b.id === k1.id) && !(await mine(A, k1.id)) && fr.includes(9) && (await det(k1.id)).s === 404, 'booking belum dibayar dihapus: hilang dari daftar admin & customer, slot kembali tersedia');
+  await wait(500); const hm1 = mails.map(decode).filter(m => /dihapus/.test(m.subject)); ok(hm1.length === 1 && hm1[0].to.includes('ana@x.id') && hm1[0].text.includes(far + ' 9:00'), 'customer booking aktif yang dihapus menerima email');
+  await wait(100); mails.length = 0; const h2 = await bd(k2.id, '?confirm=1'); await wait(500);
+  ok(h2.s === 200 && h2.j.deleted === true && h2.j.refund === 'refunded' && h2.j.refund_amount === k2.amount && !(await mine(Bt, k2.id)) && !(await call('GET', '/admin/transactions', null, AD)).j.rows.some(r => r.booking_id === k2.id), 'booking terbayar: refund 100% lalu dihapus beserta pembayarannya');
+  const hm2 = mails.map(decode).filter(m => /dihapus/.test(m.subject)); ok(hm2.length === 1 && hm2[0].to.includes('budi@x.id') && hm2[0].text.includes('Rp' + k2.amount.toLocaleString('id-ID')), 'email hapus booking terbayar menyebut dana yang dikembalikan');
+  const k3 = await book(call, A, 1, far + ' 10:00'); await call('POST', `/bookings/${k3.id}/cancel`, { reason: 'Tidak ada waktu' }, A); await wait(100); mails.length = 0;
+  const h3a = await bd(k3.id); ok(h3a.s === 409 && h3a.j.needs_confirm && h3a.j.impact.status === 'Dibatalkan', 'hapus booking dibatalkan tetap meminta konfirmasi');
+  const h3 = await bd(k3.id, '?confirm=1'); await wait(400); ok(h3.s === 200 && h3.j.deleted === true && !(await mine(A, k3.id)) && !mails.map(decode).some(m => /dihapus/.test(m.subject)), 'booking dibatalkan dihapus tanpa email ke customer');
+  const k4 = await book(call, A, 1, far + ' 11:00'), k5 = await book(call, Bt, 1, far + ' 12:00'); await pay(call, A, k4.id); await pay(call, Bt, k5.id); await call('POST', `/bookings/${k4.id}/start`, {}, A); await call('POST', `/bookings/${k5.id}/start`, {}, Bt);
+  sql('a', `UPDATE session SET status='Selesai' WHERE booking_id=?`, k5.id); sql('a', `UPDATE booking SET status='Selesai' WHERE id=?`, k5.id);
+  const h4 = await bd(k4.id, '?confirm=1'), h5 = await bd(k5.id, '?confirm=1'); ok(h4.s === 409 && /berlangsung/.test(h4.j.error) && h5.s === 409 && (await mine(A, k4.id)).status === 'Sesi Berjalan' && (await det(k5.id)).j.delete_block, 'booking Sesi Berjalan dan Selesai tidak dapat dihapus');
+  // booking tertaut sesi studio: sesi kembali AVAILABLE setelah booking dihapus (SR-16-04)
+  const z1 = (await call('POST', '/admin/studios/2/sessions', { date: far, start: '13:00', end: '13:50' }, AD)).j.created[0], k6 = await book(call, A, 2, far + ' 13:00'); sql('a', 'UPDATE booking SET studio_session_id=? WHERE id=?', z1.id, k6.id);
+  const st = async () => (await call('GET', `/admin/studios/2/sessions?date=${far}`, null, AD)).j.find(x => x.id === z1.id);
+  ok((await st()).status === 'UNAVAILABLE' && (await det(k6.id)).j.studio_session.id === z1.id, 'detail booking menampilkan sesi studio yang tertaut');
+  await bd(k6.id, '?confirm=1'); const z1b = await st(); ok(z1b.status === 'AVAILABLE' && z1b.booking === null, 'booking tertaut dihapus -> sesi studio kembali AVAILABLE');
+
+  // --- server kedua: REFUND_SIMULATE_FAIL=1 ---
+  const C2 = await reg(call2, 'Cici', 'cici@x.id', '0833333333'), AD2 = await admin(call2), f1 = await book(call2, C2, 1, far + ' 9:00'); await pay(call2, C2, f1.id); await wait(400); mails.length = 0;
+  const g1 = await bd(f1.id, '?confirm=1', call2, AD2), gb = await mine(C2, f1.id, call2); ok(g1.s === 200 && g1.j.ok === false && g1.j.kept === true && g1.j.refund === 'failed' && gb.status === 'Dibatalkan' && gb.pay_status === 'refund_failed' && gb.cancel_reason === 'Dihapus admin', 'refund gagal: booking dipertahankan sebagai Dibatalkan dengan refund gagal');
+  await wait(500); ok(mails.map(decode).some(m => m.to.includes('cici@x.id') && /gagal/.test(m.text)), 'email ke customer menyebut refund gagal');
+  const g2 = await bd(f1.id, '?confirm=1', call2, AD2); ok(g2.s === 409 && /Refund gagal/.test(g2.j.error) && (await det2(f1.id)).j.delete_block, 'booking dengan refund gagal tidak dapat dihapus sebelum ditindaklanjuti');
 
   console.log(`\n${n} tes lulus`); stop(); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);
 })().catch(e => { console.error('✘ GAGAL:', e.message); stop(); process.exit(1); });
