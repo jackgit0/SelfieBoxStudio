@@ -1,6 +1,6 @@
 // ===== PANEL ADMIN: Dashboard, Pengguna, Studio, Booking, Properti, Pose, Transaksi, Paket & Diskon =====
-const AD = { loading: {}, imgs: {}, open: {}, q: "", opPeriod: "month", opEdit: null, cdet: null, bstatus: "" };
-function adminReset() { Object.keys(AD).forEach(k => { if (!["loading", "imgs", "open"].includes(k) && !["q", "opPeriod", "bstatus"].includes(k)) AD[k] = null; }); AD.q = ""; AD.opPeriod = "month"; AD.bstatus = ""; AD.imgs = {}; AD.open = {}; AD.loading = {}; }
+const AD = { loading: {}, imgs: {}, open: {}, q: "", opPeriod: "month", opEdit: null, cdet: null, bstatus: "", scal: {}, sday: {}, sess: {}, sedit: null, sadd: null };
+function adminReset() { Object.keys(AD).forEach(k => { if (!["loading", "imgs", "open"].includes(k) && !["q", "opPeriod", "bstatus"].includes(k)) AD[k] = null; }); AD.q = ""; AD.opPeriod = "month"; AD.bstatus = ""; AD.imgs = {}; AD.open = {}; AD.loading = {}; AD.scal = {}; AD.sday = {}; AD.sess = {}; }
 const AMENU = [["adash", "Dashboard", "dash"], ["acust", "Pengguna", "users"], ["astudio", "Studio", "studio"], ["abook", "Booking", "calendar"], ["aprop", "Properti", "glasses"], ["apose", "Pose", "run"], ["atrx", "Transaksi", "card"], ["apkg", "Paket & Diskon", "tag"], ["aacct", "Akun Admin", "settings"]];
 const ATITLE = { adash: "Administrasi Pendapatan", acust: "Daftar Pengguna", astudio: () => "Daftar Studio" + (AD.studios ? ` (${AD.studios.length})` : ""), abook: "Daftar Booking", aprop: "Daftar Properti", apose: "Daftar Pose", atrx: "Transaksi", apkg: "Paket & Diskon", aacct: "Akun Admin" };
 const SEARCHABLE = ["acust", "astudio", "abook", "aprop", "apose", "atrx"];
@@ -26,15 +26,16 @@ function aModal(title, body, okLabel) {
     d.onclick = e => { const b = e.target.closest("[data-v]"); if (b) done(b.dataset.v == "1"); else if (e.target === d) done(false); };
     document.addEventListener("keydown", key); document.body.appendChild(d); d.querySelector('[data-v="0"]').focus(); });
 }
-// hapus dengan alur konfirmasi server: dialog memakai dampak yang sudah diketahui; bila server membalas 409 needs_confirm dengan dampak yang sama, ulangi dengan ?confirm=1,
-// bila dampaknya berubah (data lama), tampilkan dialog kedua dengan dampak terbaru. Mengembalikan hasil server, atau null bila dibatalkan.
-async function aConfirmDel(path, title, describe, okLabel, known) {
-  if (!await aModal(title, describe(known), okLabel)) return null;
-  try { return await API.del(path); } catch (e) {
+// aksi dengan alur konfirmasi server (DELETE/PATCH): dialog memakai dampak yang sudah diketahui (ask=false: langsung kirim tanpa dialog awal); bila server membalas 409 needs_confirm
+// dengan dampak yang sama dan dialog sudah disetujui, ulangi dengan ?confirm=1, selain itu tampilkan dialog dengan dampak terbaru. Mengembalikan hasil server, atau null bila dibatalkan.
+async function aConfirmReq(method, path, body, title, describe, okLabel, known, ask = true) {
+  if (ask && !await aModal(title, describe(known), okLabel)) return null;
+  try { return await API.req(method, path, body); } catch (e) {
     if (e.status != 409 || !e.data || !e.data.needs_confirm) throw e; const im = e.data.impact;
-    if (JSON.stringify(im) !== JSON.stringify(known) && !await aModal(title, describe(im), okLabel)) return null;
-    return API.del(path + (path.includes("?") ? "&" : "?") + "confirm=1"); }
+    if ((!ask || JSON.stringify(im) !== JSON.stringify(known)) && !await aModal(title, describe(im), okLabel)) return null;
+    return API.req(method, path + (path.includes("?") ? "&" : "?") + "confirm=1", body); }
 }
+const aConfirmDel = (path, title, describe, okLabel, known) => aConfirmReq("DELETE", path, undefined, title, describe, okLabel, known);
 const wib = ms => ms ? new Date(ms).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) : "-";
 const match = (...f) => { const q = AD.q.trim().toLowerCase(); return !q || f.some(x => String(x ?? "").toLowerCase().includes(q)); };
 const loading = `<div class="card m">Memuat…</div>`;
@@ -90,7 +91,7 @@ function studioForm(s) {
   return `<div class="body one"><div class="spanel"><h4>Detail Studio</h4><div class="sgrid"><div><label>Nama</label><input id="st${id}n" value="${esc(s.name || "")}"><label>Status</label>${sel("st" + id + "s", [["AVAILABLE", "Tersedia"], ["UNAVAILABLE", "Tidak tersedia"]], s.status || "AVAILABLE")}<label>Deskripsi</label><textarea id="st${id}d">${esc(s.description || "")}</textarea><label>Alamat / Lokasi</label><input id="st${id}a" value="${esc(s.address || "Jl. Veteran No. 3")}">
 <div class="row" style="flex-wrap:nowrap"><div class="grow"><label>Biaya sewa studio (Rp)</label><input id="st${id}p" type="number" min="0" value="${s.price || 0}"></div><div class="grow"><label>Kapasitas</label>${sel("st" + id + "r", PEOPLE.map(p => [p.id, p.range + " orang"]), s.people_range_id || 1)}</div><div class="grow"><label>Rentang budget</label>${sel("st" + id + "b", BUDGET.map(p => [p.id, p.budget]), s.budget_range_id || 1)}</div></div></div>
 <div><label>Gambar</label><div class="thumb" style="${bgi(img)}">${img ? "" : "Belum ada gambar"}</div><div class="row" style="margin-top:10px"><label class="btn sm soft" style="margin:0">${ic("upload", 16)} Unggah gambar<input type="file" accept="image/*" hidden onchange="upImg('${k}',this)"></label></div>
-<div class="row" style="margin-top:18px"><button class="btn" onclick="studioSave(${s.id || 0})">${s.id ? "Simpan" : "Tambah studio"}</button></div>${s.id ? `<p class="sm m" style="margin-top:8px">${s.active_bookings} booking aktif dari ${s.bookings} booking (tanpa yang batal) · status Tidak tersedia menyembunyikan studio dari customer tanpa mengubah booking yang sudah ada</p>` : ""}</div></div></div></div>`;
+<div class="row" style="margin-top:18px"><button class="btn" onclick="studioSave(${s.id || 0})">${s.id ? "Simpan" : "Tambah studio"}</button></div>${s.id ? `<p class="sm m" style="margin-top:8px">${s.active_bookings} booking aktif dari ${s.bookings} booking (tanpa yang batal) · status Tidak tersedia menyembunyikan studio dari customer tanpa mengubah booking yang sudah ada</p>` : ""}</div></div></div>${s.id ? sessPanel(s) : ""}</div>`;
 }
 V.astudio = () => {
   const L = AD.studios; if (!L) return loading;
@@ -99,7 +100,7 @@ V.astudio = () => {
 <button class="ibtn del" onclick="studioDel(${s.id})" title="Hapus studio" aria-label="Hapus ${esc(s.name)}">${ic("trash", 18)}</button><button class="ibtn" onclick="${tog(s.id)}" aria-label="Buka/tutup detail" aria-expanded="${!!AD.open[s.id]}">${ic(AD.open[s.id] ? "up" : "down", 20)}</button></div>${AD.open[s.id] ? studioForm(s) : ""}</div>`).join("")
     + `<div class="acc"><button onclick="AD.open.N=!AD.open.N;render()"><span>${ic("plus", 18)} Tambah studio</span>${ic(AD.open.N ? "up" : "down", 20)}</button>${AD.open.N ? studioForm({}) : ""}</div>`;
 };
-V.astudio_after = () => aLoad("studios", () => API.get("/admin/studios"), []);
+V.astudio_after = () => { aLoad("studios", () => API.get("/admin/studios"), []); (AD.studios || []).forEach(s => { if (AD.open[s.id]) sessLoad(s.id); }); };
 const masterReload = async () => { const m = await API.get("/master"); STUDIOS = m.STUDIOS; ALLSTUDIOS = m.ALLSTUDIOS || m.STUDIOS; };
 const studioSave = id => aDo(async () => { const k = "s" + (id || "N"), n = id || "N", b = { name: val(`st${n}n`), status: val(`st${n}s`), description: val(`st${n}d`), address: val(`st${n}a`), price: +val(`st${n}p`) || 0, people_range_id: +val(`st${n}r`), budget_range_id: +val(`st${n}b`) }; if (AD.imgs[k]) b.img = AD.imgs[k];
   if (id) await API.patch("/admin/studios/" + id, b); else await API.post("/admin/studios", b); delete AD.imgs[k]; AD.studios = null; await masterReload(); }, "Studio disimpan.");
@@ -108,6 +109,52 @@ const studioDel = id => { const s = (AD.studios || []).find(x => x.id == id); if
   aDo(async () => { const r = await aConfirmDel("/admin/studios/" + id, `Hapus ${s.name}?`, studioImpactText, "Ya, Hapus Studio", s.impact); if (!r) return;
     AD.studios = AD.books = AD.trx = AD.dash = AD.ops = null; delete AD.open[id]; await masterReload();
     msg = `Studio "${s.name}" dihapus.` + (r.cancelled ? ` ${r.cancelled} booking dibatalkan${r.refunded ? `, ${r.refunded} di-refund` : ""}${r.refund_failed ? `, ${r.refund_failed} refund gagal (tindak lanjuti manual di menu Transaksi)` : ""}.` : ""); }); };
+
+// ---------- Sesi studio (panel "Detail Sesi" di accordion studio, Figma): kalender bulan + chip jam per hari ----------
+const sMonth = sid => AD.scal[sid] || todayS().slice(0, 7), sDayOf = sid => AD.sday[sid] || todayS(), sKey = sid => sid + "|" + sMonth(sid);
+async function sessLoad(sid) { const k = sKey(sid); if (AD.sess[k] || AD.loading["s" + k]) return; AD.loading["s" + k] = 1;
+  try { AD.sess[k] = await API.get(`/admin/studios/${sid}/sessions?month=${sMonth(sid)}`); } catch (e) { if (e.status == 401 || e.status == 403) { AD.loading["s" + k] = 0; return logout(); } err = e.message; AD.sess[k] = []; }
+  AD.loading["s" + k] = 0; render(); }
+const sNav = (sid, dir) => { let [y, m] = sMonth(sid).split("-").map(Number); m += dir; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } AD.scal[sid] = `${y}-${pad(m)}`; AD.sedit = AD.sadd = null; render(); };
+const sDay = (sid, ds) => { AD.sday[sid] = ds; AD.sedit = AD.sadd = null; render(); };
+function sessCal(sid, L) {
+  const [y, m] = sMonth(sid).split("-").map(Number), first = (new Date(y, m - 1, 1).getDay() + 6) % 7, dim = new Date(y, m, 0).getDate(), has = new Set(L.map(x => x.date)), day = sDayOf(sid), today = todayS(); let cells = "<i></i>".repeat(first);
+  for (let d = 1; d <= dim; d++) { const ds = `${y}-${pad(m)}-${pad(d)}`, n = L.filter(x => x.date == ds).length; cells += `<button class="cd ${ds == day ? "on" : ""} ${n ? "dot" : ""} ${ds == today ? "now" : ""}" onclick="sDay(${sid},'${ds}')" aria-label="${ds}${n ? `, ${n} sesi` : ""}" aria-pressed="${ds == day}">${d}</button>`; }
+  return `<div class="cal"><div class="calh"><button class="ib" aria-label="Bulan sebelumnya" onclick="sNav(${sid},-1)">${ic("left", 16)}</button><b>${new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" })}</b><button class="ib" aria-label="Bulan berikutnya" onclick="sNav(${sid},1)">${ic("right", 16)}</button></div>
+<div class="calg">${["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"].map(x => `<small>${x}</small>`).join("")}${cells}</div></div>`;
+}
+const sChip = x => `<button class="schip ${x.status == "UNAVAILABLE" ? "full" : ""} ${x.past ? "past" : ""} ${AD.sedit == x.id ? "on" : ""}" onclick="AD.sedit=${AD.sedit == x.id ? "null" : x.id};AD.sadd=null;render()" aria-expanded="${AD.sedit == x.id}">${x.start} - ${x.end}<small>${x.past ? "lewat" : x.status == "UNAVAILABLE" ? "Terisi" : "Tersedia"}${x.booking ? ` · #${x.booking.id} ${esc(x.booking.customer)}` : ""}</small></button>`;
+function sessEdit(sid, x) {
+  const b = x.booking, id = `se${x.id}`;
+  return `<div class="sform"><div class="row sp"><b>Sesi ${x.date} · ${x.start} - ${x.end}</b><button class="ibtn del" onclick="sDel(${sid},${x.id})" title="Hapus sesi" aria-label="Hapus sesi ${x.start}">${ic("trash", 18)}</button></div>
+<p class="sm m">${b ? `Booking #${b.id} · ${esc(b.customer)} · ${esc(b.status)}` : "Belum ada booking pada sesi ini."}</p>
+${x.past ? `<p class="sm m">Sesi sudah lewat sehingga tidak dapat diubah.</p>` : `<div class="srow"><div><label for="${id}d">Tanggal</label><input id="${id}d" type="date" value="${x.date}"></div><div><label for="${id}s">Mulai</label><input id="${id}s" type="time" value="${x.start}"></div><div><label for="${id}e">Selesai</label><input id="${id}e" type="time" value="${x.end}"></div></div>
+<div class="row" style="margin-top:12px"><button class="btn sm" onclick="sSave(${sid},${x.id})">Simpan</button><button class="btn sm ghost" onclick="AD.sedit=null;render()">Tutup</button></div>`}</div>`;
+}
+function sessAdd(sid) { const id = `sa${sid}`;
+  return `<div class="sform"><b>Tambah sesi</b><div class="srow"><div><label for="${id}d">Tanggal</label><input id="${id}d" type="date" min="${todayS()}" value="${sDayOf(sid) < todayS() ? todayS() : sDayOf(sid)}"></div><div><label for="${id}s">Mulai</label><input id="${id}s" type="time" value="09:00"></div><div><label for="${id}e">Selesai</label><input id="${id}e" type="time" value="09:50"></div><div><label for="${id}r">Berulang (hari)</label><input id="${id}r" type="number" min="1" max="30" value="1"></div></div>
+<p class="sm m" style="margin-top:6px">Berulang 1 = hanya tanggal ini; lebih dari 1 = jam yang sama pada hari-hari berikutnya (tanggal yang bertabrakan dilewati).</p><div class="row" style="margin-top:12px"><button class="btn sm" onclick="sAdd(${sid})">Tambah</button><button class="btn sm ghost" onclick="AD.sadd=null;render()">Batal</button></div></div>`; }
+function sessPanel(s) {
+  const L = AD.sess[sKey(s.id)]; if (!L) return `<div class="spanel"><h4>Detail Sesi</h4><p class="m">Memuat…</p></div>`;
+  const day = sDayOf(s.id), D = L.filter(x => x.date == day), ed = D.find(x => x.id == AD.sedit);
+  return `<div class="spanel"><h4>Detail Sesi</h4><div class="ssgrid"><div>${sessCal(s.id, L)}</div><div><p class="sm m" style="margin-bottom:10px">${fmtDate(day)} · ${D.length} sesi</p>
+<div class="schips">${D.map(sChip).join("")}<button class="schip add" onclick="AD.sadd=${AD.sadd == s.id ? "null" : s.id};AD.sedit=null;render()" aria-expanded="${AD.sadd == s.id}">${ic("plus", 16)} TAMBAH</button></div>
+${D.length ? "" : `<p class="sm m" style="margin-top:10px">Belum ada sesi pada tanggal ini.</p>`}${ed ? sessEdit(s.id, ed) : ""}${AD.sadd == s.id ? sessAdd(s.id) : ""}</div></div></div>`;
+}
+// setelah perubahan: cache sesi studio dibuang, daftar studio (jumlah sesi, dampak hapus) dimuat ulang tanpa layar "Memuat"
+const sRefresh = async sid => { Object.keys(AD.sess).forEach(k => { if (k.startsWith(sid + "|")) delete AD.sess[k]; }); AD.books = AD.trx = AD.dash = AD.ops = null; AD.studios = await API.get("/admin/studios"); };
+const sFind = (sid, id) => (AD.sess[sKey(sid)] || []).find(x => x.id == id);
+const sWho = i => i.customers && i.customers.length ? ` (${i.customers.map(esc).join(", ")})` : "";
+const sAdd = sid => aDo(async () => { const id = `sa${sid}`, date = val(id + "d"), r = await API.post(`/admin/studios/${sid}/sessions`, { date, start: val(id + "s"), end: val(id + "e"), repeat: +val(id + "r") || 1 });
+  AD.sadd = null; AD.sday[sid] = date; AD.scal[sid] = date.slice(0, 7); await sRefresh(sid);
+  msg = r.created.length > 1 ? `${r.created.length} sesi berhasil ditambahkan.` : "Sesi berhasil ditambahkan."; if (r.skipped.length) msg += ` ${r.skipped.length} tanggal dilewati karena bertabrakan: ${r.skipped.join(", ")}.`; });
+const sSave = (sid, sesId) => { const x = sFind(sid, sesId); if (!x) return; const id = `se${sesId}`, body = { date: val(id + "d"), start: val(id + "s"), end: val(id + "e") };
+  aDo(async () => { const r = await aConfirmReq("PATCH", "/admin/sessions/" + sesId, body, `Ubah sesi ${x.start} - ${x.end}?`, i => `Sesi ini memiliki ${i.active_bookings} booking aktif${sWho(i)}. Setelah dikonfirmasi, jadwal sesi diubah dan pelanggan menerima email berisi jadwal baru.`, "Ya, Ubah Sesi", x.impact, false); if (!r) return; // tanpa dialog awal: server memvalidasi jam dulu, dialog muncul hanya bila server meminta konfirmasi
+    AD.sedit = null; AD.sday[sid] = r.date; AD.scal[sid] = r.date.slice(0, 7); await sRefresh(sid); msg = "Sesi berhasil diperbarui." + (x.impact.active_bookings ? " Pelanggan terdampak sudah diberi tahu lewat email." : ""); }); };
+const sessImpactText = i => i.active_bookings ? `Sesi ini memiliki ${i.active_bookings} booking aktif${sWho(i)}${i.paid_bookings ? `, ${i.paid_bookings} sudah dibayar (total refund ${rp(i.refund_total)})` : ""}. Setelah dikonfirmasi, booking tersebut dibatalkan, dana yang sudah dibayar dikembalikan 100%, dan pelanggan diberi tahu lewat email.` : "Sesi ini belum memiliki booking aktif dan akan dihapus dari daftar sesi.";
+const sDel = (sid, sesId) => { const x = sFind(sid, sesId); if (!x) return;
+  aDo(async () => { const r = await aConfirmDel("/admin/sessions/" + sesId, `Hapus sesi ${x.date} ${x.start} - ${x.end}?`, sessImpactText, "Ya, Hapus Sesi", x.impact); if (!r) return;
+    AD.sedit = null; await sRefresh(sid); msg = "Sesi dihapus." + (r.cancelled ? ` ${r.cancelled} booking dibatalkan${r.refunded ? `, ${r.refunded} di-refund` : ""}${r.refund_failed ? `, ${r.refund_failed} refund gagal (tindak lanjuti manual di menu Transaksi)` : ""}.` : ""); }); };
 
 // ---------- Booking ----------
 V.abook = () => {
