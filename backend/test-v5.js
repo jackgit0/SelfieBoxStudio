@@ -31,8 +31,12 @@ const stop = () => { srv.kill(); srv2.kill(); smtp.close(); };
   const s1 = await call('POST', '/admin/studios', { ...nst, name: 'Studio Uji', status: 'UNAVAILABLE' }, AD); ok(s1.s === 200 && s1.j.id, 'admin menambah studio berstatus UNAVAILABLE'); const U1 = s1.j.id;
   ok((await call('POST', '/admin/studios', { ...nst, name: 'Studio Rusak', status: 'RUSAK' }, AD)).s === 400, 'status studio tidak valid ditolak');
   const dup = await call('POST', '/admin/studios', { ...nst, name: '  studio MAWAR ' }, AD); ok(dup.s === 409 && /sudah dipakai/.test(dup.j.error), 'nama studio ganda (beda huruf besar/spasi) ditolak saat tambah');
-  ok((await call('PATCH', '/admin/studios/2', { name: 'Studio Mawar' }, AD)).s === 409, 'nama studio ganda ditolak saat ubah');
+  ok((await call('PATCH', '/admin/studios/2', { name: ' studio mawar' }, AD)).s === 409, 'nama studio ganda (beda huruf besar/spasi) ditolak saat ubah');
   ok((await call('PATCH', '/admin/studios/1', { name: 'Studio Mawar' }, AD)).s === 200, 'mengubah studio dengan namanya sendiri diterima');
+  ok((await call('PATCH', `/admin/studios/${U1}`, { status: '' }, AD)).s === 400, 'status kosong saat ubah ditolak');
+  ok((await call('PATCH', `/admin/studios/${U1}`, { status: null, description: 'ubah deskripsi' }, AD)).s === 200 && (await call('GET', '/admin/studios', null, AD)).j.find(s => s.id === U1).status === 'UNAVAILABLE', 'ubah tanpa status mempertahankan status lama');
+  { const { DatabaseSync } = require('node:sqlite'), D = new DatabaseSync(DB('a')), ins = D.prepare("INSERT INTO studio(name,description,people_range_id,budget_range_id,status) VALUES('Studio Kembar','x',1,1,'AVAILABLE')"); ins.run(); const k2 = +ins.run().lastInsertRowid; D.close();
+    ok((await call('PATCH', `/admin/studios/${k2}`, { status: 'UNAVAILABLE' }, AD)).s === 200, 'data lama dengan nama kembar: ubah status saja tetap bisa'); }
   ok((await call('POST', '/admin/studios', { ...nst, name: 'Studio Default' }, AD)).s === 200 && (await call('GET', '/master')).j.STUDIOS.some(s => s.name === 'Studio Default' && s.status === 'AVAILABLE'), 'status bawaan studio baru AVAILABLE');
   // --- studio tidak tersedia disembunyikan dari customer (SR-05-05, SR-04-04) ---
   let ms = (await call('GET', '/master')).j; ok(!ms.STUDIOS.some(s => s.id === U1) && ms.ALLSTUDIOS.some(s => s.id === U1 && s.status === 'UNAVAILABLE'), 'studio tidak tersedia: tidak ada di STUDIOS, ada di ALLSTUDIOS');
@@ -42,9 +46,9 @@ const stop = () => { srv.kill(); srv2.kill(); smtp.close(); };
   const eb = await book(call, A, 2, far + ' 10:00'); ok((await call('PATCH', '/admin/studios/2', { status: 'UNAVAILABLE' }, AD)).s === 200, 'admin menonaktifkan studio yang sudah punya booking');
   const mine = (await call('GET', '/bookings', null, A)).j.find(b => b.id === eb.id); ok(mine && mine.status === 'Menunggu Pembayaran' && mine.studio === 2 && mine.date === far + ' 10:00', 'booking lama di studio tidak tersedia tetap utuh');
   ok((await call('PATCH', `/bookings/${eb.id}`, { studio_id: 2, date: far + ' 11:00' }, A)).s === 400, 'reschedule ke studio tidak tersedia ditolak');
-  ok((await call('PATCH', '/admin/studios/2', { status: 'AVAILABLE' }, AD)).s === 200 && (await call('GET', '/master')).j.STUDIOS.some(s => s.id === 2) && (await call('GET', `/availability?studio_id=2&date=${far}`)).s === 200, 'studio kembali tersedia dan bisa dipesan');
+  ok((await call('PATCH', '/admin/studios/2', { status: 'AVAILABLE' }, AD)).s === 200 && (await call('GET', '/master')).j.STUDIOS.some(s => s.id === 2) && (await call('GET', `/availability?studio_id=2&date=${far}`)).s === 200 && (await call('POST', '/bookings', { package_id: 1, studio_id: 2, date: far + ' 11:00' }, Bt)).s === 200, 'studio kembali tersedia dan bisa dipesan');
   // --- daftar studio admin (SR-03-02) ---
-  const L = (await call('GET', '/admin/studios', null, AD)).j, r2 = L.find(s => s.id === 2); ok(r2 && r2.status === 'AVAILABLE' && typeof r2.price === 'number' && r2.active_bookings === 1 && r2.sessions === 0, 'daftar studio admin: status, biaya, booking aktif, jumlah sesi');
+  const L = (await call('GET', '/admin/studios', null, AD)).j, r2 = L.find(s => s.id === 2); ok(r2 && r2.status === 'AVAILABLE' && typeof r2.price === 'number' && r2.active_bookings === 2 && r2.bookings === 2 && r2.sessions === 0, 'daftar studio admin: status, biaya, booking aktif, jumlah sesi');
   ok(L.some(s => s.id === U1 && s.status === 'UNAVAILABLE'), 'daftar studio admin memuat studio tidak tersedia');
 
   // --- hapus studio: soft delete + batalkan & refund booking aktif + email (US-06) ---
@@ -55,11 +59,11 @@ const stop = () => { srv.kill(); srv2.kill(); smtp.close(); };
   const ba = (await call('GET', '/bookings', null, A)).j.find(b => b.id === d1.id), bb = (await call('GET', '/bookings', null, Bt)).j.find(b => b.id === d2.id);
   ok(ba.status === 'Dibatalkan' && ba.cancel_reason === 'Studio dihapus admin' && ba.studio === 3 && bb.status === 'Dibatalkan' && bb.pay_status === 'refunded', 'booking terdampak dibatalkan (alasan tercatat); yang terbayar di-refund 100%');
   ms = (await call('GET', '/master')).j; ok(!ms.STUDIOS.some(s => s.id === 3) && ms.ALLSTUDIOS.some(s => s.id === 3 && s.deleted_at && s.status === 'UNAVAILABLE') && !(await call('GET', '/admin/studios', null, AD)).j.some(s => s.id === 3), 'studio terhapus hilang dari customer & daftar admin, tetap ada di ALLSTUDIOS untuk riwayat');
-  await wait(500); const dm = mails.map(decode), mb = dm.find(m => m.to.includes('budi@x.id'));
+  await wait(500); const dm = mails.map(decode).filter(m => /dibatalkan/.test(m.subject)), mb = dm.find(m => m.to.includes('budi@x.id'));
   ok(dm.length === 2 && dm.some(m => m.to.includes('ana@x.id')) && mb && dm.every(m => /dibatalkan/.test(m.subject)), 'email pembatalan ke setiap customer terdampak');
-  ok(mb.text.includes('Studio Anggrek') && mb.text.includes('Rp' + d2.amount.toLocaleString('id-ID')), 'email memuat studio dan nominal refund');
+  ok(mb.text.includes('Studio Anggrek') && mb.text.includes(far + ' 14:00') && mb.text.includes('Rp' + d2.amount.toLocaleString('id-ID')), 'email memuat studio, jadwal, dan nominal refund');
   ok((await call('PATCH', '/admin/studios/3', { name: 'X' }, AD)).s === 404 && (await call('DELETE', '/admin/studios/3', null, AD)).s === 404, 'studio terhapus: ubah/hapus -> 404');
-  ok((await call('POST', '/bookings', { package_id: 1, studio_id: 3, date: far + ' 15:00' }, A)).s === 400, 'studio terhapus tidak bisa dipesan');
+  ok((await call('POST', '/bookings', { package_id: 1, studio_id: 3, date: far + ' 15:00' }, A)).s === 400 && (await call('GET', `/availability?studio_id=3&date=${far}`)).s === 400 && (await call('POST', '/quote', { package_id: 1, studio_id: 3 }, A)).s === 400, 'studio terhapus tidak bisa dipesan (booking, availability, quote)');
   ok((await call('POST', '/admin/studios', { ...nst, name: 'Studio Anggrek' }, AD)).s === 200, 'nama studio yang sudah dihapus boleh dipakai lagi');
   // booking kedaluwarsa tidak ikut dihitung/dibatalkan sebagai "Studio dihapus admin"
   const SD = (await call('GET', '/admin/studios', null, AD)).j.find(s => s.name === 'Studio Default').id, x1 = await book(call, A, SD, far + ' 9:00');
@@ -69,6 +73,8 @@ const stop = () => { srv.kill(); srv2.kill(); smtp.close(); };
   // sesi berjalan memblokir penghapusan
   const e1 = await book(call, A, 1, far + ' 15:00'); await pay(call, A, e1.id); await call('POST', `/bookings/${e1.id}/start`, {}, A);
   const bl = await call('DELETE', '/admin/studios/1?confirm=1', null, AD); ok(bl.s === 409 && /sedang berlangsung/.test(bl.j.error) && (await call('GET', '/master')).j.STUDIOS.some(s => s.id === 1), 'studio dengan sesi berjalan tidak bisa dihapus');
+  { const { DatabaseSync } = require('node:sqlite'), D = new DatabaseSync(DB('a')); D.prepare('UPDATE session SET end_time=? WHERE booking_id=?').run(Date.now() - 1000, e1.id); D.close(); } // waktu sesi habis tanpa customer membuka halaman sesi
+  const tl = await call('DELETE', '/admin/studios/1', null, AD); ok(tl.s === 200 && (await call('GET', '/bookings', null, A)).j.find(b => b.id === e1.id).status === 'Selesai', 'sesi yang waktunya sudah habis tidak lagi memblokir penghapusan (booking jadi Selesai)');
 
   // --- server kedua: REFUND_SIMULATE_FAIL=1 membuat refund paksa (admin) gagal ---
   const C2 = await reg(call2, 'Cici', 'cici@x.id', '0833333333'), AD2 = await admin(call2);
@@ -77,7 +83,7 @@ const stop = () => { srv.kill(); srv2.kill(); smtp.close(); };
   const f2 = await book(call2, C2, 2, far + ' 10:00'); await pay(call2, C2, f2.id); await wait(400); mails.length = 0;
   const fd = (await call2('DELETE', '/admin/studios/2?confirm=1', null, AD2)).j, fb = (await call2('GET', '/bookings', null, C2)).j.find(b => b.id === f2.id);
   ok(fd.cancelled === 1 && fd.refund_failed === 1 && fd.refunded === 0 && fb.status === 'Dibatalkan' && fb.pay_status === 'refund_failed', 'hapus studio saat refund gagal: booking dibatalkan, pembayaran ditandai refund gagal');
-  await wait(500); ok(mails.map(decode).some(m => m.to.includes('cici@x.id') && /gagal/.test(m.text)), 'email ke customer menyebut refund gagal dan tindak lanjut admin');
+  await wait(500); ok(mails.map(decode).some(m => m.to.includes('cici@x.id') && /dibatalkan/.test(m.subject) && /gagal/.test(m.text)), 'email ke customer menyebut refund gagal dan tindak lanjut admin');
   ok((await call2('DELETE', '/admin/studios/3', null, AD2)).s === 200, 'studio lain tanpa booking aktif dihapus');
   const last = await call2('DELETE', '/admin/studios/1', null, AD2); ok(last.s === 409 && /Minimal satu studio/.test(last.j.error), 'studio terakhir tidak bisa dihapus');
 
