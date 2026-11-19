@@ -105,6 +105,18 @@ function seedData() {
   run(`UPDATE promo SET used_count=(SELECT COUNT(*) FROM booking b JOIN payment p ON p.booking_id=b.id WHERE b.promo_code=promo.code AND p.status IN ('paid','refunded','refund_failed'))
     WHERE code IN (${PROMOS.map(() => '?').join(',')})`, ...PROMOS.map(p => p[0]));
 
+  // sesi studio contoh (dibuat admin): 09.00-17.50 (50 menit) untuk 7 hari ke depan di setiap studio yang belum dihapus.
+  // Jam yang sudah lewat atau bertabrakan dengan sesi yang ada dilewati, jadi aman dijalankan berulang.
+  let added = 0, linked = 0;
+  for (const st of all('SELECT id FROM studio WHERE deleted_at IS NULL ORDER BY id')) for (let o = 0; o < 7; o++) for (let h = 9; h <= 17; h++) {
+    const a = slotMs(`${day(o)} ${h}:00`), z = a + 50 * M; if (a <= now || get('SELECT 1 FROM studio_session WHERE studio_id=? AND deleted_at IS NULL AND start_time<? AND end_time>?', st.id, z, a)) continue;
+    run(`INSERT INTO studio_session(studio_id,start_time,end_time,status) VALUES(?,?,?,'AVAILABLE')`, st.id, a, z); added++; }
+  // booking demo aktif yang jam & studionya sama dengan sebuah sesi ditautkan ke sesi itu (paling banyak satu booking aktif per sesi)
+  for (const b of all(`SELECT b.id,x.studio_id,x.slot FROM booking b JOIN session x ON x.booking_id=b.id WHERE b.user_id IN ${inn} AND b.status IN ('Menunggu Pembayaran','Terbayar') ORDER BY b.id`, ...ids)) {
+    const ss = get('SELECT id FROM studio_session WHERE studio_id=? AND start_time=? AND deleted_at IS NULL', b.studio_id, slotMs(b.slot));
+    if (!ss || get(`SELECT 1 FROM booking WHERE studio_session_id=? AND status IN ('Menunggu Pembayaran','Terbayar') AND id!=?`, ss.id, b.id)) continue; run('UPDATE booking SET studio_session_id=? WHERE id=?', ss.id, b.id); linked++; }
+  run(`UPDATE studio_session SET status=CASE WHEN EXISTS(SELECT 1 FROM booking b WHERE b.studio_session_id=studio_session.id AND b.status IN ('Menunggu Pembayaran','Terbayar')) THEN 'UNAVAILABLE' ELSE 'AVAILABLE' END WHERE deleted_at IS NULL`); // sama dengan syncSessStatus di server.js
+
   if (owners[0]) { // preferensi customer demo (kuis rekomendasi paket)
     run('DELETE FROM schedule_preference WHERE user_id=?', owners[0]); run('INSERT INTO schedule_preference(user_id,people,budget) VALUES(?,?,?)', owners[0], 1, 150000);
     run('INSERT INTO setup_preference(user_id,vibe) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET vibe=excluded.vibe', owners[0], 2);
@@ -115,6 +127,7 @@ function seedData() {
 
   console.log(`Data demo: ${EXTRA.length} customer contoh${wantCust ? ` (password sama dengan ${cust.email})` : ' (tidak bisa login: DEMO_CUSTOMER_* kosong)'}, promo ${PROMOS.map(p => p[0]).join(', ')}, 3 item keuangan.`);
   console.log(`Booking : ${old} lama dihapus, dibuat ${Object.entries(count).map(([s, n]) => `${n} ${s}`).join(', ')}.`);
+  console.log(`Sesi    : ${added} ditambahkan, ${linked} booking ditautkan.`);
   if (count['Menunggu Pembayaran']) console.log('          Booking "Menunggu Pembayaran" otomatis batal 15 menit lagi (aturan pembayaran); jalankan ulang sebelum demo.');
   if (skipped.length) console.warn(`          Dilewati (semua jam sudah terisi): ${skipped.join('; ')}`);
 }

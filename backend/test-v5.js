@@ -150,5 +150,14 @@ const stop = () => { srv.kill(); srv2.kill(); smtp.close(); };
     ok(zr.cancelled === 1 && zr.refund_failed === 1 && zz.status === 'Dibatalkan' && zz.pay_status === 'refund_failed', 'hapus sesi saat refund gagal: pembayaran ditandai refund gagal'); }
   const last = await call2('DELETE', '/admin/studios/1', null, AD2); ok(last.s === 409 && /Minimal satu studio/.test(last.j.error), 'studio terakhir tidak bisa dihapus');
 
+  // --- seeder demo: sesi contoh idempoten + booking demo ditautkan ke sesinya ---
+  { const env = path.join(TMP, 'demo.env'), sdb = DB('seed'); fs.writeFileSync(env, 'DEMO_ADMIN_USER=demoadmin\nDEMO_ADMIN_PASS=Demo12345\nDEMO_CUSTOMER_NAME=Demo\nDEMO_CUSTOMER_EMAIL=demo@x.id\nDEMO_CUSTOMER_PHONE=0899999999\nDEMO_CUSTOMER_PASS=demo123\n');
+    const seed = () => execFileSync('node', ['--disable-warning=ExperimentalWarning', 'seed-demo.js', env], { cwd: __dirname, env: { ...process.env, DB_FILE: sdb, DEMO_DATA: '1' } }).toString(), num = o => (/Sesi\s*: (\d+) ditambahkan, (\d+) booking ditautkan/.exec(o) || []).slice(1).map(Number);
+    const [add1, link1] = num(seed()), [add2, link2] = num(seed()), d = new DatabaseSync(sdb);
+    const dup = d.prepare('SELECT COUNT(*) n FROM (SELECT studio_id,start_time FROM studio_session WHERE deleted_at IS NULL GROUP BY 1,2 HAVING COUNT(*)>1)').get().n, una = d.prepare(`SELECT COUNT(*) n FROM studio_session WHERE status='UNAVAILABLE'`).get().n;
+    const lk = d.prepare(`SELECT COUNT(*) n FROM booking b JOIN session x ON x.booking_id=b.id JOIN studio_session s ON s.id=b.studio_session_id WHERE b.status IN ('Menunggu Pembayaran','Terbayar') AND s.studio_id=x.studio_id`).get().n; d.close();
+    ok(add1 > 0 && add2 === 0 && dup === 0, 'seeder demo: sesi contoh dibuat sekali, dijalankan ulang tidak menduplikasi');
+    ok(link1 > 0 && link2 === link1 && lk === link2 && una === link2, 'seeder demo: booking aktif ditautkan ke sesi yang cocok dan sesinya UNAVAILABLE'); }
+
   console.log(`\n${n} tes lulus`); stop(); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);
 })().catch(e => { console.error('✘ GAGAL:', e.message); stop(); process.exit(1); });
