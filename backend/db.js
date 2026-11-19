@@ -46,6 +46,9 @@ addCol('studio', 'img', 'TEXT'); addCol('studio', 'address', "TEXT DEFAULT 'Jl. 
 addCol('property', 'category', 'TEXT'); addCol('property', 'qty', 'INTEGER DEFAULT 1'); addCol('property', 'img', 'TEXT');
 addCol('booking', 'studio_fee', 'INTEGER DEFAULT 0'); addCol('booking', 'cancel_reason', 'TEXT'); addCol('booking', 'cancel_detail', 'TEXT'); addCol('booking', 'cancelled_at', 'INTEGER');
 addCol('payment', 'refunded_at', 'INTEGER');
+// ---- migrasi fitur admin: status studio (AVAILABLE/UNAVAILABLE) & soft delete ----
+addCol('studio', 'status', "TEXT DEFAULT 'AVAILABLE'"); addCol('studio', 'deleted_at', 'INTEGER');
+db.prepare(`UPDATE studio SET status='AVAILABLE' WHERE status IS NULL OR status=''`).run();
 const flag = k => db.prepare('SELECT 1 FROM setting WHERE key=?').get(k), setFlag = k => db.prepare('INSERT OR IGNORE INTO setting(key,value) VALUES(?,?)').run(k, '1');
 db.prepare(`UPDATE studio SET img='/img/studio-'||(CASE WHEN id%2=1 THEN 1 ELSE 2 END)||'.jpg' WHERE img IS NULL OR img=''`).run();
 db.prepare(`UPDATE studio SET address='Jl. Veteran No. 3' WHERE address IS NULL`).run();

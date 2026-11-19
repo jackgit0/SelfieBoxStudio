@@ -2,11 +2,11 @@
 const AD = { loading: {}, imgs: {}, open: {}, q: "", opPeriod: "month", opEdit: null, cdet: null, bstatus: "" };
 function adminReset() { Object.keys(AD).forEach(k => { if (!["loading", "imgs", "open"].includes(k) && !["q", "opPeriod", "bstatus"].includes(k)) AD[k] = null; }); AD.q = ""; AD.opPeriod = "month"; AD.bstatus = ""; AD.imgs = {}; AD.open = {}; AD.loading = {}; }
 const AMENU = [["adash", "Dashboard", "dash"], ["acust", "Pengguna", "users"], ["astudio", "Studio", "studio"], ["abook", "Booking", "calendar"], ["aprop", "Properti", "glasses"], ["apose", "Pose", "run"], ["atrx", "Transaksi", "card"], ["apkg", "Paket & Diskon", "tag"], ["aacct", "Akun Admin", "settings"]];
-const ATITLE = { adash: "Administrasi Pendapatan", acust: "Daftar Pengguna", astudio: "Daftar Studio", abook: "Daftar Booking", aprop: "Daftar Properti", apose: "Daftar Pose", atrx: "Transaksi", apkg: "Paket & Diskon", aacct: "Akun Admin" };
+const ATITLE = { adash: "Administrasi Pendapatan", acust: "Daftar Pengguna", astudio: () => "Daftar Studio" + (AD.studios ? ` (${AD.studios.length})` : ""), abook: "Daftar Booking", aprop: "Daftar Properti", apose: "Daftar Pose", atrx: "Transaksi", apkg: "Paket & Diskon", aacct: "Akun Admin" };
 const SEARCHABLE = ["acust", "astudio", "abook", "aprop", "apose", "atrx"];
 function adminShell(inner) {
   return `<div class="adm"><aside class="side"><h3>Admin</h3>${AMENU.map(m => `<button class="${S.view == m[0] ? "on" : ""}" onclick="go('${m[0]}')">${ic(m[2], 20)} ${m[1]}</button>`).join("")}<div class="foot"><div class="sm m" style="margin:0 6px 8px">${esc(BRAND)}</div><button onclick="logout()">${ic("logout", 20)} Keluar</button></div></aside>
-<main class="amain">${AD.me && AD.me.must_change ? `<div class="toast err">⚠ Anda masih memakai password bawaan. Ganti password sekarang — fitur admin lain terkunci sampai password diganti.</div>` : ""}<div class="ahead"><h1>${ATITLE[S.view] || ""}</h1>${SEARCHABLE.includes(S.view) ? `<div class="search">${ic("search", 18)}<input placeholder="Search..." value="${esc(AD.q)}" onchange="AD.q=this.value;render()"></div>` : ""}</div>${toasts()}${inner}</main></div>`;
+<main class="amain">${AD.me && AD.me.must_change ? `<div class="toast err">⚠ Anda masih memakai password bawaan. Ganti password sekarang — fitur admin lain terkunci sampai password diganti.</div>` : ""}<div class="ahead"><h1>${(typeof ATITLE[S.view] == "function" ? ATITLE[S.view]() : ATITLE[S.view]) || ""}</h1>${SEARCHABLE.includes(S.view) ? `<div class="search">${ic("search", 18)}<input placeholder="Search..." value="${esc(AD.q)}" onchange="AD.q=this.value;render()"></div>` : ""}</div>${toasts()}${inner}</main></div>`;
 }
 async function aLoad(k, fn, def) {
   if (AD[k] || AD.loading[k]) return; AD.loading[k] = 1;
@@ -70,20 +70,23 @@ const delCust = (id, name) => confirm(`Hapus akun "${name}" beserta SELURUH book
 // ---------- Studio (accordion) ----------
 function studioForm(s) {
   const k = "s" + (s.id || "N"), img = AD.imgs[k] || s.img || "", id = s.id || "N";
-  return `<div class="body"><div><label>Nama</label><input id="st${id}n" value="${esc(s.name || "")}"><label>Deskripsi</label><textarea id="st${id}d">${esc(s.description || "")}</textarea><label>Alamat / Lokasi</label><input id="st${id}a" value="${esc(s.address || "Jl. Veteran No. 3")}">
+  return `<div class="body one"><div class="spanel"><h4>Detail Studio</h4><div class="sgrid"><div><label>Nama</label><input id="st${id}n" value="${esc(s.name || "")}"><label>Status</label>${sel("st" + id + "s", [["AVAILABLE", "Tersedia"], ["UNAVAILABLE", "Tidak tersedia"]], s.status || "AVAILABLE")}<label>Deskripsi</label><textarea id="st${id}d">${esc(s.description || "")}</textarea><label>Alamat / Lokasi</label><input id="st${id}a" value="${esc(s.address || "Jl. Veteran No. 3")}">
 <div class="row" style="flex-wrap:nowrap"><div class="grow"><label>Biaya sewa studio (Rp)</label><input id="st${id}p" type="number" min="0" value="${s.price || 0}"></div><div class="grow"><label>Kapasitas</label>${sel("st" + id + "r", PEOPLE.map(p => [p.id, p.range + " orang"]), s.people_range_id || 1)}</div><div class="grow"><label>Rentang budget</label>${sel("st" + id + "b", BUDGET.map(p => [p.id, p.budget]), s.budget_range_id || 1)}</div></div></div>
 <div><label>Gambar</label><div class="thumb" style="${bgi(img)}">${img ? "" : "Belum ada gambar"}</div><div class="row" style="margin-top:10px"><label class="btn sm soft" style="margin:0">${ic("upload", 16)} Unggah gambar<input type="file" accept="image/*" hidden onchange="upImg('${k}',this)"></label></div>
-<div class="row" style="margin-top:18px"><button class="btn" onclick="studioSave(${s.id || 0})">${s.id ? "Simpan" : "Tambah studio"}</button>${s.id ? `<button class="btn ghost" onclick="studioDel(${s.id})">Hapus</button>` : ""}</div>${s.id ? `<p class="sm m" style="margin-top:8px">${s.bookings} booking aktif/riwayat</p>` : ""}</div></div>`;
+<div class="row" style="margin-top:18px"><button class="btn" onclick="studioSave(${s.id || 0})">${s.id ? "Simpan" : "Tambah studio"}</button></div>${s.id ? `<p class="sm m" style="margin-top:8px">${s.active_bookings} booking aktif · status Tidak tersedia menyembunyikan studio dari customer tanpa mengubah booking yang sudah ada</p>` : ""}</div></div></div></div>`;
 }
 V.astudio = () => {
   const L = AD.studios; if (!L) return loading;
-  return L.filter(s => match(s.name, s.description, s.address)).map(s => `<div class="acc"><button onclick="AD.open[${s.id}]=!AD.open[${s.id}];render()"><span>${esc(s.name)} <small class="m">· ${esc(s.address || "")}</small></span>${ic(AD.open[s.id] ? "up" : "down", 20)}</button>${AD.open[s.id] ? studioForm(s) : ""}</div>`).join("")
+  const tog = id => `AD.open[${id}]=!AD.open[${id}];render()`, on = s => s.status != "UNAVAILABLE";
+  return L.filter(s => match(s.name, s.description, s.address)).map(s => `<div class="acc"><div class="acc-h"><button class="acc-t" onclick="${tog(s.id)}" aria-expanded="${!!AD.open[s.id]}"><span>${esc(s.name)}</span><span class="tag ${on(s) ? "ok" : "off"}">${on(s) ? "Tersedia" : "Tidak tersedia"}</span><span class="meta">${rp(s.price || 0)} · ${s.sessions} sesi</span></button>
+<button class="ibtn del" onclick="studioDel(${s.id})" title="Hapus studio" aria-label="Hapus ${esc(s.name)}">${ic("trash", 18)}</button><button class="ibtn" onclick="${tog(s.id)}" aria-label="Buka/tutup detail">${ic(AD.open[s.id] ? "up" : "down", 20)}</button></div>${AD.open[s.id] ? studioForm(s) : ""}</div>`).join("")
     + `<div class="acc"><button onclick="AD.open.N=!AD.open.N;render()"><span>${ic("plus", 18)} Tambah studio</span>${ic(AD.open.N ? "up" : "down", 20)}</button>${AD.open.N ? studioForm({}) : ""}</div>`;
 };
 V.astudio_after = () => aLoad("studios", () => API.get("/admin/studios"), []);
-const studioSave = id => aDo(async () => { const k = "s" + (id || "N"), n = id || "N", b = { name: val(`st${n}n`), description: val(`st${n}d`), address: val(`st${n}a`), price: +val(`st${n}p`) || 0, people_range_id: +val(`st${n}r`), budget_range_id: +val(`st${n}b`) }; if (AD.imgs[k]) b.img = AD.imgs[k];
-  if (id) await API.patch("/admin/studios/" + id, b); else await API.post("/admin/studios", b); delete AD.imgs[k]; AD.studios = null; STUDIOS = (await API.get("/master")).STUDIOS; }, "Studio disimpan.");
-const studioDel = id => confirm("Hapus studio ini?") && aDo(async () => { await API.del("/admin/studios/" + id); AD.studios = null; STUDIOS = (await API.get("/master")).STUDIOS; }, "Studio dihapus.");
+const masterReload = async () => { const m = await API.get("/master"); STUDIOS = m.STUDIOS; ALLSTUDIOS = m.ALLSTUDIOS; };
+const studioSave = id => aDo(async () => { const k = "s" + (id || "N"), n = id || "N", b = { name: val(`st${n}n`), status: val(`st${n}s`), description: val(`st${n}d`), address: val(`st${n}a`), price: +val(`st${n}p`) || 0, people_range_id: +val(`st${n}r`), budget_range_id: +val(`st${n}b`) }; if (AD.imgs[k]) b.img = AD.imgs[k];
+  if (id) await API.patch("/admin/studios/" + id, b); else await API.post("/admin/studios", b); delete AD.imgs[k]; AD.studios = null; await masterReload(); }, "Studio disimpan.");
+const studioDel = id => confirm("Hapus studio ini?") && aDo(async () => { await API.del("/admin/studios/" + id); AD.studios = null; await masterReload(); }, "Studio dihapus.");
 
 // ---------- Booking ----------
 V.abook = () => {
