@@ -273,7 +273,8 @@ const wibMs = (d, t) => Date.parse(`${d}T${t}:00Z`) - TZ * 60000, hm = t => new 
 const sessBookings = id => q(`SELECT b.* FROM booking b WHERE b.studio_session_id=? AND ${ACTIVE} ORDER BY b.id`, id);
 const syncSessStatus = id => { const st = one(`SELECT 1 FROM booking b WHERE b.studio_session_id=? AND (${ACTIVE} OR b.status='Sesi Berjalan')`, id) ? 'UNAVAILABLE' : 'AVAILABLE'; run('UPDATE studio_session SET status=? WHERE id=? AND status!=?', st, id, st); }; // UNAVAILABLE selama terisi booking aktif atau yang sedang berlangsung
 const isDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d + 'T00:00:00Z')) && new Date(Date.parse(d + 'T00:00:00Z')).toISOString().slice(0, 10) === d; // tolak tanggal yang tidak ada (mis. 30 Februari)
-const runningSess = id => { q(`SELECT x.* FROM session x JOIN booking b ON b.id=x.booking_id WHERE b.studio_session_id=? AND x.status='Aktif'`, id).forEach(left); // sesi foto yang waktunya habis -> Selesai
+const timeoutSess = id => q(`SELECT x.* FROM session x JOIN booking b ON b.id=x.booking_id WHERE b.studio_session_id=? AND x.status='Aktif'`, id).forEach(left); // sesi foto yang waktunya habis -> Selesai
+const runningSess = id => { timeoutSess(id);
   if (one(`SELECT 1 FROM booking WHERE studio_session_id=? AND status='Sesi Berjalan'`, id)) bad('Masih ada sesi yang sedang berlangsung', 409); };
 const sessImpact = id => { const act = sessBookings(id), paid = act.filter(b => b.status === 'Terbayar'), cs = act.map(b => one('SELECT name FROM user WHERE id=?', b.user_id).name);
   return { act, impact: { active_bookings: act.length, paid_bookings: paid.length, refund_total: paid.reduce((a, b) => a + b.amount, 0), customers: [...new Set(cs)] } }; };
@@ -288,7 +289,7 @@ route('GET', '/api/admin/studios/:id/sessions', 2, ({ params, query }) => { expi
   if (query.date) { if (!isDate(query.date)) bad('Tanggal tidak valid'); from = wibMs(query.date, '00:00'); to = from + 864e5; }
   else if (query.month) { const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(query.month); if (!m) bad('Bulan tidak valid'); from = Date.UTC(+m[1], +m[2] - 1, 1) - TZ * 60000; to = Date.UTC(+m[1], +m[2], 1) - TZ * 60000; }
   const rows = q('SELECT * FROM studio_session WHERE studio_id=? AND deleted_at IS NULL AND start_time>=? AND start_time<? ORDER BY start_time,id', st.id, from, to);
-  rows.forEach(r => syncSessStatus(r.id)); return rows.map(r => sessOutAdmin(one('SELECT * FROM studio_session WHERE id=?', r.id))); }); // termasuk sesi terisi & yang sudah lewat (SR-08-02)
+  rows.forEach(r => { timeoutSess(r.id); syncSessStatus(r.id); }); return rows.map(r => sessOutAdmin(one('SELECT * FROM studio_session WHERE id=?', r.id))); }); // termasuk sesi terisi & yang sudah lewat (SR-08-02)
 // tambah sesi; repeat 1-30 = tanggal berturut-turut dengan jam sama (tombol "Berulang"), hari yang bertabrakan dilewati
 route('POST', '/api/admin/studios/:id/sessions', 2, ({ params, body }) => { const st = liveStudio(params.id), v = sessBody(body), n = body.repeat === undefined || body.repeat === null || body.repeat === '' ? 1 : +body.repeat;
   if (!Number.isInteger(n) || n < 1 || n > 30) bad('Jumlah hari berulang harus 1-30');

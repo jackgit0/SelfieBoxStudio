@@ -121,7 +121,6 @@ const stop = () => { srv.kill(); srv2.kill(); smtp.close(); };
   ok((await sd(s6.id)).s === 200 && (await call('GET', '/bookings', null, A)).j.find(b => b.id === r6.id).status === 'Selesai', 'sesi foto yang waktunya habis tidak lagi memblokir penghapusan sesi');
   const d3 = await sd(e3.id); ok(d3.s === 200 && d3.j.cancelled === 0, 'sesi tanpa booking langsung dihapus tanpa konfirmasi');
   ok((await sd(pastId)).s === 200 && !(await ls(S2)).some(x => x.id === pastId), 'sesi yang sudah lewat boleh dihapus');
-  let n4;
   // perbaikan audit: status kembali AVAILABLE, booking berjalan, tanggal tidak valid, batas hari/bulan WIB, jumlah email
   { const s8 = (await sp(S2, { date: day2, start: '20:00', end: '20:30' })).j.created[0], b8 = await book(call, Bt, 2, day2 + ' 20:00'); sql('a', 'UPDATE booking SET studio_session_id=? WHERE id=?', s8.id, b8.id);
     ok((await ls(S2, '?date=' + day2)).find(x => x.id === s8.id).status === 'UNAVAILABLE', 'sesi tertaut booking belum dibayar: UNAVAILABLE');
@@ -129,13 +128,15 @@ const stop = () => { srv.kill(); srv2.kill(); smtp.close(); };
     const s9 = (await sp(S2, { date: day2, start: '21:00', end: '21:30' })).j.created[0], b9 = await book(call, A, 2, day1 + ' 20:00'); await pay(call, A, b9.id); sql('a', 'UPDATE booking SET studio_session_id=? WHERE id=?', s9.id, b9.id); await call('POST', `/bookings/${b9.id}/start`, {}, A);
     const g9 = (await ls(S2, '?date=' + day2)).find(x => x.id === s9.id), p9 = await sx(s9.id, { start: '21:30', end: '22:00' }, '?confirm=1');
     ok(g9.status === 'UNAVAILABLE' && g9.booking.status === 'Sesi Berjalan' && p9.s === 409 && /sedang berlangsung/.test(p9.j.error), 'sesi dengan booking yang sedang berlangsung: UNAVAILABLE dan tidak bisa diubah');
+    sql('a', 'UPDATE session SET end_time=? WHERE booking_id=?', Date.now() - 1000, b9.id); const t9 = (await ls(S2, '?date=' + day2)).find(x => x.id === s9.id);
+    ok(t9.status === 'AVAILABLE' && t9.booking.status === 'Selesai' && (await sx(s9.id, { start: '21:30', end: '22:00' })).s === 200, 'sesi foto yang waktunya habis: ringkasan langsung AVAILABLE dan sesi bisa diubah lagi');
     ok((await call('GET', `/admin/studios/${S2}/sessions?date=2030-02-30`, null, AD)).s === 400, 'filter tanggal yang tidak ada ditolak');
     const fm = new Date(); fm.setDate(1); fm.setMonth(fm.getMonth() + 2); const M2 = `${fm.getFullYear()}-${pad(fm.getMonth() + 1)}`, first = M2 + '-01', pv = new Date(fm.getFullYear(), fm.getMonth(), 0), last = `${pv.getFullYear()}-${pad(pv.getMonth() + 1)}-${pad(pv.getDate())}`;
     const n1 = (await sp(S2, { date: first, start: '00:30', end: '01:00' })).j.created[0], n2 = (await sp(S2, { date: last, start: '23:30', end: '23:59' })).j.created[0];
     const lmA = await ls(S2, '?month=' + M2), lmB = await ls(S2, '?month=' + last.slice(0, 7)), ldA = await ls(S2, '?date=' + first), ldB = await ls(S2, '?date=' + last);
     ok(lmA.some(x => x.id === n1.id) && !lmA.some(x => x.id === n2.id) && lmB.some(x => x.id === n2.id) && !lmB.some(x => x.id === n1.id) && ldA.map(x => x.id).join() === String(n1.id) && ldB.map(x => x.id).join() === String(n2.id), 'batas hari dan bulan mengikuti WIB (00:30 dan 23:30)');
     const n3 = (await sp(S2, { date: first, start: '09:00', end: '09:50' })).j.created[0], b3 = await book(call, A, 2, first + ' 9:00'); await pay(call, A, b3.id); sql('a', 'UPDATE booking SET studio_session_id=? WHERE id=?', n3.id, b3.id);
-    const u3 = await sx(n3.id, { start: '09:00', end: '09:50' }), c3 = await sx(n3.id, { start: '10:00', end: '10:50' }, '?confirm=1'), f3 = await sx(n4 = (await sp(S2, { date: first, start: '12:00', end: '12:50' })).j.created[0].id, { start: '12:10', end: '12:50' });
+    const u3 = await sx(n3.id, { start: '09:00', end: '09:50' }), c3 = await sx(n3.id, { start: '10:00', end: '10:50' }, '?confirm=1'), n4 = (await sp(S2, { date: first, start: '12:00', end: '12:50' })).j.created[0], f3 = await sx(n4.id, { start: '12:10', end: '12:50' });
     ok(u3.s === 200 && u3.j.notified === 0 && c3.s === 200 && c3.j.notified === 1 && f3.s === 200 && f3.j.notified === 0, 'respons ubah sesi melaporkan jumlah customer yang diberi tahu'); }
   // tambah berulang (Berulang) dan filter bulan
   const r7 = dayOf(7); await sp(AG, { date: r7, start: '10:00', end: '10:50' });

@@ -114,7 +114,7 @@ function seedData() {
   // booking demo aktif yang jam & studionya sama dengan sebuah sesi ditautkan ke sesi itu (paling banyak satu booking aktif per sesi)
   for (const b of all(`SELECT b.id,x.studio_id,x.slot FROM booking b JOIN session x ON x.booking_id=b.id WHERE b.user_id IN ${inn} AND b.status IN ('Menunggu Pembayaran','Terbayar') ORDER BY b.id`, ...ids)) {
     const ss = get('SELECT id FROM studio_session WHERE studio_id=? AND start_time=? AND deleted_at IS NULL', b.studio_id, slotMs(b.slot));
-    if (!ss || get(`SELECT 1 FROM booking WHERE studio_session_id=? AND status IN ('Menunggu Pembayaran','Terbayar') AND id!=?`, ss.id, b.id)) continue; run('UPDATE booking SET studio_session_id=? WHERE id=?', ss.id, b.id); linked++; }
+    if (!ss || get(`SELECT 1 FROM booking WHERE studio_session_id=? AND status IN ('Menunggu Pembayaran','Terbayar','Sesi Berjalan') AND id!=?`, ss.id, b.id)) continue; run('UPDATE booking SET studio_session_id=? WHERE id=?', ss.id, b.id); linked++; }
   run(`UPDATE studio_session SET status=CASE WHEN EXISTS(SELECT 1 FROM booking b WHERE b.studio_session_id=studio_session.id AND b.status IN ('Menunggu Pembayaran','Terbayar','Sesi Berjalan')) THEN 'UNAVAILABLE' ELSE 'AVAILABLE' END WHERE deleted_at IS NULL`); // sama dengan syncSessStatus di server.js
 
   if (owners[0]) { // preferensi customer demo (kuis rekomendasi paket)

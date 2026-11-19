@@ -128,7 +128,7 @@ function sessEdit(sid, x) {
   const b = x.booking, id = `se${x.id}`;
   return `<div class="sform"><div class="row sp"><b>Sesi ${x.date} · ${x.start} - ${x.end}</b><button class="ibtn del" onclick="sDel(${sid},${x.id})" title="Hapus sesi" aria-label="Hapus sesi ${x.start}">${ic("trash", 18)}</button></div>
 <p class="sm m">${b ? `Booking #${b.id} · ${esc(b.customer)} · ${esc(b.status)}` : "Belum ada booking pada sesi ini."}</p>
-${x.past ? `<p class="sm m">Sesi sudah lewat sehingga tidak dapat diubah.</p>` : `<div class="srow"><div><label for="${id}d">Tanggal</label><input id="${id}d" type="date" value="${x.date}"></div><div><label for="${id}s">Mulai</label><input id="${id}s" type="time" value="${x.start}"></div><div><label for="${id}e">Selesai</label><input id="${id}e" type="time" value="${x.end}"></div></div>
+${x.past || (b && b.status == "Sesi Berjalan") ? `<p class="sm m">${x.past ? "Sesi sudah lewat" : "Sesi foto sedang berlangsung"} sehingga tidak dapat diubah.</p>` : `<div class="srow"><div><label for="${id}d">Tanggal</label><input id="${id}d" type="date" value="${x.date}"></div><div><label for="${id}s">Mulai</label><input id="${id}s" type="time" value="${x.start}"></div><div><label for="${id}e">Selesai</label><input id="${id}e" type="time" value="${x.end}"></div></div>
 <div class="row" style="margin-top:12px"><button class="btn sm" onclick="sSave(${sid},${x.id})">Simpan</button><button class="btn sm ghost" onclick="AD.sedit=null;render()">Tutup</button></div>`}</div>`;
 }
 function sessAdd(sid) { const id = `sa${sid}`;
@@ -151,7 +151,7 @@ const sAdd = sid => aDo(async () => { const id = `sa${sid}`, date = val(id + "d"
 const sSave = (sid, sesId) => { const x = sFind(sid, sesId); if (!x) return; const id = `se${sesId}`, body = { date: val(id + "d"), start: val(id + "s"), end: val(id + "e") };
   const sn = snap(); let back = false;
   aDo(async () => { const r = await aConfirmReq("PATCH", "/admin/sessions/" + sesId, body, `Ubah sesi ${x.start} - ${x.end}?`, i => `Sesi ini memiliki ${i.active_bookings} booking aktif${sWho(i)}. Setelah dikonfirmasi, jadwal sesi diubah dan pelanggan menerima email berisi jadwal baru.`, "Ya, Ubah Sesi", x.impact, false); if (!r) { back = true; return; } // tanpa dialog awal: server memvalidasi jam dulu, dialog muncul hanya bila server meminta konfirmasi
-    AD.sedit = null; AD.sday[sid] = r.date; AD.scal[sid] = r.date.slice(0, 7); await sRefresh(sid); msg = "Sesi berhasil diperbarui." + (r.notified ? ` ${r.notified} pelanggan terdampak sudah diberi tahu lewat email.` : ""); }).then(() => { if (back) restore(sn); }); };
+    AD.sedit = null; AD.sday[sid] = r.date; AD.scal[sid] = r.date.slice(0, 7); await sRefresh(sid); msg = "Sesi berhasil diperbarui." + (r.notified ? ` Pelanggan dari ${r.notified} booking terdampak sudah diberi tahu lewat email.` : ""); }).then(() => { if (back) restore(sn); }); };
 const sessImpactText = i => i.active_bookings ? `Sesi ini memiliki ${i.active_bookings} booking aktif${sWho(i)}${i.paid_bookings ? `, ${i.paid_bookings} sudah dibayar (total refund ${rp(i.refund_total)})` : ""}. Setelah dikonfirmasi, booking tersebut dibatalkan, dana yang sudah dibayar dikembalikan 100%, dan pelanggan diberi tahu lewat email.` : "Sesi ini belum memiliki booking aktif dan akan dihapus dari daftar sesi.";
 const sDel = (sid, sesId) => { const x = sFind(sid, sesId); if (!x) return;
   aDo(async () => { const r = await aConfirmDel("/admin/sessions/" + sesId, `Hapus sesi ${x.date} ${x.start} - ${x.end}?`, sessImpactText, "Ya, Hapus Sesi", x.impact); if (!r) return;
