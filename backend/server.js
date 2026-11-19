@@ -42,11 +42,11 @@ const ownBooking = (id, u) => one('SELECT * FROM booking WHERE id=? AND user_id=
 const ownSession = (id, u) => one('SELECT s.* FROM session s JOIN booking b ON b.id=s.booking_id WHERE s.id=? AND b.user_id=?', id, u.sub) || bad('Sesi tidak ditemukan', 404);
 const slotMs = slot => { const m = /^(\d{4}-\d{2}-\d{2}) (\d{1,2}):00$/.exec(slot); return Date.parse(`${m[1]}T${m[2].padStart(2, '0')}:00:00Z`) - TZ * 60000; };
 function validSlot(slot) { const m = /^(\d{4}-\d{2}-\d{2}) (\d{1,2}):00$/.exec(slot || ''); if (!m || !HRS.includes(+m[2])) bad('Format/jam slot tidak valid'); if (slotMs(slot) < now() - 3000e3) bad('Jadwal sudah lewat'); }
-function priceSetup(st) { if (!st) return { json: null, add: 0 }; const bg = st.bg || null, acc = [...new Set(st.acc || [])]; let add = 0;
-  for (const id of [bg, ...acc].filter(Boolean)) { const p = one('SELECT * FROM property WHERE id=?', id); if (!p || p.qty <= 0) bad('Properti tidak tersedia'); add += p.price; if (id === bg && p.type !== 'background') bad('Background tidak valid'); }
+function priceSetup(st, held) { if (!st) return { json: null, add: 0 }; const bg = st.bg || null, acc = [...new Set(st.acc || [])]; let add = 0;
+  for (const id of [bg, ...acc].filter(Boolean)) { const p = one('SELECT * FROM property WHERE id=?', id); if (!p || (!held && p.qty <= 0)) bad('Properti tidak tersedia'); add += p.price; if (id === bg && p.type !== 'background') bad('Background tidak valid'); }
   return { json: JSON.stringify({ vibe: st.vibe || null, bg, acc }), add }; }
 // harga: paket - diskon utama + add-on - kode promo (satu fungsi untuk pratinjau & pembuatan booking)
-function quote(pk, studio, st, code) { const { json, add } = priceSetup(st), fee = studio ? studio.price || 0 : 0; const pct = +getSet('main_discount_pct') || 0, mainDisc = Math.round(pk.price * pct / 100), base = pk.price - mainDisc + add + fee; let promoDisc = 0, promo = null;
+function quote(pk, studio, st, code, held) { const { json, add } = priceSetup(st, held), fee = studio ? studio.price || 0 : 0; const pct = +getSet('main_discount_pct') || 0, mainDisc = Math.round(pk.price * pct / 100), base = pk.price - mainDisc + add + fee; let promoDisc = 0, promo = null;
   if (code) { promo = one('SELECT * FROM promo WHERE code=?', String(code).trim().toUpperCase()); if (!promo || !promo.active) bad('Kode promo tidak valid'); if (promo.expires_at && promo.expires_at < now()) bad('Kode promo sudah kedaluwarsa'); if (promo.max_uses && promo.used_count >= promo.max_uses) bad('Kuota kode promo sudah habis');
     promoDisc = promo.kind === 'percent' ? Math.round(base * promo.value / 100) : Math.min(promo.value, base); }
   return { json, add, studio_fee: fee, subtotal: pk.price + add + fee, mainDisc, promoDisc, total: Math.max(0, base - promoDisc), promo_code: promo ? promo.code : null, pct }; }
@@ -62,14 +62,14 @@ function invoice(bid) { const b = one('SELECT * FROM booking WHERE id=?', bid), 
 <table>${(b.studio_fee ? row('Biaya studio', idr(b.studio_fee)) : '') + row('Paket ' + esc(pk.name), idr(sub - add - (b.studio_fee || 0)))}${add ? row('Add-on setup', idr(add)) : ''}${b.main_disc ? row('Diskon utama', '-' + idr(b.main_disc), 'd') : ''}${b.promo_disc ? row('Kode promo ' + esc(b.promo_code), '-' + idr(b.promo_disc), 'd') : ''}${row('TOTAL', idr(b.amount), 't')}</table>
 <p><small>Status pembayaran: ${p.status === 'paid' ? 'LUNAS' : esc(p.status)}. Terima kasih telah memilih ${esc(BRAND)}.</small></p></body></html>`; return { html, no, email: u.email, name: u.name }; }
 // notifikasi email ke customer saat admin membatalkan/mengubah bookingnya; fire-and-forget seperti invoice (gagal kirim tidak menggagalkan request)
-function notifyCustomer(bid, subject, html) { const u = one('SELECT u.name,u.email FROM user u JOIN booking b ON b.user_id=u.id WHERE b.id=?', bid); if (!u) return;
+function notifyCustomer(bid, subject, html, u = one('SELECT u.name,u.email FROM user u JOIN booking b ON b.user_id=u.id WHERE b.id=?', bid)) { if (!u) return;
   Promise.resolve().then(() => sendMail({ to: u.email, subject: `${subject} - ${BRAND}`, html: `<p>Halo ${esc(u.name)},</p>${html}<p>Salam,<br>${esc(BRAND)}</p>` })).catch(e => console.error('Gagal kirim notifikasi:', e.message)); }
 const refundLine = refund => refund.state === 'refunded' ? `<p>Dana sebesar <b>${idr(refund.amount)}</b> telah dikembalikan 100%.</p>` : refund.state === 'failed' ? `<p>Pengembalian dana sebesar <b>${idr(refund.amount)}</b> gagal diproses. Admin akan menghubungi Anda untuk menindaklanjutinya.</p>` : '<p>Booking ini belum dibayar, jadi tidak ada dana yang perlu dikembalikan.</p>';
 const bookWhere = b => one('SELECT x.slot,st.name FROM session x JOIN studio st ON st.id=x.studio_id WHERE x.booking_id=?', b.id) || {};
 const notifyCancel = (b, refund, why) => { const x = bookWhere(b);
   notifyCustomer(b.id, `Booking #${b.id} dibatalkan`, `<p>Booking #${b.id} di <b>${esc(x.name)}</b> pada <b>${esc(x.slot)} WIB</b> dibatalkan karena ${esc(why)}.</p>${refundLine(refund)}<p>Mohon maaf atas ketidaknyamanannya. Anda dapat membuat booking baru kapan saja.</p>`); };
-const notifyDel = (b, refund) => { const x = bookWhere(b); // dipanggil sebelum baris booking dihapus (data customer & jadwal dibaca saat itu juga)
-  notifyCustomer(b.id, `Booking #${b.id} dihapus`, `<p>Booking #${b.id} di <b>${esc(x.name)}</b> pada <b>${esc(x.slot)} WIB</b> dihapus oleh admin.</p>${refundLine(refund)}<p>Mohon maaf atas ketidaknyamanannya. Anda dapat membuat booking baru kapan saja.</p>`); };
+const prepDel = (b, refund) => { const x = bookWhere(b), u = one('SELECT name,email FROM user WHERE id=?', b.user_id); // data dibaca sebelum baris booking dihapus, email dikirim sesudahnya
+  return () => notifyCustomer(b.id, `Booking #${b.id} dihapus`, `<p>Booking #${b.id} di <b>${esc(x.name)}</b> pada <b>${esc(x.slot)} WIB</b> dihapus oleh admin.</p>${refundLine(refund)}<p>Mohon maaf atas ketidaknyamanannya. Anda dapat membuat booking baru kapan saja.</p>`, u); };
 async function sendInvoice(bid) { const v = invoice(bid); return sendMail({ to: v.email, subject: `Invoice ${v.no} - ${BRAND}`, html: `<p>Halo ${esc(v.name)},</p><p>Terima kasih. Invoice <b>${v.no}</b> terlampir pada email ini.</p>`, attachments: [{ name: v.no + '.html', type: 'text/html; charset=UTF-8', content: v.html }] }); }
 // ---- akun admin: dibuat sekali saat tabel masih kosong (ADMIN_USER/ADMIN_PASS hanya untuk nilai awal), disimpan sebagai hash scrypt ----
 if (!one('SELECT 1 FROM admin')) { const u = (process.env.ADMIN_USER || 'adminstudio').trim(), p = process.env.ADMIN_PASS || 'admin123', weak = !process.env.ADMIN_PASS || p === 'admin123' || p.length < 8;
@@ -275,7 +275,7 @@ route('DELETE', '/api/admin/studios/:id', 2, ({ params, query }) => { expireStal
 // waktu dikirim sebagai tanggal + HH:MM WIB, disimpan epoch ms; sesi tidak boleh tumpang tindih [mulai, selesai) dengan sesi lain di studio yang sama
 const wibMs = (d, t) => Date.parse(`${d}T${t}:00Z`) - TZ * 60000, hm = t => new Date(t + TZ * 60000).toISOString().slice(11, 16), OVERLAP = 'Sesi bertabrakan dengan sesi lain pada studio ini';
 const sessBookings = id => q(`SELECT b.* FROM booking b WHERE b.studio_session_id=? AND ${ACTIVE} ORDER BY b.id`, id);
-const syncSessStatus = id => { const st = one(`SELECT 1 FROM booking b WHERE b.studio_session_id=? AND (${ACTIVE} OR b.status='Sesi Berjalan')`, id) ? 'UNAVAILABLE' : 'AVAILABLE'; run('UPDATE studio_session SET status=? WHERE id=? AND status!=?', st, id, st); }; // UNAVAILABLE selama terisi booking aktif atau yang sedang berlangsung
+const syncSessStatus = id => { const st = one(`SELECT 1 FROM booking b WHERE b.studio_session_id=? AND (${ACTIVE} OR b.status='Sesi Berjalan')`, id) ? 'UNAVAILABLE' : 'AVAILABLE'; run('UPDATE studio_session SET status=? WHERE id=? AND status!=? AND deleted_at IS NULL', st, id, st); }; // UNAVAILABLE selama terisi booking aktif atau yang sedang berlangsung
 const isDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d + 'T00:00:00Z')) && new Date(Date.parse(d + 'T00:00:00Z')).toISOString().slice(0, 10) === d; // tolak tanggal yang tidak ada (mis. 30 Februari)
 const timeoutSess = id => q(`SELECT x.* FROM session x JOIN booking b ON b.id=x.booking_id WHERE b.studio_session_id=? AND x.status='Aktif'`, id).forEach(left); // sesi foto yang waktunya habis -> Selesai
 const runningSess = id => { timeoutSess(id);
@@ -334,17 +334,19 @@ route('POST', '/api/admin/bookings/:id/cancel', 2, ({ params, body }) => { const
   return cancelWithRefund(b, 'Dibatalkan admin', String(body.detail || '').slice(0, 300), true); }); // admin selalu me-refund
 // ---- booking oleh admin: detail (SR-14-04), hapus (US-16), ubah paket & status (US-15) ----
 const BSTATUS = ['Menunggu Pembayaran', 'Terbayar', 'Sesi Berjalan', 'Selesai', 'Dibatalkan'], NEXT = { 'Menunggu Pembayaran': ['Dibatalkan'], 'Terbayar': ['Sesi Berjalan', 'Selesai', 'Dibatalkan'], 'Sesi Berjalan': ['Selesai'] }; // transisi status oleh admin: hanya maju, tidak memutar balik sesi foto
-const bookOr404 = id => { const s = one(`SELECT * FROM session WHERE booking_id=? AND status='Aktif'`, id); if (s) left(s); return one('SELECT * FROM booking WHERE id=?', id) || bad('Booking tidak ditemukan', 404); }; // sesi foto yang waktunya habis -> Selesai dulu
+const bookOr404 = id => { const s = one(`SELECT * FROM session WHERE booking_id=? AND status='Aktif'`, id); if (s) left(s); const b = one('SELECT * FROM booking WHERE id=?', id) || bad('Booking tidak ditemukan', 404); if (s && b.studio_session_id) syncSessStatus(b.studio_session_id); return b; }; // sesi foto yang waktunya habis -> Selesai dulu
 const delImpact = b => { const p = one('SELECT status,amount FROM payment WHERE booking_id=?', b.id); return { status: b.status, paid: p.status === 'paid', refund_amount: p.status === 'paid' ? p.amount : 0 }; };
-const delBlock = b => ['Sesi Berjalan', 'Selesai'].includes(b.status) ? 'Booking yang sedang/sudah berlangsung tidak dapat dihapus' : one(`SELECT 1 FROM payment WHERE booking_id=? AND status='refund_failed'`, b.id) ? 'Refund gagal belum ditindaklanjuti, booking tidak dapat dihapus' : null;
-const addOn = b => { if (!b.setup_json) return 0; const x = JSON.parse(b.setup_json); return [x.bg, ...(x.acc || [])].filter(Boolean).reduce((a, i) => a + ((one('SELECT price FROM property WHERE id=?', i) || {}).price || 0), 0); }; // harga properti saat ini, seperti invoice
-const bookDetail = b => { const o = bookOut(b), u = one('SELECT name,email,phone FROM user WHERE id=?', b.user_id), p = one('SELECT * FROM payment WHERE booking_id=?', b.id), ss = b.studio_session_id ? one('SELECT * FROM studio_session WHERE id=?', b.studio_session_id) : null, add = addOn(b);
+const delBlock = b => ['Sesi Berjalan', 'Selesai'].includes(b.status) ? 'Booking yang sedang/sudah berlangsung tidak dapat dihapus' : one(`SELECT 1 FROM payment WHERE booking_id=? AND status='refund_failed'`, b.id) ? (REASONS.includes(b.cancel_reason) ? 'Refund gagal karena pembatalan mendadak (dana tercatat sebagai pendapatan), booking tidak dapat dihapus' : 'Refund gagal belum ditindaklanjuti, booking tidak dapat dihapus') : null;
+const addOns = b => { if (!b.setup_json) return []; const x = JSON.parse(b.setup_json); return [x.bg, ...(x.acc || [])].filter(Boolean).map(i => (one('SELECT name FROM property WHERE id=?', i) || {}).name).filter(Boolean); };
+const bookDetail = b => { const o = bookOut(b), u = one('SELECT name,email,phone FROM user WHERE id=?', b.user_id), p = one('SELECT * FROM payment WHERE booking_id=?', b.id), ss = b.studio_session_id ? one('SELECT * FROM studio_session WHERE id=?', b.studio_session_id) : null;
   return { ...o, customer: u, studio_name: one('SELECT name FROM studio WHERE id=?', o.studio).name, package_name: one('SELECT name FROM package WHERE id=?', b.package_id).name, slot: o.date, created_at: b.created_at, cancel_detail: b.cancel_detail, studio_session_id: b.studio_session_id,
     studio_session: ss ? { id: ss.id, date: ymd(ss.start_time), start: hm(ss.start_time), end: hm(ss.end_time), deleted: !!ss.deleted_at } : null, payment: { status: p.status, method: p.method, amount: p.amount, paid_at: p.paid_at, refunded_at: p.refunded_at, expire_at: p.expire_at },
-    invoice: invNo(b), add_on: add, package_price: o.subtotal - add - o.studio_fee, allowed: NEXT[b.status] || [], delete_block: delBlock(b), impact: delImpact(b) }; };
+    invoice: invNo(b), items_price: o.subtotal - o.studio_fee, add_ons: addOns(b), // paket + add-on dari nilai tersimpan saat booking (harga properti bisa berubah sesudahnya)
+    packages: b.status === 'Menunggu Pembayaran' ? q('SELECT id,name,price FROM package WHERE active!=0 ORDER BY price,id') : [], allowed: NEXT[b.status] || [], delete_block: delBlock(b), impact: delImpact(b) }; };
 route('GET', '/api/admin/bookings/:id', 2, ({ params }) => { expireStale(); return bookDetail(bookOr404(params.id)); });
 // hapus booking: selalu minta konfirmasi (status + dana refund); terbayar -> refund 100% dulu, bila gagal booking dipertahankan (Dibatalkan + refund gagal) untuk ditindaklanjuti manual
-const purgeBooking = b => { const s = one('SELECT id FROM session WHERE booking_id=?', b.id), files = s ? q('SELECT img_url FROM photo WHERE session_id=?', s.id) : [];
+const purgeBooking = b => { // status yang boleh dihapus tidak pernah punya foto; baris foto ikut dibersihkan hanya untuk berjaga
+  const s = one('SELECT id FROM session WHERE booking_id=?', b.id), files = s ? q('SELECT img_url FROM photo WHERE session_id=?', s.id) : [];
   tx(() => { if (s) { run('DELETE FROM photo WHERE session_id=?', s.id); run('DELETE FROM staff_log WHERE session_id=?', s.id); } run('DELETE FROM session WHERE booking_id=?', b.id); run('DELETE FROM payment WHERE booking_id=?', b.id); run('DELETE FROM booking WHERE id=?', b.id); if (b.studio_session_id) syncSessStatus(b.studio_session_id); }); rmFiles(files); };
 route('DELETE', '/api/admin/bookings/:id', 2, ({ params, query }) => { expireStale(); const b = bookOr404(params.id), blk = delBlock(b); if (blk) bad(blk, 409);
   if (query.confirm !== '1') bad('Konfirmasi diperlukan', 409, { needs_confirm: true, impact: delImpact(b) });
@@ -352,16 +354,17 @@ route('DELETE', '/api/admin/bookings/:id', 2, ({ params, query }) => { expireSta
   if (b.status === 'Terbayar') { r = cancelWithRefund(b, 'Dihapus admin', '', true).refund; // transaksi sendiri, di luar tx
     if (r.state !== 'refunded') { if (b.studio_session_id) syncSessStatus(b.studio_session_id); notifyCancel(b, r, 'booking tersebut dihapus oleh admin');
       return { ok: false, kept: true, refund: 'failed', refund_amount: r.amount, message: 'Refund gagal: booking dipertahankan sebagai Dibatalkan untuk ditindaklanjuti manual' }; } }
-  if (active) notifyDel(b, r); purgeBooking(b); return { ok: true, deleted: true, refund: r.state, refund_amount: r.amount }; });
+  const send = active ? prepDel(b, r) : null; purgeBooking(b); if (send) send(); return { ok: true, deleted: true, refund: r.state, refund_amount: r.amount }; });
 // ubah booking oleh admin: paket (hanya belum dibayar, dihitung ulang dengan quote; kode promo dilepas bila tidak berlaku lagi) lalu status (hanya maju, NEXT); satu email ringkasan ke customer
 route('PATCH', '/api/admin/bookings/:id', 2, ({ params, body }) => { expireStale(); const b = bookOr404(params.id), hasP = body.package_id !== undefined && body.package_id !== null && body.package_id !== '', hasS = !!body.status;
   if (!hasP && !hasS) bad('Tidak ada perubahan'); if (hasS && !BSTATUS.includes(body.status)) bad('Status booking tidak valid');
   const pk = hasP && +body.package_id !== b.package_id ? one('SELECT * FROM package WHERE id=?', body.package_id) : null, to = hasS && body.status !== b.status ? body.status : null;
+  if (b.status === 'Dibatalkan') bad('Booking yang dibatalkan tidak dapat diubah', 409);
   if (hasP && +body.package_id !== b.package_id) { if (b.status !== 'Menunggu Pembayaran') bad('Paket hanya dapat diubah sebelum booking dibayar', 409); if (!pk || !pk.active) bad('Paket tidak valid'); }
-  if (to && !(NEXT[b.status] || []).includes(to)) bad(b.status === 'Dibatalkan' ? 'Booking yang dibatalkan tidak dapat diubah' : `Status ${b.status} tidak dapat diubah menjadi ${to}`, 409);
+  if (to && !(NEXT[b.status] || []).includes(to)) bad(`Status ${b.status} tidak dapat diubah menjadi ${to}`, 409);
   const lines = []; let x = null;
   if (pk) { const s = one('SELECT * FROM session WHERE booking_id=?', b.id), st = one('SELECT * FROM studio WHERE id=?', s.studio_id), setup = b.setup_json ? JSON.parse(b.setup_json) : null;
-    try { x = quote(pk, st, setup, b.promo_code); } catch (e) { if (!b.promo_code || !(e instanceof HttpErr)) throw e; x = quote(pk, st, setup, null); } // kode promo tidak berlaku lagi -> dihitung tanpa promo
+    try { x = quote(pk, st, setup, b.promo_code, true); } catch (e) { if (!b.promo_code || !(e instanceof HttpErr)) throw e; x = quote(pk, st, setup, null, true); } // properti sudah dipegang booking: tanpa cek stok // kode promo tidak berlaku lagi -> dihitung tanpa promo
     tx(() => { run('UPDATE booking SET package_id=?,amount=?,subtotal=?,main_disc=?,promo_disc=?,promo_code=?,studio_fee=? WHERE id=?', pk.id, x.total, x.subtotal, x.mainDisc, x.promoDisc, x.promo_code, x.studio_fee, b.id); run('UPDATE payment SET amount=? WHERE booking_id=?', x.total, b.id); });
     lines.push(`Paket diubah dari <b>${esc(one('SELECT name FROM package WHERE id=?', b.package_id).name)}</b> menjadi <b>${esc(pk.name)}</b>; total baru <b>${idr(x.total)}</b>.${b.promo_code && !x.promo_code ? ` Kode promo ${esc(b.promo_code)} tidak berlaku lagi sehingga dilepas.` : ''}`); }
   let refund = null; const t = now();

@@ -38,7 +38,12 @@ const { DatabaseSync } = require('node:sqlite');
   const dt = (await det(k2.id)).j;
   ok(dt.id === k2.id && dt.customer.name === 'Budi' && dt.customer.email === 'budi@x.id' && dt.customer.phone === '0822222222' && dt.studio_name && dt.package_name && dt.slot === far + ' 9:00', 'detail booking memuat customer, studio, paket, dan jadwal');
   ok(dt.payment.status === 'paid' && dt.payment.method === 'QRIS' && dt.payment.amount === k2.amount && dt.payment.paid_at > 0 && /^INV-\d{8}-\d{4}$/.test(dt.invoice), 'detail booking memuat status pembayaran dan nomor invoice');
-  ok(dt.subtotal === k2.subtotal && dt.studio_fee === k2.studio_fee && dt.package_price + dt.add_on + dt.studio_fee === dt.subtotal && dt.amount === k2.amount, 'detail booking memuat rincian biaya');
+  ok(dt.subtotal === k2.subtotal && dt.studio_fee === k2.studio_fee && dt.items_price === 90000 && dt.add_ons.length === 0 && dt.amount === k2.amount, 'detail booking memuat rincian biaya (harga paket tanpa add-on)');
+  { const kp = (await call('POST', '/bookings', { package_id: 1, studio_id: 1, date: far + ' 16:00', setup: { bg: 2, acc: [] } }, A)).j; sql('a', 'UPDATE property SET price=99999 WHERE id=2'); const dp = (await det(kp.id)).j; sql('a', 'UPDATE property SET price=10000 WHERE id=2');
+    ok(dp.items_price === 60000 && dp.add_ons.join() === 'Panggung Sepia' && dp.items_price + dp.studio_fee === dp.subtotal, 'rincian biaya memakai harga saat booking walau harga properti berubah');
+    ok(dp.packages.some(p => p.id === 4) && (sql('a', 'UPDATE package SET active=0 WHERE id=4'), !(await det(kp.id)).j.packages.some(p => p.id === 4)) && !dt.packages.length, 'detail booking belum dibayar memuat daftar paket aktif terbaru'); sql('a', 'UPDATE package SET active=1 WHERE id=4');
+    sql('a', 'UPDATE property SET qty=0 WHERE id=2'); const ep = await call('PATCH', `/admin/bookings/${kp.id}`, { package_id: 2 }, AD); sql('a', 'UPDATE property SET qty=1 WHERE id=2');
+    ok(ep.s === 200 && ep.j.amount === 90000 + 10000 + ep.j.studio_fee, 'ubah paket tetap bisa walau properti yang sudah dipegang booking kini habis'); }
   ok(JSON.stringify(dt.allowed) === JSON.stringify(['Sesi Berjalan', 'Selesai', 'Dibatalkan']) && JSON.stringify((await det(k1.id)).j.allowed) === JSON.stringify(['Dibatalkan']) && dt.impact.paid === true && dt.impact.refund_amount === k2.amount, 'detail booking memuat status tujuan yang diizinkan dan dampak hapus');
 
   // --- hapus booking (US-16) ---
@@ -61,7 +66,16 @@ const { DatabaseSync } = require('node:sqlite');
   const z1 = (await call('POST', '/admin/studios/2/sessions', { date: far, start: '13:00', end: '13:50' }, AD)).j.created[0], k6 = await book(call, A, 2, far + ' 13:00'); sql('a', 'UPDATE booking SET studio_session_id=? WHERE id=?', z1.id, k6.id);
   const st = async () => (await call('GET', `/admin/studios/2/sessions?date=${far}`, null, AD)).j.find(x => x.id === z1.id);
   ok((await st()).status === 'UNAVAILABLE' && (await det(k6.id)).j.studio_session.id === z1.id, 'detail booking menampilkan sesi studio yang tertaut');
-  await bd(k6.id, '?confirm=1'); const z1b = await st(); ok(z1b.status === 'AVAILABLE' && z1b.booking === null, 'booking tertaut dihapus -> sesi studio kembali AVAILABLE');
+  await bd(k6.id, '?confirm=1'); const z1s = sql('a', 'SELECT status FROM studio_session WHERE id=?', z1.id)[0].status, z1b = await st(); ok(z1s === 'AVAILABLE' && z1b.status === 'AVAILABLE' && z1b.booking === null, 'booking tertaut dihapus -> sesi studio kembali AVAILABLE');
+
+  { const z3 = (await call('POST', '/admin/studios/2/sessions', { date: far, start: '14:00', end: '14:50' }, AD)).j.created[0], k7 = await book(call, A, 2, far + ' 14:00'); await pay(call, A, k7.id); sql('a', 'UPDATE booking SET studio_session_id=? WHERE id=?', z3.id, k7.id);
+    await call('DELETE', `/admin/sessions/${z3.id}?confirm=1`, null, AD); const h7 = await bd(k7.id, '?confirm=1'), r3 = sql('a', 'SELECT status,deleted_at FROM studio_session WHERE id=?', z3.id)[0];
+    ok(h7.s === 200 && r3.deleted_at && r3.status === 'UNAVAILABLE', 'hapus booking dari sesi yang sudah dihapus tidak menghidupkan lagi sesinya'); }
+  { const k8 = await book(call, Bt, 2, far + ' 15:00'); await pay(call, Bt, k8.id); await call('POST', `/bookings/${k8.id}/cancel`, { reason: 'Tidak ada waktu' }, Bt); sql('a', `UPDATE payment SET status='refund_failed',refunded_at=NULL WHERE booking_id=?`, k8.id);
+    const h8 = await bd(k8.id, '?confirm=1'); ok(h8.s === 409 && /pendapatan/.test(h8.j.error), 'refund gagal karena pembatalan customer: tidak dapat dihapus, pesan menyebut dana tercatat sebagai pendapatan'); }
+  { const z4 = (await call('POST', '/admin/studios/2/sessions', { date: far, start: '16:00', end: '16:50' }, AD)).j.created[0], k9 = await book(call, A, 2, far + ' 16:00'); await pay(call, A, k9.id); sql('a', 'UPDATE booking SET studio_session_id=? WHERE id=?', z4.id, k9.id); await call('POST', `/bookings/${k9.id}/start`, {}, A);
+    sql('a', 'UPDATE session SET end_time=? WHERE booking_id=?', Date.now() - 1000, k9.id); const h9 = await bd(k9.id, '?confirm=1'), d9 = (await det(k9.id)).j;
+    ok(h9.s === 409 && d9.status === 'Selesai' && JSON.stringify(d9.allowed) === '[]' && sql('a', 'SELECT status FROM studio_session WHERE id=?', z4.id)[0].status === 'AVAILABLE', 'sesi foto yang waktunya habis menjadi Selesai sebelum hapus/ubah, sesi studionya disinkronkan'); }
 
   // --- ubah booking: paket (SR-15-04) ---
   const be = (id, b, tok = AD, c = call) => c('PATCH', `/admin/bookings/${id}`, b, tok), qt = async (package_id, studio_id, code) => (await call('POST', '/quote', { package_id, studio_id, code }, A)).j;
@@ -75,8 +89,9 @@ const { DatabaseSync } = require('node:sqlite');
   const m2 = await book(call, Bt, 3, far + ' 10:00'); await pay(call, Bt, m2.id); ok((await be(m2.id, { package_id: 2 })).s === 409, 'ubah paket booking yang sudah dibayar ditolak');
   sql('a', `INSERT INTO promo(code,kind,value,active) VALUES('HEMAT10','percent',10,1)`);
   const m3 = await book(call, A, 3, far + ' 11:00', 1, 'HEMAT10'), e3 = await be(m3.id, { package_id: 2 }), q2p = await qt(2, 3, 'HEMAT10'); ok(m3.promo_code === 'HEMAT10' && e3.s === 200 && e3.j.promo_code === 'HEMAT10' && e3.j.amount === q2p.total, 'kode promo yang masih berlaku dipertahankan saat paket diubah');
-  sql('a', `UPDATE promo SET active=0 WHERE code='HEMAT10'`); const e3b = await be(m3.id, { package_id: 3 }), q3n = await qt(3, 3);
+  sql('a', `UPDATE promo SET active=0 WHERE code='HEMAT10'`); await wait(400); mails.length = 0; const e3b = await be(m3.id, { package_id: 3 }), q3n = await qt(3, 3);
   ok(e3b.s === 200 && e3b.j.promo_code === null && e3b.j.promo_disc === 0 && e3b.j.amount === q3n.total, 'kode promo yang tidak berlaku lagi dilepas dan total dihitung tanpa promo');
+  await wait(500); ok(mails.map(decode).some(m => /diperbarui/.test(m.subject) && m.text.includes('HEMAT10') && /tidak berlaku/.test(m.text)), 'email perubahan menyebut kode promo yang dilepas');
 
   // --- ubah booking: status (SR-15-05, SR-15-06) ---
   ok((await be(m1.id, { status: 'Terbayar' })).s === 409 && (await be(m1.id, { status: 'Selesai' })).s === 409 && (await be(m1.id, { status: 'Sesi Berjalan' })).s === 409, 'status lunas pada booking belum dibayar ditolak');
@@ -84,24 +99,25 @@ const { DatabaseSync } = require('node:sqlite');
   await wait(100); mails.length = 0; const c1 = await be(m1.id, { status: 'Dibatalkan' }), c1b = await mine(A, m1.id);
   ok(c1.s === 200 && c1b.status === 'Dibatalkan' && c1b.cancel_reason === 'Dibatalkan admin' && c1b.pay_status === 'batal' && (await call('GET', `/availability?studio_id=3&date=${far}`)).j.free.includes(9), 'Menunggu Pembayaran -> Dibatalkan: dibatalkan tanpa refund, slot dibuka kembali');
   await wait(500); ok(mails.map(decode).filter(m => /dibatalkan/.test(m.subject) && m.to.includes('ana@x.id')).length === 1 && !mails.map(decode).some(m => /diperbarui/.test(m.subject)), 'pembatalan oleh admin memakai email pembatalan');
-  ok((await be(m1.id, { status: 'Terbayar' })).s === 409 && (await be(m1.id, { package_id: 2 })).s === 409, 'booking Dibatalkan tidak dapat diubah lagi');
+  { const x1 = await be(m1.id, { package_id: 2 }); ok((await be(m1.id, { status: 'Terbayar' })).s === 409 && x1.s === 409 && /dibatalkan/.test(x1.j.error), 'booking Dibatalkan tidak dapat diubah lagi (pesan menyebut dibatalkan)'); }
   const z2 = (await call('POST', '/admin/studios/3/sessions', { date: far, start: '10:00', end: '10:50' }, AD)).j.created[0]; sql('a', 'UPDATE booking SET studio_session_id=? WHERE id=?', z2.id, m2.id);
-  const c2 = await be(m2.id, { status: 'Dibatalkan' }), c2b = await mine(Bt, m2.id), z2b = (await call('GET', `/admin/studios/3/sessions?date=${far}`, null, AD)).j.find(x => x.id === z2.id);
-  ok(c2.s === 200 && c2b.status === 'Dibatalkan' && c2b.pay_status === 'refunded' && c2.j.payment.status === 'refunded' && z2b.status === 'AVAILABLE', 'Terbayar -> Dibatalkan: refund 100% dan sesi studio dibuka kembali');
+  await wait(100); mails.length = 0; const c2 = await be(m2.id, { status: 'Dibatalkan' }), z2s = sql('a', 'SELECT status FROM studio_session WHERE id=?', z2.id)[0].status, c2b = await mine(Bt, m2.id), z2b = (await call('GET', `/admin/studios/3/sessions?date=${far}`, null, AD)).j.find(x => x.id === z2.id);
+  ok(c2.s === 200 && c2b.status === 'Dibatalkan' && c2b.pay_status === 'refunded' && c2.j.payment.status === 'refunded' && z2s === 'AVAILABLE' && z2b.status === 'AVAILABLE', 'Terbayar -> Dibatalkan: refund 100% dan sesi studio dibuka kembali');
+  await wait(500); ok(mails.map(decode).some(m => /dibatalkan/.test(m.subject) && m.to.includes('budi@x.id') && m.text.includes('Rp' + m2.amount.toLocaleString('id-ID'))), 'email pembatalan lewat ubah status menyebut dana yang dikembalikan');
   const m4 = await book(call, A, 3, far + ' 12:00'); await pay(call, A, m4.id); const s4 = await be(m4.id, { status: 'Sesi Berjalan' }), rs = (await call('GET', '/sessions', null, A)).j.find(x => x.booking_id === m4.id);
   ok(s4.s === 200 && s4.j.status === 'Sesi Berjalan' && rs && rs.status === 'Aktif' && rs.left > 0, 'Terbayar -> Sesi Berjalan: sesi foto dimulai');
   ok((await be(m4.id, { status: 'Terbayar' })).s === 409 && (await be(m4.id, { status: 'Dibatalkan' })).s === 409, 'Sesi Berjalan tidak dapat kembali ke Terbayar atau dibatalkan');
   const f4 = await be(m4.id, { status: 'Selesai' }), rf = (await call('GET', '/sessions', null, A)).j.find(x => x.booking_id === m4.id); ok(f4.s === 200 && f4.j.status === 'Selesai' && rf.status === 'Selesai' && JSON.stringify(f4.j.allowed) === '[]', 'Sesi Berjalan -> Selesai: sesi foto diakhiri');
   ok((await be(m4.id, { status: 'Sesi Berjalan' })).s === 409 && (await be(m4.id, { status: 'Terbayar' })).s === 409, 'Selesai tidak dapat diubah kembali');
   const m5 = await book(call, Bt, 3, far + ' 13:00'); await pay(call, Bt, m5.id); await wait(400); mails.length = 0; const f5 = await be(m5.id, { status: 'Selesai' });
-  await wait(500); ok(f5.s === 200 && f5.j.status === 'Selesai' && mails.map(decode).some(m => /diperbarui/.test(m.subject) && m.to.includes('budi@x.id') && m.text.includes('Selesai')), 'Terbayar -> Selesai, customer menerima email perubahan status');
+  await wait(500); ok(f5.s === 200 && f5.j.status === 'Selesai' && (await call('GET', '/sessions', null, Bt)).j.find(x => x.booking_id === m5.id).status === 'Selesai' && mails.map(decode).some(m => /diperbarui/.test(m.subject) && m.to.includes('budi@x.id') && m.text.includes('Selesai')), 'Terbayar -> Selesai, customer menerima email perubahan status');
   const m6 = await book(call, A, 3, far + ' 14:00'), b6 = await be(m6.id, { package_id: 2, status: 'Dibatalkan' }), b6b = await mine(A, m6.id); ok(b6.s === 200 && b6b.package_id === 2 && b6b.amount === (await qt(2, 3)).total && b6b.status === 'Dibatalkan', 'paket dan status dalam satu permintaan: paket dulu, lalu status');
   const m7 = await book(call, A, 3, far + ' 15:00'), b7 = await be(m7.id, { package_id: 2, status: 'Selesai' }); ok(b7.s === 409 && (await mine(A, m7.id)).package_id === 1, 'permintaan dengan status tidak sah tidak mengubah paket');
   const b8 = await be(m7.id, { package_id: 1, status: 'Menunggu Pembayaran' }); ok(b8.s === 200 && b8.j.notified === false, 'nilai yang sama dengan sekarang: tidak ada perubahan dan tidak ada email');
 
   // --- server kedua: REFUND_SIMULATE_FAIL=1 ---
-  const C2 = await reg(call2, 'Cici', 'cici@x.id', '0833333333'), AD2 = await admin(call2), f1 = await book(call2, C2, 1, far + ' 9:00'); await pay(call2, C2, f1.id); await wait(400); mails.length = 0;
-  const g1 = await bd(f1.id, '?confirm=1', call2, AD2), gb = await mine(C2, f1.id, call2); ok(g1.s === 200 && g1.j.ok === false && g1.j.kept === true && g1.j.refund === 'failed' && gb.status === 'Dibatalkan' && gb.pay_status === 'refund_failed' && gb.cancel_reason === 'Dihapus admin', 'refund gagal: booking dipertahankan sebagai Dibatalkan dengan refund gagal');
+  const C2 = await reg(call2, 'Cici', 'cici@x.id', '0833333333'), AD2 = await admin(call2), f1 = await book(call2, C2, 1, far + ' 9:00'); await pay(call2, C2, f1.id); const zf = (await call2('POST', '/admin/studios/1/sessions', { date: far, start: '09:00', end: '09:50' }, AD2)).j.created[0]; sql('b', 'UPDATE booking SET studio_session_id=? WHERE id=?', zf.id, f1.id); await wait(400); mails.length = 0;
+  const g1 = await bd(f1.id, '?confirm=1', call2, AD2), gb = await mine(C2, f1.id, call2); ok(g1.s === 200 && g1.j.ok === false && g1.j.kept === true && g1.j.refund === 'failed' && gb.status === 'Dibatalkan' && gb.pay_status === 'refund_failed' && gb.cancel_reason === 'Dihapus admin' && sql('b', 'SELECT status FROM studio_session WHERE id=?', zf.id)[0].status === 'AVAILABLE', 'refund gagal: booking dipertahankan sebagai Dibatalkan dengan refund gagal');
   await wait(500); ok(mails.map(decode).some(m => m.to.includes('cici@x.id') && /gagal/.test(m.text)), 'email ke customer menyebut refund gagal');
   const g2 = await bd(f1.id, '?confirm=1', call2, AD2); ok(g2.s === 409 && /Refund gagal/.test(g2.j.error) && (await det2(f1.id)).j.delete_block, 'booking dengan refund gagal tidak dapat dihapus sebelum ditindaklanjuti');
 
