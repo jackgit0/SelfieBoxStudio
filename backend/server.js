@@ -14,8 +14,8 @@ const sign = (p, ttl = 86400) => { const d = b64(JSON.stringify({ alg: 'HS256', 
 const verify = t => { try { const [h, p, s] = t.split('.'), e = crypto.createHmac('sha256', SECRET).update(h + '.' + p).digest('base64url'); if (s.length !== e.length || !crypto.timingSafeEqual(Buffer.from(s), Buffer.from(e))) return null; const o = JSON.parse(Buffer.from(p, 'base64url')); return o.exp > Date.now() / 1e3 ? o : null; } catch { return null; } };
 const hash = pw => { const s = crypto.randomBytes(16).toString('hex'); return s + ':' + crypto.scryptSync(pw, s, 32).toString('hex'); };
 const check = (pw, st) => { const [s, h] = st.split(':'); return crypto.timingSafeEqual(crypto.scryptSync(pw, s, 32), Buffer.from(h, 'hex')); };
-class HttpErr extends Error { constructor(c, m) { super(m); this.code = c; } }
-const bad = (m, c = 400) => { throw new HttpErr(c, m); };
+class HttpErr extends Error { constructor(c, m, extra) { super(m); this.code = c; this.extra = extra; } } // extra: data tambahan di body error (mis. needs_confirm + impact)
+const bad = (m, c = 400, extra) => { throw new HttpErr(c, m, extra); };
 const tx = fn => { db.exec('BEGIN'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
 const now = () => Date.now(), q = (s, ...a) => db.prepare(s).all(...a), one = (s, ...a) => db.prepare(s).get(...a), run = (s, ...a) => db.prepare(s).run(...a);
 const sha = x => crypto.createHash('sha256').update(String(x)).digest('hex'), eq = (a, b) => crypto.timingSafeEqual(Buffer.from(sha(a)), Buffer.from(sha(b)));
@@ -58,6 +58,9 @@ function invoice(bid) { const b = one('SELECT * FROM booking WHERE id=?', bid), 
 <p><b>${esc(u.name)}</b><br><small>${esc(u.email)} · ${esc(u.phone)}</small></p><p>Studio: <b>${esc(st.name)}</b><br>Jadwal: <b>${esc(s.slot)}</b></p>
 <table>${(b.studio_fee ? row('Biaya studio', idr(b.studio_fee)) : '') + row('Paket ' + esc(pk.name), idr(sub - add - (b.studio_fee || 0)))}${add ? row('Add-on setup', idr(add)) : ''}${b.main_disc ? row('Diskon utama', '-' + idr(b.main_disc), 'd') : ''}${b.promo_disc ? row('Kode promo ' + esc(b.promo_code), '-' + idr(b.promo_disc), 'd') : ''}${row('TOTAL', idr(b.amount), 't')}</table>
 <p><small>Status pembayaran: ${p.status === 'paid' ? 'LUNAS' : esc(p.status)}. Terima kasih telah memilih ${esc(BRAND)}.</small></p></body></html>`; return { html, no, email: u.email, name: u.name }; }
+// notifikasi email ke customer saat admin membatalkan/mengubah bookingnya; fire-and-forget seperti invoice (gagal kirim tidak menggagalkan request)
+function notifyCustomer(bid, subject, html) { const u = one('SELECT u.name,u.email FROM user u JOIN booking b ON b.user_id=u.id WHERE b.id=?', bid); if (!u) return;
+  Promise.resolve().then(() => sendMail({ to: u.email, subject: `${subject} - ${BRAND}`, html: `<p>Halo ${esc(u.name)},</p>${html}<p>Salam,<br>${esc(BRAND)}</p>` })).catch(e => console.error('Gagal kirim notifikasi:', e.message)); }
 async function sendInvoice(bid) { const v = invoice(bid); return sendMail({ to: v.email, subject: `Invoice ${v.no} - ${BRAND}`, html: `<p>Halo ${esc(v.name)},</p><p>Terima kasih. Invoice <b>${v.no}</b> terlampir pada email ini.</p>`, attachments: [{ name: v.no + '.html', type: 'text/html; charset=UTF-8', content: v.html }] }); }
 // ---- akun admin: dibuat sekali saat tabel masih kosong (ADMIN_USER/ADMIN_PASS hanya untuk nilai awal), disimpan sebagai hash scrypt ----
 if (!one('SELECT 1 FROM admin')) { const u = (process.env.ADMIN_USER || 'adminstudio').trim(), p = process.env.ADMIN_PASS || 'admin123', weak = !process.env.ADMIN_PASS || p === 'admin123' || p.length < 8;
@@ -104,10 +107,11 @@ route('PATCH', '/api/bookings/:id', 1, ({ params, body, user }) => { expireStale
   try { run('UPDATE session SET studio_id=?,slot=? WHERE booking_id=?', body.studio_id, body.date, b.id); } catch (e) { if (/UNIQUE/.test(e.message)) bad('Jadwal baru tidak tersedia', 409); throw e; } return bookOut(b); });
 route('DELETE', '/api/bookings/:id', 1, ({ params, user }) => { const b = ownBooking(params.id, user); if (!['Menunggu Pembayaran', 'Terbayar'].includes(b.status)) bad('Booking tidak dapat dihapus', 409); cancel(b.id); return { ok: true }; });
 // pembatalan + refund (simulasi): refund berhasil bila sesi masih >= REFUND_MIN_HOURS jam lagi, selain itu refund gagal
+// force (admin) selalu me-refund; REFUND_SIMULATE_FAIL=1 hanya untuk tes: refund paksa dibuat gagal
 const REASONS = ['Tidak ada waktu', 'Penggunaan dana lain', 'Pemesanan ganda', 'Pembatalan lainnya'];
 function cancelWithRefund(b, reason, detail, force) { const p = one('SELECT * FROM payment WHERE booking_id=?', b.id), s = one('SELECT * FROM session WHERE booking_id=?', b.id); let state = 'none';
   tx(() => { cancel(b.id); run('UPDATE booking SET cancel_reason=?,cancel_detail=?,cancelled_at=? WHERE id=?', reason, detail, now(), b.id);
-    if (p.status === 'paid') { const ok = force || slotMs(s.slot) - now() >= REFUND_H * 3600e3; state = ok ? 'refunded' : 'failed'; run('UPDATE payment SET status=?,refunded_at=? WHERE id=?', ok ? 'refunded' : 'refund_failed', ok ? now() : null, p.id); } });
+    if (p.status === 'paid') { const ok = force ? process.env.REFUND_SIMULATE_FAIL !== '1' : slotMs(s.slot) - now() >= REFUND_H * 3600e3; state = ok ? 'refunded' : 'failed'; run('UPDATE payment SET status=?,refunded_at=? WHERE id=?', ok ? 'refunded' : 'refund_failed', ok ? now() : null, p.id); } });
   return { ok: true, refund: { state, amount: state === 'none' ? 0 : p.amount, at: state === 'refunded' ? now() : null, min_hours: REFUND_H }, booking: bookOut(one('SELECT * FROM booking WHERE id=?', b.id)) }; }
 route('POST', '/api/bookings/:id/cancel', 1, ({ params, body, user }) => { expireStale(); const b = ownBooking(params.id, user); if (!['Menunggu Pembayaran', 'Terbayar'].includes(b.status)) bad('Booking tidak dapat dibatalkan', 409);
   const reason = String(body.reason || ''), detail = String(body.detail || '').trim().slice(0, 300); if (!REASONS.includes(reason)) bad('Pilih alasan pembatalan'); if (reason === 'Pembatalan lainnya' && !detail) bad('Tuliskan alasan pembatalan Anda'); return cancelWithRefund(b, reason, detail, false); });
@@ -280,5 +284,5 @@ http.createServer(async (req, res) => {
       if (r.auth === 2) { if (ctx.user.role !== 'admin') throw new HttpErr(403, 'Hanya admin'); const a = one('SELECT pw_changed_at,must_change FROM admin WHERE id=?', ctx.user.sub); if (!a || (a.pw_changed_at && (ctx.user.iatms ?? ctx.user.iat * 1000) < a.pw_changed_at)) throw new HttpErr(401, 'Sesi admin tidak berlaku');
         if (a.must_change && !['/api/admin/me', '/api/admin/account'].includes(u.pathname)) throw new HttpErr(403, 'Ganti password bawaan terlebih dahulu (menu Akun Admin)'); } // password bawaan memblokir seluruh fitur admin
       else { const u = ctx.user.role === 'customer' && one('SELECT pw_changed_at FROM user WHERE id=?', ctx.user.sub); if (!u || (u.pw_changed_at && (ctx.user.iatms ?? ctx.user.iat * 1000) < u.pw_changed_at)) throw new HttpErr(401, 'Belum login'); } }
-    send(200, await r.fn(ctx)); } catch (e) { if (!(e instanceof HttpErr)) console.error(e); send(e.code || 500, { error: e instanceof HttpErr ? e.message : 'Kesalahan server' }); }
+    send(200, await r.fn(ctx)); } catch (e) { if (!(e instanceof HttpErr)) console.error(e); send(e.code || 500, e instanceof HttpErr ? { error: e.message, ...e.extra } : { error: 'Kesalahan server' }); }
 }).listen(PORT, () => console.log(`Snapia berjalan di http://localhost:${PORT}`));
