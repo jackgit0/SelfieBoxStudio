@@ -78,7 +78,7 @@ function shell(inner) {
 }
 // muat ulang data master (studio/properti/paket) bila admin mengubahnya; render ulang hanya jika berbeda
 let _mj = "";
-async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, VIBES, PROP, POSES } = m); if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
+async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, VIBES, PROP, POSES } = m); ALLSTUDIOS = ALLSTUDIOS || STUDIOS; if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
 V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
 function render() {
   if (!S.me && !["auth", "landing"].includes(S.view)) S.view = "landing";
@@ -94,7 +94,7 @@ function render() {
 }
 async function prefetch() {
   const home = S.view === "home", d = home ? (S.hDate || todayS()) : (B.date || todayS()), ids = home ? STUDIOS.map(s => s.id) : (B.studio ? [B.studio] : []); let ch = 0;
-  for (const id of ids) { const k = id + "|" + d; if (AV[k]) continue; try { AV[k] = (await API.get(`/availability?studio_id=${id}&date=${d}`)).free; ch = 1; } catch (e) {} }
+  for (const id of ids) { const k = id + "|" + d; if (AV[k]) continue; try { AV[k] = (await API.get(`/availability?studio_id=${id}&date=${d}`)).free; ch = 1; } catch (e) { if (e.status == 400) { AV[k] = []; ch = 1; } } } // studio ditolak (mis. tidak tersedia): tidak ada slot
   if (ch && ["home", "time"].includes(S.view)) render();
 }
 
