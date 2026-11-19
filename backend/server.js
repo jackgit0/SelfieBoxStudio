@@ -271,18 +271,21 @@ route('DELETE', '/api/admin/studios/:id', 2, ({ params, query }) => { expireStal
 // waktu dikirim sebagai tanggal + HH:MM WIB, disimpan epoch ms; sesi tidak boleh tumpang tindih [mulai, selesai) dengan sesi lain di studio yang sama
 const wibMs = (d, t) => Date.parse(`${d}T${t}:00Z`) - TZ * 60000, hm = t => new Date(t + TZ * 60000).toISOString().slice(11, 16), OVERLAP = 'Sesi bertabrakan dengan sesi lain pada studio ini';
 const sessBookings = id => q(`SELECT b.* FROM booking b WHERE b.studio_session_id=? AND ${ACTIVE} ORDER BY b.id`, id);
-const syncSessStatus = id => run('UPDATE studio_session SET status=? WHERE id=?', sessBookings(id).length ? 'UNAVAILABLE' : 'AVAILABLE', id); // UNAVAILABLE selama ada booking aktif
+const syncSessStatus = id => { const st = one(`SELECT 1 FROM booking b WHERE b.studio_session_id=? AND (${ACTIVE} OR b.status='Sesi Berjalan')`, id) ? 'UNAVAILABLE' : 'AVAILABLE'; run('UPDATE studio_session SET status=? WHERE id=? AND status!=?', st, id, st); }; // UNAVAILABLE selama terisi booking aktif atau yang sedang berlangsung
+const isDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d + 'T00:00:00Z')) && new Date(Date.parse(d + 'T00:00:00Z')).toISOString().slice(0, 10) === d; // tolak tanggal yang tidak ada (mis. 30 Februari)
+const runningSess = id => { q(`SELECT x.* FROM session x JOIN booking b ON b.id=x.booking_id WHERE b.studio_session_id=? AND x.status='Aktif'`, id).forEach(left); // sesi foto yang waktunya habis -> Selesai
+  if (one(`SELECT 1 FROM booking WHERE studio_session_id=? AND status='Sesi Berjalan'`, id)) bad('Masih ada sesi yang sedang berlangsung', 409); };
 const sessImpact = id => { const act = sessBookings(id), paid = act.filter(b => b.status === 'Terbayar'), cs = act.map(b => one('SELECT name FROM user WHERE id=?', b.user_id).name);
   return { act, impact: { active_bookings: act.length, paid_bookings: paid.length, refund_total: paid.reduce((a, b) => a + b.amount, 0), customers: [...new Set(cs)] } }; };
 const sessOutAdmin = r => { const b = one(`SELECT b.id,b.status,u.name customer FROM booking b JOIN user u ON u.id=b.user_id WHERE b.studio_session_id=? AND b.status!='Dibatalkan' ORDER BY ${ACTIVE} DESC,b.id DESC`, r.id);
   return { id: r.id, studio_id: r.studio_id, start_time: r.start_time, end_time: r.end_time, date: ymd(r.start_time), start: hm(r.start_time), end: hm(r.end_time), status: r.status, past: r.start_time <= now(), booking: b || null, impact: sessImpact(r.id).impact }; };
 const sessBody = b => { const d = String(b.date || ''), s = String(b.start || ''), e = String(b.end || ''), T = /^([01]\d|2[0-3]):[0-5]\d$/;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || isNaN(Date.parse(d + 'T00:00:00Z')) || new Date(Date.parse(d + 'T00:00:00Z')).toISOString().slice(0, 10) !== d || !T.test(s) || !T.test(e)) bad('Tanggal (YYYY-MM-DD) atau jam (HH:MM) sesi tidak valid');
+  if (!isDate(d) || !T.test(s) || !T.test(e)) bad('Tanggal (YYYY-MM-DD) atau jam (HH:MM) sesi tidak valid');
   const st = wibMs(d, s), en = wibMs(d, e); if (st <= now()) bad('Waktu mulai sudah lewat'); if (st >= en) bad('Waktu mulai harus lebih awal dari waktu selesai'); return { st, en }; };
 const clash = (sid, st, en, self = 0) => !!one('SELECT 1 FROM studio_session WHERE studio_id=? AND deleted_at IS NULL AND start_time<? AND end_time>? AND id!=?', sid, en, st, self);
 const liveSess = id => one('SELECT * FROM studio_session WHERE id=? AND deleted_at IS NULL', id) || bad('Sesi tidak ditemukan', 404);
 route('GET', '/api/admin/studios/:id/sessions', 2, ({ params, query }) => { expireStale(); const st = liveStudio(params.id); let from = -9e15, to = 9e15;
-  if (query.date) { if (!/^\d{4}-\d{2}-\d{2}$/.test(query.date)) bad('Tanggal tidak valid'); from = wibMs(query.date, '00:00'); to = from + 864e5; }
+  if (query.date) { if (!isDate(query.date)) bad('Tanggal tidak valid'); from = wibMs(query.date, '00:00'); to = from + 864e5; }
   else if (query.month) { const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(query.month); if (!m) bad('Bulan tidak valid'); from = Date.UTC(+m[1], +m[2] - 1, 1) - TZ * 60000; to = Date.UTC(+m[1], +m[2], 1) - TZ * 60000; }
   const rows = q('SELECT * FROM studio_session WHERE studio_id=? AND deleted_at IS NULL AND start_time>=? AND start_time<? ORDER BY start_time,id', st.id, from, to);
   rows.forEach(r => syncSessStatus(r.id)); return rows.map(r => sessOutAdmin(one('SELECT * FROM studio_session WHERE id=?', r.id))); }); // termasuk sesi terisi & yang sudah lewat (SR-08-02)
@@ -295,17 +298,15 @@ route('POST', '/api/admin/studios/:id/sessions', 2, ({ params, body }) => { cons
     return { created: created.map(id => sessOutAdmin(one('SELECT * FROM studio_session WHERE id=?', id))), skipped }; }); });
 // ubah sesi: sesi yang sudah lewat ditolak; ada booking aktif -> 409 + dampak, setelah ?confirm=1 disimpan + email jadwal baru ke customer
 // (slot tetap booking di tabel session tidak dipindah: customer belum membooking sesi studio)
-route('PATCH', '/api/admin/sessions/:id', 2, ({ params, body, query }) => { expireStale(); const ss = liveSess(params.id); if (ss.start_time <= now()) bad('Sesi yang sudah lewat tidak dapat diubah');
+route('PATCH', '/api/admin/sessions/:id', 2, ({ params, body, query }) => { expireStale(); const ss = liveSess(params.id); if (ss.start_time <= now()) bad('Sesi yang sudah lewat tidak dapat diubah'); runningSess(ss.id);
   const v = sessBody({ date: ymd(ss.start_time), start: hm(ss.start_time), end: hm(ss.end_time), ...body }); if (clash(ss.studio_id, v.st, v.en, ss.id)) bad(OVERLAP, 409);
-  if (v.st === ss.start_time && v.en === ss.end_time) return sessOutAdmin(ss);
+  if (v.st === ss.start_time && v.en === ss.end_time) return { ...sessOutAdmin(ss), notified: 0 };
   const { act, impact } = sessImpact(ss.id); if (act.length && query.confirm !== '1') bad('Konfirmasi diperlukan', 409, { needs_confirm: true, impact });
   run('UPDATE studio_session SET start_time=?,end_time=? WHERE id=?', v.st, v.en, ss.id); syncSessStatus(ss.id); const stn = one('SELECT name FROM studio WHERE id=?', ss.studio_id).name, w = (a, z) => `${ymd(a)} ${hm(a)}-${hm(z)} WIB`;
   for (const b of act) notifyCustomer(b.id, `Jadwal booking #${b.id} diubah`, `<p>Admin mengubah jadwal sesi booking #${b.id} di <b>${esc(stn)}</b> menjadi <b>${w(v.st, v.en)}</b> (sebelumnya ${w(ss.start_time, ss.end_time)}).</p><p>Hubungi kami bila jadwal baru tidak sesuai.</p>`);
-  return sessOutAdmin(one('SELECT * FROM studio_session WHERE id=?', ss.id)); });
+  return { ...sessOutAdmin(one('SELECT * FROM studio_session WHERE id=?', ss.id)), notified: act.length }; }); // notified = jumlah booking yang diberi tahu lewat email
 // hapus sesi = soft delete: booking yang sedang berlangsung memblokir; booking aktif -> 409 + dampak, setelah ?confirm=1 dibatalkan + refund 100% + email
-route('DELETE', '/api/admin/sessions/:id', 2, ({ params, query }) => { expireStale(); const ss = liveSess(params.id);
-  q(`SELECT x.* FROM session x JOIN booking b ON b.id=x.booking_id WHERE b.studio_session_id=? AND x.status='Aktif'`, ss.id).forEach(left);
-  if (one(`SELECT 1 FROM booking WHERE studio_session_id=? AND status='Sesi Berjalan'`, ss.id)) bad('Masih ada sesi yang sedang berlangsung', 409);
+route('DELETE', '/api/admin/sessions/:id', 2, ({ params, query }) => { expireStale(); const ss = liveSess(params.id); runningSess(ss.id);
   const { act, impact } = sessImpact(ss.id); if (act.length && query.confirm !== '1') bad('Konfirmasi diperlukan', 409, { needs_confirm: true, impact });
   let refunded = 0, failed = 0; for (const b of act) { const r = cancelWithRefund(b, 'Sesi dihapus admin', '', true).refund; if (r.state === 'refunded') refunded++; else if (r.state === 'failed') failed++; notifyCancel(b, r, 'sesi tersebut dihapus oleh admin'); }
   tx(() => run(`UPDATE studio_session SET deleted_at=?,status='UNAVAILABLE' WHERE id=?`, now(), ss.id)); return { ok: true, cancelled: act.length, refunded, refund_failed: failed }; });

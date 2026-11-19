@@ -83,7 +83,7 @@ ${c.bookings.map(b => `<tr><td>${wib(b.created_at)}</td><td>${esc(b.package)}</t
 const aImg = id => `${API_BASE}/api/admin/photos/${id}/image?t=${API.token}`;
 V.acust_after = () => aLoad("cust", () => API.get("/admin/customers"), []);
 const openCust = id => aDo(async () => { const [b, p] = await Promise.all([API.get(`/admin/customers/${id}/bookings`), API.get(`/admin/customers/${id}/photos`)]); AD.cdet = { customer: b.customer, bookings: b.bookings, photos: p.photos }; window.scrollTo(0, document.body.scrollHeight); });
-const delCust = (id, name) => confirm(`Hapus akun "${name}" beserta SELURUH booking, pembayaran, dan foto miliknya?\nTindakan ini tidak dapat dibatalkan.`) && aDo(async () => { const r = await API.del("/admin/customers/" + id); AD.cust = AD.cdet = AD.dash = AD.ops = null; msg = `Akun dihapus (${r.photos_deleted} foto ikut terhapus).`; });
+const delCust = (id, name) => confirm(`Hapus akun "${name}" beserta SELURUH booking, pembayaran, dan foto miliknya?\nTindakan ini tidak dapat dibatalkan.`) && aDo(async () => { const r = await API.del("/admin/customers/" + id); AD.cust = AD.cdet = AD.dash = AD.ops = AD.studios = AD.books = AD.trx = null; AD.sess = {}; msg = `Akun dihapus (${r.photos_deleted} foto ikut terhapus).`; });
 
 // ---------- Studio (accordion) ----------
 function studioForm(s) {
@@ -107,7 +107,7 @@ const studioSave = id => aDo(async () => { const k = "s" + (id || "N"), n = id |
 const studioImpactText = i => `Studio ini memiliki ${i.sessions} sesi dan ${i.active_bookings} booking aktif${i.paid_bookings ? ` (${i.paid_bookings} sudah dibayar, total refund ${rp(i.refund_total)})` : ""}. ${i.active_bookings ? "Setelah dikonfirmasi, seluruh booking aktif dibatalkan dan dana yang sudah dibayar dikembalikan 100% kepada pelanggan. " : ""}Studio beserta sesinya tidak lagi tampil, tetapi riwayat booking tetap tersimpan.`;
 const studioDel = id => { const s = (AD.studios || []).find(x => x.id == id); if (!s) return;
   aDo(async () => { const r = await aConfirmDel("/admin/studios/" + id, `Hapus ${s.name}?`, studioImpactText, "Ya, Hapus Studio", s.impact); if (!r) return;
-    AD.studios = AD.books = AD.trx = AD.dash = AD.ops = null; delete AD.open[id]; await masterReload();
+    AD.studios = AD.books = AD.trx = AD.dash = AD.ops = null; AD.sess = {}; delete AD.open[id]; await masterReload();
     msg = `Studio "${s.name}" dihapus.` + (r.cancelled ? ` ${r.cancelled} booking dibatalkan${r.refunded ? `, ${r.refunded} di-refund` : ""}${r.refund_failed ? `, ${r.refund_failed} refund gagal (tindak lanjuti manual di menu Transaksi)` : ""}.` : ""); }); };
 
 // ---------- Sesi studio (panel "Detail Sesi" di accordion studio, Figma): kalender bulan + chip jam per hari ----------
@@ -115,15 +115,15 @@ const sMonth = sid => AD.scal[sid] || todayS().slice(0, 7), sDayOf = sid => AD.s
 async function sessLoad(sid) { const k = sKey(sid); if (AD.sess[k] || AD.loading["s" + k]) return; AD.loading["s" + k] = 1;
   try { AD.sess[k] = await API.get(`/admin/studios/${sid}/sessions?month=${sMonth(sid)}`); } catch (e) { if (e.status == 401 || e.status == 403) { AD.loading["s" + k] = 0; return logout(); } err = e.message; AD.sess[k] = []; }
   AD.loading["s" + k] = 0; render(); }
-const sNav = (sid, dir) => { let [y, m] = sMonth(sid).split("-").map(Number); m += dir; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } AD.scal[sid] = `${y}-${pad(m)}`; AD.sedit = AD.sadd = null; render(); };
+const sNav = (sid, dir) => { let [y, m] = sMonth(sid).split("-").map(Number); m += dir; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } const mo = `${y}-${pad(m)}`; AD.scal[sid] = mo; AD.sday[sid] = todayS().startsWith(mo) ? todayS() : mo + "-01"; AD.sedit = AD.sadd = null; render(); }; // hari terpilih ikut pindah bulan
 const sDay = (sid, ds) => { AD.sday[sid] = ds; AD.sedit = AD.sadd = null; render(); };
 function sessCal(sid, L) {
-  const [y, m] = sMonth(sid).split("-").map(Number), first = (new Date(y, m - 1, 1).getDay() + 6) % 7, dim = new Date(y, m, 0).getDate(), has = new Set(L.map(x => x.date)), day = sDayOf(sid), today = todayS(); let cells = "<i></i>".repeat(first);
+  const [y, m] = sMonth(sid).split("-").map(Number), first = (new Date(y, m - 1, 1).getDay() + 6) % 7, dim = new Date(y, m, 0).getDate(), day = sDayOf(sid), today = todayS(); let cells = "<i></i>".repeat(first);
   for (let d = 1; d <= dim; d++) { const ds = `${y}-${pad(m)}-${pad(d)}`, n = L.filter(x => x.date == ds).length; cells += `<button class="cd ${ds == day ? "on" : ""} ${n ? "dot" : ""} ${ds == today ? "now" : ""}" onclick="sDay(${sid},'${ds}')" aria-label="${ds}${n ? `, ${n} sesi` : ""}" aria-pressed="${ds == day}">${d}</button>`; }
   return `<div class="cal"><div class="calh"><button class="ib" aria-label="Bulan sebelumnya" onclick="sNav(${sid},-1)">${ic("left", 16)}</button><b>${new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" })}</b><button class="ib" aria-label="Bulan berikutnya" onclick="sNav(${sid},1)">${ic("right", 16)}</button></div>
 <div class="calg">${["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"].map(x => `<small>${x}</small>`).join("")}${cells}</div></div>`;
 }
-const sChip = x => `<button class="schip ${x.status == "UNAVAILABLE" ? "full" : ""} ${x.past ? "past" : ""} ${AD.sedit == x.id ? "on" : ""}" onclick="AD.sedit=${AD.sedit == x.id ? "null" : x.id};AD.sadd=null;render()" aria-expanded="${AD.sedit == x.id}">${x.start} - ${x.end}<small>${x.past ? "lewat" : x.status == "UNAVAILABLE" ? "Terisi" : "Tersedia"}${x.booking ? ` · #${x.booking.id} ${esc(x.booking.customer)}` : ""}</small></button>`;
+const sChip = x => `<button class="schip ${x.status == "UNAVAILABLE" ? "full" : ""} ${x.past ? "past" : ""} ${AD.sedit == x.id ? "on" : ""}" onclick="AD.sedit=${AD.sedit == x.id ? "null" : x.id};AD.sadd=null;render()" aria-expanded="${AD.sedit == x.id}">${x.start} - ${x.end}<small>${x.past ? "lewat" : x.booking && x.booking.status == "Sesi Berjalan" ? "Berlangsung" : x.status == "UNAVAILABLE" ? "Terisi" : "Tersedia"}${x.booking ? ` · #${x.booking.id} ${esc(x.booking.customer)}` : ""}</small></button>`;
 function sessEdit(sid, x) {
   const b = x.booking, id = `se${x.id}`;
   return `<div class="sform"><div class="row sp"><b>Sesi ${x.date} · ${x.start} - ${x.end}</b><button class="ibtn del" onclick="sDel(${sid},${x.id})" title="Hapus sesi" aria-label="Hapus sesi ${x.start}">${ic("trash", 18)}</button></div>
@@ -142,15 +142,16 @@ function sessPanel(s) {
 ${D.length ? "" : `<p class="sm m" style="margin-top:10px">Belum ada sesi pada tanggal ini.</p>`}${ed ? sessEdit(s.id, ed) : ""}${AD.sadd == s.id ? sessAdd(s.id) : ""}</div></div></div>`;
 }
 // setelah perubahan: cache sesi studio dibuang, daftar studio (jumlah sesi, dampak hapus) dimuat ulang tanpa layar "Memuat"
-const sRefresh = async sid => { Object.keys(AD.sess).forEach(k => { if (k.startsWith(sid + "|")) delete AD.sess[k]; }); AD.books = AD.trx = AD.dash = AD.ops = null; AD.studios = await API.get("/admin/studios"); };
+const sRefresh = async sid => { Object.keys(AD.sess).forEach(k => { if (k.startsWith(sid + "|")) delete AD.sess[k]; }); AD.books = AD.trx = AD.dash = AD.ops = null; try { AD.studios = await API.get("/admin/studios"); } catch (e) { AD.studios = null; } }; // gagal muat ulang: daftar dimuat lagi saat render
 const sFind = (sid, id) => (AD.sess[sKey(sid)] || []).find(x => x.id == id);
 const sWho = i => i.customers && i.customers.length ? ` (${i.customers.map(esc).join(", ")})` : "";
-const sAdd = sid => aDo(async () => { const id = `sa${sid}`, date = val(id + "d"), r = await API.post(`/admin/studios/${sid}/sessions`, { date, start: val(id + "s"), end: val(id + "e"), repeat: +val(id + "r") || 1 });
+const sAdd = sid => aDo(async () => { const id = `sa${sid}`, date = val(id + "d"), r = await API.post(`/admin/studios/${sid}/sessions`, { date, start: val(id + "s"), end: val(id + "e"), repeat: val(id + "r") === "" ? 1 : +val(id + "r") });
   AD.sadd = null; AD.sday[sid] = date; AD.scal[sid] = date.slice(0, 7); await sRefresh(sid);
   msg = r.created.length > 1 ? `${r.created.length} sesi berhasil ditambahkan.` : "Sesi berhasil ditambahkan."; if (r.skipped.length) msg += ` ${r.skipped.length} tanggal dilewati karena bertabrakan: ${r.skipped.join(", ")}.`; });
 const sSave = (sid, sesId) => { const x = sFind(sid, sesId); if (!x) return; const id = `se${sesId}`, body = { date: val(id + "d"), start: val(id + "s"), end: val(id + "e") };
-  aDo(async () => { const r = await aConfirmReq("PATCH", "/admin/sessions/" + sesId, body, `Ubah sesi ${x.start} - ${x.end}?`, i => `Sesi ini memiliki ${i.active_bookings} booking aktif${sWho(i)}. Setelah dikonfirmasi, jadwal sesi diubah dan pelanggan menerima email berisi jadwal baru.`, "Ya, Ubah Sesi", x.impact, false); if (!r) return; // tanpa dialog awal: server memvalidasi jam dulu, dialog muncul hanya bila server meminta konfirmasi
-    AD.sedit = null; AD.sday[sid] = r.date; AD.scal[sid] = r.date.slice(0, 7); await sRefresh(sid); msg = "Sesi berhasil diperbarui." + (x.impact.active_bookings ? " Pelanggan terdampak sudah diberi tahu lewat email." : ""); }); };
+  const sn = snap(); let back = false;
+  aDo(async () => { const r = await aConfirmReq("PATCH", "/admin/sessions/" + sesId, body, `Ubah sesi ${x.start} - ${x.end}?`, i => `Sesi ini memiliki ${i.active_bookings} booking aktif${sWho(i)}. Setelah dikonfirmasi, jadwal sesi diubah dan pelanggan menerima email berisi jadwal baru.`, "Ya, Ubah Sesi", x.impact, false); if (!r) { back = true; return; } // tanpa dialog awal: server memvalidasi jam dulu, dialog muncul hanya bila server meminta konfirmasi
+    AD.sedit = null; AD.sday[sid] = r.date; AD.scal[sid] = r.date.slice(0, 7); await sRefresh(sid); msg = "Sesi berhasil diperbarui." + (r.notified ? ` ${r.notified} pelanggan terdampak sudah diberi tahu lewat email.` : ""); }).then(() => { if (back) restore(sn); }); };
 const sessImpactText = i => i.active_bookings ? `Sesi ini memiliki ${i.active_bookings} booking aktif${sWho(i)}${i.paid_bookings ? `, ${i.paid_bookings} sudah dibayar (total refund ${rp(i.refund_total)})` : ""}. Setelah dikonfirmasi, booking tersebut dibatalkan, dana yang sudah dibayar dikembalikan 100%, dan pelanggan diberi tahu lewat email.` : "Sesi ini belum memiliki booking aktif dan akan dihapus dari daftar sesi.";
 const sDel = (sid, sesId) => { const x = sFind(sid, sesId); if (!x) return;
   aDo(async () => { const r = await aConfirmDel("/admin/sessions/" + sesId, `Hapus sesi ${x.date} ${x.start} - ${x.end}?`, sessImpactText, "Ya, Hapus Sesi", x.impact); if (!r) return;
@@ -164,7 +165,7 @@ V.abook = () => {
 <td>${["Menunggu Pembayaran", "Terbayar"].includes(b.status) ? `<button class="btn sm ghost" onclick="abookCancel(${b.id})">Batalkan</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="9" class="m">Tidak ada booking.</td></tr>`}</table></div></div>`;
 };
 V.abook_after = () => aLoad("books", () => API.get("/admin/bookings?status=" + encodeURIComponent(AD.bstatus)), []);
-const abookCancel = id => confirm("Batalkan booking ini? Jika sudah dibayar, dana otomatis di-refund.") && aDo(async () => { await API.post(`/admin/bookings/${id}/cancel`, {}); AD.books = null; AD.dash = AD.ops = AD.trx = null; }, "Booking dibatalkan.");
+const abookCancel = id => confirm("Batalkan booking ini? Jika sudah dibayar, dana otomatis di-refund.") && aDo(async () => { await API.post(`/admin/bookings/${id}/cancel`, {}); AD.books = null; AD.dash = AD.ops = AD.trx = AD.studios = null; AD.sess = {}; }, "Booking dibatalkan.");
 
 // ---------- Properti ----------
 const CATS = ["Background", "Topi", "Rompi", "Kalung", "Kacamata", "Lainnya"];
