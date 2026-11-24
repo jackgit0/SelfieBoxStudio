@@ -58,7 +58,10 @@ function previewHTML(st) {
   const style = bg ? (bg.img ? bgi(bg.img) : bg.bg ? `background-image:linear-gradient(135deg,${esc(bg.bg)})` : "") : "";
   return `<div class="pv" style="${style}"><div class="acc">${acc.map(a => `<span title="${esc(a.name)}" style="${a.img ? bgi(a.img) : ""}">${a.img ? "" : esc(a.e || "🎁")}</span>`).join("")}</div></div>`;
 }
+// studio yang tidak tersedia/dihapus tidak bisa dibuka untuk dipesan (riwayat booking tetap memakai studioOf)
+const shown = id => STUDIOS.some(s => s.id == id), noStudio = (edit = false) => `<div class="panel"><div class="card center"><h1 class="h1">Studio tidak tersedia</h1><p class="sub">Studio ini sedang tidak dapat dipesan.</p><div style="margin-top:12px"><button class="btn" onclick="${edit && editId ? `go('bdetail',{id:${editId}})` : "go('home')"}">${edit && editId ? "Kembali ke booking" : "Cari studio lain"}</button></div></div></div>`;
 V.studio = () => {
+  if (!shown(S.p.id)) return noStudio();
   const s = studioOf(S.p.id), st = S.setup, cat = S.pCat || "Semua", cats = ["Semua", ...new Set(PROP.map(p => p.category || "Lainnya"))], list = PROP.filter(p => cat === "Semua" || (p.category || "Lainnya") === cat);
   const add = setupItems(st).reduce((a, p) => a + p.price, 0), on = S.bm.includes(s.id);
   return `<button class="back" onclick="go('home')">${ic("left", 16)} Kembali</button>
@@ -74,7 +77,7 @@ V.studio = () => {
 
 // ---------- booking: langkah 1 (tanggal & waktu) ----------
 V.time = () => {
-  if (!B.studio) return `<div class="card">Pilih studio terlebih dahulu.</div>`;
+  if (!B.studio) return `<div class="card">Pilih studio terlebih dahulu.</div>`; if (!shown(B.studio)) return noStudio(true);
   const s = studioOf(B.studio), d = B.date || (B.date = todayS()), fr = free(s.id, d);
   return `<div class="panel"><button class="back" onclick="editId?go('bdetail',{id:editId}):go('studio',{id:${s.id}})">${ic("left", 16)} ${editId ? "Batal ubah jadwal" : "Kembali"}</button>
 <div class="row sp"><div><h1 class="h1">${editId ? "Ubah Jadwal" : "Pilih Tanggal & Waktu"}</h1><p class="sub">${esc(s.name)} · ${esc(s.address || "")}</p></div>${editId ? "" : '<span class="steps">1/2</span>'}</div>
@@ -101,7 +104,7 @@ function qr() {
 async function applyPromo() { const c = $("#pc").value.trim(); msg = err = ""; try { await loadQuote(c); promoCode = c; if (c) msg = "Kode promo diterapkan."; } catch (e) { err = e.message; try { await loadQuote(promoCode); } catch (x) { promoCode = ""; await loadQuote(); } } render(); }
 async function selectPkg(id) { S.pkg = id; save(); msg = err = ""; try { await loadQuote(promoCode); } catch (e) { promoCode = ""; await loadQuote(); } render(); }
 V.pay = () => {
-  if (!B.slot || !S.pkg || !Q) return `<div class="card">Pilih jadwal terlebih dahulu.</div>`;
+  if (!B.slot || !S.pkg || !Q) return `<div class="card">Pilih jadwal terlebih dahulu.</div>`; if (!shown(B.studio)) return noStudio();
   const s = studioOf(B.studio), p = pkOf(S.pkg), col = f => PKG.map(x => `<td class="${x.id == S.pkg ? "sel" : ""}">${f(x)}</td>`).join(""), method = S.method || "QRIS";
   return `<div class="panel"><button class="back" onclick="go('time')">${ic("left", 16)} Kembali</button><div class="row sp"><h1 class="h1">Paket & Pembayaran</h1><span class="steps">2/2</span></div>
 <div class="card" style="margin-top:16px"><div class="bk"><div><h2 class="h2">Paket</h2><div style="overflow-x:auto;margin-top:8px"><table class="cmp"><tr><th>Fitur</th>${PKG.map(x => `<th>${esc(x.name)}</th>`).join("")}</tr>
@@ -163,7 +166,7 @@ V.bdetail = () => {
   const s = studioOf(b.studio), pt = parseSlot(b.date), pending = b.status == "Menunggu Pembayaran";
   return `<div class="panel"><button class="back" onclick="go('my')">${ic("left", 16)} Booking Saya</button>
 <div class="row sp" style="align-items:flex-start"><div><h1 class="h1"><a href="#" style="color:inherit;text-decoration:none" onclick="go('studio',{id:${s.id}});return false">${esc(s.name)} ${ic("ext", 18)}</a></h1><div class="h1" style="font-size:24px">${slotRange(b.date)}</div></div><div style="text-align:right"><div class="h2">${fmtDate(pt.date)}</div>${stTag(b)}</div></div>
-<div class="row" style="margin:16px 0">${canChange(b) ? `<button class="btn sm" onclick="startReschedule(${b.id})">Reschedule</button><button class="btn sm ghost" onclick="openCancel(${b.id})">Batalkan</button>` : ""}${pending ? `<button class="btn sm" onclick="payNow(${b.id})">Bayar</button>` : ""}${b.status == "Terbayar" ? `<button class="btn sm soft" onclick="startSession(${b.id})">${ic("camera", 16)} Check-in & Mulai Sesi</button>` : ""}${b.status == "Sesi Berjalan" ? `<button class="btn sm soft" onclick="go('session')">Buka Sesi</button>` : ""}</div>
+<div class="row" style="margin:16px 0">${canChange(b) ? `${shown(b.studio) ? `<button class="btn sm" onclick="startReschedule(${b.id})">Reschedule</button>` : ""}<button class="btn sm ghost" onclick="openCancel(${b.id})">Batalkan</button>` : ""}${pending ? `<button class="btn sm" onclick="payNow(${b.id})">Bayar</button>` : ""}${b.status == "Terbayar" ? `<button class="btn sm soft" onclick="startSession(${b.id})">${ic("camera", 16)} Check-in & Mulai Sesi</button>` : ""}${b.status == "Sesi Berjalan" ? `<button class="btn sm soft" onclick="go('session')">Buka Sesi</button>` : ""}</div>
 <div class="card"><h3 class="h3" style="margin-bottom:6px">Detail Booking</h3>${bookRows(b)}<hr><h3 class="h3" style="margin-bottom:6px">Detail Pembayaran</h3>${payDetail(b)}
 ${b.cancel_reason ? `<hr><div class="kv"><span>Alasan pembatalan</span><b>${esc(b.cancel_reason)}</b></div>` : ""}
 ${b.paid && b.status != "Dibatalkan" ? `<div class="row" style="margin-top:12px"><a class="btn sm ghost" href="${API.invUrl(b.id, 1)}" download>${ic("download", 16)} Unduh invoice</a><button class="btn sm ghost" onclick="mailInv(${b.id})">${ic("mail", 16)} Kirim ke email</button></div>` : ""}</div></div>`;

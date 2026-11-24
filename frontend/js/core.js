@@ -1,7 +1,7 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
 const $ = s => document.querySelector(s);
 const BRAND = window.BRAND || "SelfieBox Studio";
-let PKG = [], ALLPKG = [], DISC = { pct: 0, label: "" }, PEOPLE = [], BUDGET = [], STUDIOS = [], VIBES = [], PROP = [], POSES = {}, POLICY = { refund_hours: 2 };
+let PKG = [], ALLPKG = [], DISC = { pct: 0, label: "" }, PEOPLE = [], BUDGET = [], STUDIOS = [], ALLSTUDIOS = [], VIBES = [], PROP = [], POSES = {}, POLICY = { refund_hours: 2 };
 const V = {};
 let S; try { S = JSON.parse(localStorage.getItem("snapia")); } catch (e) {}
 S = Object.assign({ user: null, me: null, admin: false, view: "landing", p: {}, quiz: null, pkg: null, bm: [], staff: false, log: [] }, S || {});
@@ -28,7 +28,7 @@ const fmtTime = ms => ms ? new Date(ms).toLocaleString("id-ID", { timeZone: "Asi
 const pkOf = id => ALLPKG.find(p => p.id == id) || { name: "(paket dihapus)", price: 0, photo_count: 1, dur: 1, strip_size: "", strip_material: "" };
 const eff = p => Math.round(p.price * (1 - (DISC.pct || 0) / 100));
 const ptag = p => DISC.pct ? `<s class="m">${rp(p.price)}</s> ${rp(eff(p))}` : rp(p.price);
-const studioOf = id => STUDIOS.find(s => s.id == id) || { id, name: "(studio dihapus)", img: "", address: "-", price: 0, description: "" };
+const studioOf = id => ALLSTUDIOS.find(s => s.id == id) || { id, name: "(studio dihapus)", img: "", address: "-", price: 0, description: "" };
 const free = (sid, d) => AV[sid + "|" + d] || HRS.filter(h => d > todayS() || h > new Date().getHours());
 const priceRange = s => { if (!PKG.length) return "-"; const v = PKG.map(p => eff(p) + (s.price || 0)); const a = Math.min(...v), b = Math.max(...v); return a === b ? rpk(a) : rpk(a) + " - " + rpk(b); };
 const capLabel = s => ((PEOPLE.find(p => p.id == s.people_range_id) || {}).range || "").replace("-", " - ");
@@ -78,7 +78,7 @@ function shell(inner) {
 }
 // muat ulang data master (studio/properti/paket) bila admin mengubahnya; render ulang hanya jika berbeda
 let _mj = "";
-async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, DISC, PEOPLE, BUDGET, STUDIOS, VIBES, PROP, POSES } = m); if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
+async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, VIBES, PROP, POSES } = m); ALLSTUDIOS = ALLSTUDIOS || STUDIOS; if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
 V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
 function render() {
   if (!S.me && !["auth", "landing"].includes(S.view)) S.view = "landing";
@@ -94,7 +94,7 @@ function render() {
 }
 async function prefetch() {
   const home = S.view === "home", d = home ? (S.hDate || todayS()) : (B.date || todayS()), ids = home ? STUDIOS.map(s => s.id) : (B.studio ? [B.studio] : []); let ch = 0;
-  for (const id of ids) { const k = id + "|" + d; if (AV[k]) continue; try { AV[k] = (await API.get(`/availability?studio_id=${id}&date=${d}`)).free; ch = 1; } catch (e) {} }
+  for (const id of ids) { const k = id + "|" + d; if (AV[k]) continue; try { AV[k] = (await API.get(`/availability?studio_id=${id}&date=${d}`)).free; ch = 1; } catch (e) { if (e.status == 400) { AV[k] = []; ch = 1; } } } // studio ditolak (mis. tidak tersedia): tidak ada slot
   if (ch && ["home", "time"].includes(S.view)) render();
 }
 
