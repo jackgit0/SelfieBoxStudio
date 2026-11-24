@@ -7,7 +7,7 @@ frontend/  index.html · css/style.css · img/ (aset dari Figma)
            customer.js (Beranda, Studio, Booking, Booking Saya, Pembatalan/Refund, Akun)
            session.js (Sesi foto, Google Drive, Galeri) · admin.js (panel admin) · boot.js
 backend/   server.js (REST API + file statis) · db.js (skema + migrasi) · mailer.js (SMTP) · seed.json
-           reset-admin.js · test.js · test-admin.js · test-v3.js · test-v4.js
+           reset-admin.js · reset-db.js · seed-demo.js · test.js · test-admin.js · test-v3.js · test-v4.js
 ```
 
 ## Menjalankan
@@ -19,6 +19,26 @@ npm start                 # http://localhost:3000
 npm test && npm run test:admin && npm run test:v3 && npm run test:v4
 ```
 Database lama (`snapia.db`) otomatis dimigrasi saat server dinyalakan; data tidak hilang.
+
+### Akun demo
+Akun untuk presentasi tidak ditulis di repo; isinya ada di `backend/.env.demo` (tidak di-commit).
+```
+cd backend
+cp .env.demo.example .env.demo   # isi DEMO_ADMIN_*, (opsional) DEMO_CUSTOMER_*, dan DEMO_DATA
+npm run seed:demo                # buat/perbarui akun admin + customer demo di database server
+```
+Boleh dijalankan berulang (akun yang ada diperbarui, password diatur ulang, kunci akun dibuka). Admin demo tidak diminta mengganti password. Jika dijalankan sebelum server pertama kali menyala, akun bawaan `adminstudio`/`admin123` tidak dibuat.
+
+Dengan `DEMO_DATA=1` ikut dibuat: 4 customer contoh (`@selfiebox.test`, password sama dengan customer demo), kode promo `DEMO10` dan `HEMAT20K`, booking di setiap status (Terbayar, Menunggu Pembayaran, Selesai, Dibatalkan dengan refund berhasil / gagal / kedaluwarsa / oleh admin) dengan tanggal relatif ke hari ini, preferensi customer demo, dan 3 item keuangan. Booking milik akun-akun demo itu dihapus lalu dibuat ulang setiap kali dijalankan; data customer lain tidak disentuh. Booking "Menunggu Pembayaran" otomatis batal 15 menit setelah seed, jadi jalankan ulang tepat sebelum demo.
+
+### Reset database (lokal)
+```
+cd backend
+npm run db:reset                 # minta konfirmasi, hapus database + isi uploads/ media/ outbox/, isi ulang seed.json
+npm run db:reset -- --demo       # sekaligus jalankan seed:demo
+npm run db:reset -- --yes --keep-files   # tanpa konfirmasi, berkas unggahan tidak dihapus
+```
+Matikan server dulu (script menolak jika server masih jalan di `PORT`). Semua customer, booking, pembayaran, promo, galeri, dan akun admin hilang; data awal (paket, studio, vibe, properti, pose) dibuat ulang.
 
 ## UI (mengikuti file Figma IMK)
 Font Poppins, warna biru `#506fce` + oranye `#f28800`. Desktop: navbar atas (Beranda · Booking · Galeri). Mobile: top bar + bottom bar.
@@ -49,10 +69,4 @@ Halaman utama satu halaman gulir dengan navbar (Home, About, Fasilitas, Keterang
 - 5x salah login -> akun terkunci 15 menit. Respons login sama untuk username salah/password salah.
 - Lupa password / akun terkunci: `cd backend && node reset-admin.js <username> <password-baru>`.
 - Kelola dari panel: menu **Akun Admin** (ganti username/password).
-
-(AKUN ADMIN
-
-id : adminstudio
-pw : admin123
-another pw : admin.123
-)
+- Akun demo untuk presentasi: lihat bagian **Akun demo** (`npm run seed:demo`).
