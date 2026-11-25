@@ -73,3 +73,7 @@ export function deleteBookingBody(detail, slotHours, impact) {
   const mail = ["Menunggu Pembayaran", "Terbayar"].includes(impact.status) ? " Pelanggan menerima email pemberitahuan." : "";
   return html`<p>${bookingLine(detail, slotHours)} atas nama ${detail.customer.name}. Status booking: ${impact.status} (${impact.paid ? "sudah dibayar" : "belum dibayar"}). ${effect}${mail} Tindakan ini tidak dapat dibatalkan.</p>`;
 }
+
+// ---------- Properti dan Pose (dulu confirm() bawaan browser) ----------
+export const deletePropertyBody = () => html`<p>Hapus properti ini?</p>`;
+export const deletePoseBody = () => html`<p>Hapus pose ini?</p>`;

@@ -39,6 +39,8 @@ import { galleryView } from "./views/session/gallery.js";
 import { dashboardView } from "./views/admin/dashboard.js";
 import { studiosView } from "./views/admin/studios.js";
 import { bookingsView } from "./views/admin/bookings.js";
+import { propertiesView } from "./views/admin/properties.js";
+import { posesView } from "./views/admin/poses.js";
 import { usersView } from "./views/admin/users.js";
 import { transactionsView } from "./views/admin/transactions.js";
 import { packagesView as adminPackagesView } from "./views/admin/packages.js";
@@ -59,9 +61,8 @@ import { loginView } from "./views/auth/login.js";
 import { registerView } from "./views/auth/register.js";
 import { forgotView } from "./views/auth/forgot.js";
 import { resetView } from "./views/auth/reset.js";
-import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
+import { S, M, BK, R, D, AD, connectLegacy } from "./legacy/state.js";
 import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell } from "./legacy/core.js";
-import { AD } from "./legacy/admin.js";
 import { installLegacyBridge } from "./legacy-bridge.js";
 import { registerLegacyActions } from "./legacy-actions.js";
 
@@ -158,10 +159,12 @@ function pagesFor({ studio, payment, landing, photo, gallery, admin, adminBookin
     "/sessions/:id": { view: photoSessionView, after: match => photo.enter(match), leave: () => photo.stopTimers() },
     // Galeri (GalleryController)
     "/gallery": { view: galleryView },
-    // panel admin (AdminController; Studio + Detail Sesi = StudioController; Booking = AdminBookingController); Properti, Pose masih V.<view> lama (fase 8b)
+    // panel admin (AdminController; Studio + Detail Sesi = StudioController; Booking = AdminBookingController)
     "/admin": { view: dashboardView, after: () => admin.loadDashboard() },
     "/admin/studios": { view: studiosView, after: () => studio.loadStudios() },
     "/admin/bookings": { view: bookingsView, after: () => adminBooking.load() },
+    "/admin/props": { view: propertiesView, after: () => admin.loadProperties() },
+    "/admin/poses": { view: posesView, after: () => admin.loadPoses() },
     "/admin/users": { view: (state, match) => usersView(state, match, links), after: () => admin.loadUsers() },
     "/admin/transactions": { view: transactionsView, after: () => admin.loadTransactions() },
     "/admin/packages": { view: adminPackagesView, after: () => admin.loadPackagesPage() },
@@ -204,6 +207,13 @@ function controllerActions({ studio, package: packages, booking, payment, accoun
     "studio:addSession": (dataset, event) => studio.addSession(dataset, formValues(event.target)),
     "studio:saveSession": (dataset, event) => studio.saveSession(dataset, formValues(event.target)),
     "studio:deleteSession": studio.deleteSession,
+    "admin:saveProperty": (dataset, event) => admin.saveProperty(dataset, formValues(event.target)),
+    "admin:addProperty": (dataset, event) => admin.addProperty(formValues(event.target)),
+    "admin:uploadPropertyImage": (dataset, event) => admin.uploadPropertyImage(dataset, event.target.files[0], formValues(event.target.form)),
+    "admin:deleteProperty": admin.deleteProperty,
+    "admin:savePose": (dataset, event) => admin.savePose(dataset, formValues(event.target)),
+    "admin:addPose": (dataset, event) => admin.addPose(formValues(event.target)),
+    "admin:deletePose": admin.deletePose,
     "adminBooking:setFilter": adminBooking.setFilter,
     "adminBooking:open": adminBooking.open,
     "adminBooking:close": adminBooking.close,
@@ -282,7 +292,7 @@ async function start() {
   const account = createAccountController({ api, store, models });
   // AuthController dan AdminController saling memakai: keluar (auth.logout) dan dialog Akses ditolak (admin.showAccessDenied)
   const auth = createAuthController({ api, store, ui, router: navigation, models, booking, accessDenied: () => admin.showAccessDenied() });
-  admin = createAdminController({ api, store, ui, router: navigation, models, logout: () => auth.logout() });
+  admin = createAdminController({ api, store, ui, router: navigation, models, logout: () => auth.logout(), files });
   const landing = createLandingController({ api, store, router: navigation, models, page: createLandingPage({ document, window }), timers: { setTimeout: (callback, delay) => window.setTimeout(callback, delay) } });
   const photo = createPhotoSessionController({
     api,

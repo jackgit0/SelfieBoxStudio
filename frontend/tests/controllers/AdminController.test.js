@@ -393,3 +393,80 @@ test("saveAccount: 403 Password saat ini salah → toast galat, admin tetap masu
   assert.ok(!log.includes("logout"));
   assert.deepEqual(store.get().admin.drafts.account, { username: "admin2" });
 });
+
+// ---------- Properti dan Pose (fase 8b) ----------
+import * as masterModel from "../../js/models/master.js";
+
+function setupCatalog({ responses = {}, modalAnswers = [], admin = {}, readImage = async file => "data:" + file.name } = {}) {
+  const store = createStore({ ...sampleState({ persisted: { admin: true }, runtime: { accessDeniedOpen: false } }), admin: { ...createAdminState(), me: { username: "admin", must_change: false }, ...admin } }, { storage: createFakeStorage(), persistKey: "snapia" });
+  const api = createFakeApi({ "GET /master": { body: { PKG: [], ALLPKG: [], DISC: { pct: 0, label: "" }, PEOPLE: [], BUDGET: [], STUDIOS: [], PROP: [{ id: 9, name: "Baru" }], POSES: {}, POLICY: {} } }, ...responses });
+  const ui = createFakeUi({ modalAnswers });
+  const controller = createAdminController({ api, store, ui, router: { navigate: () => {} }, models: { admin: adminModels, master: masterModel }, logout: () => {}, files: { readImage } });
+  return { store, api, ui, controller, requests: () => api.calls.map(call => `${call.method} ${call.path}`), admin: () => store.get().admin, toast: () => store.get().runtime.toast };
+}
+
+test("properti: muat sekali ke admin.properties", async () => {
+  const { controller, admin, requests } = setupCatalog({ responses: { "GET /admin/properties": { body: [{ id: 4 }] } } });
+  await controller.loadProperties();
+  await controller.loadProperties();
+  assert.deepEqual(requests(), ["GET /admin/properties"]);
+  assert.deepEqual(admin().properties, [{ id: 4 }]);
+});
+
+test("properti: simpan baris (PATCH + gambar baru), daftar dan properti master dimuat ulang; tambah = POST; gagal → draf baris", async () => {
+  const { controller, api, requests, admin, toast, store } = setupCatalog({ admin: { properties: [], images: { "property-4": "/media/t.jpg" }, drafts: { "property-4": { name: "lama" } } }, responses: { "PATCH /admin/properties/4": { body: {} }, "POST /admin/properties": { body: {} } } });
+  await controller.saveProperty({ id: "4" }, { name: "Topi", category: "Topi", qty: "3" });
+  assert.deepEqual(api.calls[0].body, { name: "Topi", category: "Topi", qty: 3, img: "/media/t.jpg" });
+  assert.deepEqual(requests(), ["PATCH /admin/properties/4", "GET /master"]);
+  assert.equal(toast().message, "Properti disimpan.");
+  assert.deepEqual([admin().properties, admin().images, admin().drafts], [null, {}, {}]);
+  assert.deepEqual(store.get().master.properties, [{ id: 9, name: "Baru" }]);
+  await controller.addProperty({ name: "Rompi", category: "Rompi", qty: "1" });
+  assert.equal(requests()[2], "POST /admin/properties");
+  const failed = setupCatalog({ admin: { properties: [] }, responses: { "POST /admin/properties": { status: 400, body: { error: "Nama properti wajib diisi" } } } });
+  await failed.controller.addProperty({ name: "", category: "Topi", qty: "1" });
+  assert.equal(failed.toast().error, "Nama properti wajib diisi");
+  assert.deepEqual(failed.admin().drafts["property-new"], { name: "", category: "Topi", qty: "1" });
+});
+
+test("properti: unggah foto → isian baris jadi draf, gambar di admin.images, toast Klik Simpan; gagal → toast galat", async () => {
+  const { controller, admin, toast, api } = setupCatalog({ admin: { properties: [] }, responses: { "POST /admin/media": { body: { url: "/media/p.jpg" } } } });
+  await controller.uploadPropertyImage({ key: "4" }, { name: "p.png" }, { name: "Ketikan" });
+  assert.deepEqual(api.calls[0].body, { data: "data:p.png" });
+  assert.equal(admin().images["property-4"], "/media/p.jpg");
+  assert.deepEqual(admin().drafts["property-4"], { name: "Ketikan" });
+  assert.equal(toast().message, "Gambar diunggah. Klik Simpan untuk menerapkan.");
+  await controller.uploadPropertyImage({ key: "new" }, null, {});
+  assert.equal(api.calls.length, 1);
+  const broken = setupCatalog({ readImage: async () => { throw new Error("File bukan gambar"); } });
+  await broken.controller.uploadPropertyImage({ key: "new" }, { name: "x" }, {});
+  assert.equal(broken.toast().error, "File bukan gambar");
+});
+
+test("properti: hapus lewat modal Konfirmasi Hapus Properti; Kembali → tanpa permintaan", async () => {
+  const { controller, ui, requests, toast } = setupCatalog({ modalAnswers: [false, true], admin: { properties: [] }, responses: { "DELETE /admin/properties/4": { body: {} } } });
+  await controller.deleteProperty({ id: "4" });
+  assert.deepEqual(requests(), []);
+  await controller.deleteProperty({ id: "4" });
+  assert.equal(ui.modals[0].title, "Konfirmasi Hapus Properti");
+  assert.match(String(ui.modals[0].body), /<p>Hapus properti ini\?<\/p>/);
+  assert.deepEqual(ui.modals[0].buttons.map(button => button.label), ["Kembali", "Ya, Hapus Properti"]);
+  assert.deepEqual(requests(), ["DELETE /admin/properties/4", "GET /master"]);
+  assert.equal(toast().message, "Properti dihapus.");
+});
+
+test("pose: muat, simpan (PATCH), tambah (POST), gagal → draf, hapus lewat modal Konfirmasi Hapus Pose", async () => {
+  const { controller, api, requests, admin, toast, ui } = setupCatalog({ modalAnswers: [true], responses: { "GET /admin/poses": { body: [{ id: 6 }] }, "PATCH /admin/poses/6": { body: {} }, "POST /admin/poses": { status: 400, body: { error: "Nama pose wajib diisi" } }, "DELETE /admin/poses/6": { body: {} } } });
+  await controller.loadPoses();
+  await controller.savePose({ id: "6" }, { nama: "Lompat", people_range_id: "2" });
+  assert.deepEqual(api.calls[1].body, { nama: "Lompat", people_range_id: 2 });
+  assert.equal(toast().message, "Pose disimpan.");
+  assert.equal(admin().poses, null);
+  await controller.addPose({ nama: "", people_range_id: "1" });
+  assert.deepEqual(admin().drafts["pose-new"], { nama: "", people_range_id: "1" });
+  await controller.deletePose({ id: "6" });
+  assert.equal(ui.modals[0].title, "Konfirmasi Hapus Pose");
+  assert.match(String(ui.modals[0].body), /Hapus pose ini\?/);
+  assert.deepEqual(requests(), ["GET /admin/poses", "PATCH /admin/poses/6", "POST /admin/poses", "DELETE /admin/poses/6"]);
+  assert.equal(toast().message, "Pose dihapus.");
+});

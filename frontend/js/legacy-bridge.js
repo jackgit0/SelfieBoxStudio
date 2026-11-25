@@ -4,15 +4,13 @@
 // Daftar = semua nama milik js/legacy yang muncul di teks string kode lama (lebih luas dari yang benar-benar dipakai atribut, tidak masalah).
 import * as state from "./legacy/state.js";
 import * as core from "./legacy/core.js";
-import * as admin from "./legacy/admin.js";
 
 const BRIDGED = {
   state: ["R", "S"],
   core: ["go", "ic", "me", "modal", "render"],
-  admin: ["AD", "loading", "poseDel", "poseSave", "propDel", "propSave", "pthumb", "sel", "upImg"],
 };
 
-const MODULES = { state, core, admin };
+const MODULES = { state, core };
 
 // dipanggil main.js sebelum render pertama
 export function installLegacyBridge() {

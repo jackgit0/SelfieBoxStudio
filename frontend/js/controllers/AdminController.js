@@ -2,8 +2,9 @@
 // - load(key, request, fallback): muat sekali ke slice admin (penanda loading), galat lewat handleError
 // - run(action, okMessage, what, { draft }): aksi admin dengan toast hasil; galat lewat handleError, isian form yang gagal disimpan sebagai draf
 // - handleError: 401 → keluar; 403 "Hanya admin" → dialog Akses ditolak; 403 "Ganti password" → Akun Admin; selain itu toast galat
-// logout = AuthController.logout (main.js). Halaman Studio, Booking, Properti dan Pose masih kode lama (fase 8b) dan memakai inti ini lewat CONTROLLERS.admin.
-import { DEFAULT_DENIED, accessDeniedModal, confirmModal, deleteCustomerBody, deleteOperationBody, deletePackageBody } from "../views/admin/dialogs.js";
+// logout = AuthController.logout (main.js). Studio + Detail Sesi = StudioController, Booking = AdminBookingController (memakai inti ini);
+// Properti dan Pose di sini (fase 8b). files.readImage(file) → data URL yang sudah diperkecil (components/imageFile.js)
+import { DEFAULT_DENIED, accessDeniedModal, confirmModal, deleteCustomerBody, deleteOperationBody, deletePackageBody, deletePoseBody, deletePropertyBody } from "../views/admin/dialogs.js";
 
 // isi awal slice admin (dulu objek AD dan adminReset)
 export function createAdminState() {
@@ -45,7 +46,7 @@ export function createAdminState() {
   };
 }
 
-export function createAdminController({ api, store, ui, router, models, logout }) {
+export function createAdminController({ api, store, ui, router, models, logout, files = null }) {
   const state = () => store.get();
   const admin = () => state().admin;
   const pages = models.admin;
@@ -284,6 +285,70 @@ export function createAdminController({ api, store, ui, router, models, logout }
       );
     },
 
+    // ---------- Properti (/admin/props) ----------
+    loadProperties() {
+      return controller.load("properties", () => pages.properties.loadProperties(api), []);
+    },
+
+    // values = isian baris (form property-form-<id>); gambar baru dari admin.images["property-<id>"]
+    saveProperty({ id }, values) {
+      return savePropertyForm(id, values);
+    },
+
+    addProperty(values) {
+      return savePropertyForm(null, values);
+    },
+
+    // foto baris properti (data-change pada input file berform=): isian baris saat itu disimpan sebagai draf agar tidak hilang saat dirender ulang
+    async uploadPropertyImage({ key }, file, values = {}) {
+      if (!file) {
+        return;
+      }
+      setToast({});
+      store.update("admin", { drafts: { ...admin().drafts, ["property-" + key]: values } }, { silent: true });
+      try {
+        const url = await pages.uploads.uploadImage(api, await files.readImage(file));
+        store.update("admin", { images: { ...admin().images, ["property-" + key]: url } }, { silent: true });
+        setToast({ message: "Gambar diunggah. Klik Simpan untuk menerapkan." });
+      } catch (error) {
+        setToast({ error: error.message });
+      }
+      store.update("admin", {});
+    },
+
+    async deleteProperty({ id }) {
+      if (!(await controller.confirm({ title: "Konfirmasi Hapus Properti", body: deletePropertyBody(), okLabel: "Ya, Hapus Properti" }))) {
+        return;
+      }
+      await controller.run(async () => {
+        await pages.properties.deleteProperty(api, id);
+        await reloadProperties();
+      }, "Properti dihapus.");
+    },
+
+    // ---------- Pose (/admin/poses) ----------
+    loadPoses() {
+      return controller.load("poses", () => pages.poses.loadPoses(api), []);
+    },
+
+    savePose({ id }, values) {
+      return savePoseForm(id, values);
+    },
+
+    addPose(values) {
+      return savePoseForm(null, values);
+    },
+
+    async deletePose({ id }) {
+      if (!(await controller.confirm({ title: "Konfirmasi Hapus Pose", body: deletePoseBody(), okLabel: "Ya, Hapus Pose" }))) {
+        return;
+      }
+      await controller.run(async () => {
+        await pages.poses.deletePose(api, id);
+        store.update("admin", { poses: null }, { silent: true });
+      }, "Pose dihapus.");
+    },
+
     // ---------- Akun Admin (/admin/account) ----------
     // values = { username, current_password, new_password, new_password_repeat }; setelah galat hanya username yang tetap
     async saveAccount(values) {
@@ -310,6 +375,41 @@ export function createAdminController({ api, store, ui, router, models, logout }
       );
     },
   };
+
+  // daftar properti dimuat ulang, properti di data master (halaman studio pelanggan) juga
+  async function reloadProperties() {
+    store.update("admin", { properties: null }, { silent: true });
+    store.update("master", await models.master.loadMaster(api), { silent: true });
+  }
+
+  // simpan satu baris properti (id null = baru); galat → isian baris itu disimpan sebagai draf
+  function savePropertyForm(id, values) {
+    const key = "property-" + (id || "new");
+    return controller.run(
+      async () => {
+        await pages.properties.saveProperty(api, id, pages.properties.propertyBody(values, admin().images[key]));
+        const { [key]: droppedImage, ...images } = admin().images;
+        store.update("admin", { images, drafts: withoutDraft(key) }, { silent: true });
+        await reloadProperties();
+      },
+      "Properti disimpan.",
+      undefined,
+      { draft: { key, values } },
+    );
+  }
+
+  function savePoseForm(id, values) {
+    const key = "pose-" + (id || "new");
+    return controller.run(
+      async () => {
+        await pages.poses.savePose(api, id, pages.poses.poseBody(values));
+        store.update("admin", { poses: null, drafts: withoutDraft(key) }, { silent: true });
+      },
+      "Pose disimpan.",
+      undefined,
+      { draft: { key, values } },
+    );
+  }
 
   // simpan satu baris paket: daftar dimuat ulang; galat → isian baris itu disimpan sebagai draf
   function savePackageForm(key, values, request, okMessage) {

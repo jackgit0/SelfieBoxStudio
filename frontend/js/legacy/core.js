@@ -1,12 +1,11 @@
-// ===== INTI (sisa): utilitas, ikon, navigasi go()/goPath(), kait render, modal dan toast untuk kode lama admin.js =====
-import { BK, CONTROLLERS, M, R, RENDERER, ROUTER, S, V, save, saveBooking } from "./state.js";
+// ===== INTI (sisa): utilitas, ikon, navigasi go()/goPath(), kait render (dihapus di fase 9) =====
+import { AD, BK, CONTROLLERS, M, R, RENDERER, ROUTER, S, V, save, saveBooking } from "./state.js";
 import { raw } from "../core/html.js";
 import { icon, iconFilled } from "../components/icon.js";
 import { openModal } from "../components/modal.js";
 import { renderToasts } from "../components/toast.js";
 import * as masterModel from "../models/master.js";
 import { legacyPath } from "../core/router.js";
-import { AD } from "./admin.js";
 import { composeOutlet, layoutOf, shellMarkup } from "../core/render.js";
 import { adminHeader, adminTitle } from "../components/adminSidebar.js";
 const $ = s => document.querySelector(s);

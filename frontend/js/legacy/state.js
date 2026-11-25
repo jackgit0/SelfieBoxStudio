@@ -1,4 +1,6 @@
 // ===== STATE BERSAMA KODE LAMA (refactor MVC fase 2) =====
+// AD (slice admin) dari createAdminState(): AdminController hanya mengimpor view dialog, jadi modul ini tetap daun bagi berkas lama
+import { createAdminState } from "../controllers/AdminController.js";
 // Objek fase 1 dalam satu modul daun (tidak mengimpor berkas fitur), agar sudah terisi sebelum berkas fitur menjalankan V.home = … saat dimuat:
 // core.js dan berkas fitur saling mengimpor, sehingga sebagian berkas fitur dievaluasi lebih dulu daripada core.js (decisions.md 31).
 // main.js membungkus objek-objek ini dengan store (slice persisted = S, master = M, booking = BK, runtime = R, data = D) lalu memanggil connectLegacy().
@@ -13,6 +15,8 @@ export const V = {};
 export const D = { bookings: [], sessions: [] };
 // state sementara (tidak disimpan): rute aktif (dari router: nama view, params, query, judul, tab), toast, cache ketersediaan slot, bulan kalender, isian pembatalan, mode form masuk + token reset, form Contact Us di landing, dialog Akses Ditolak yang sedang terbuka
 export const R = { route: { name: "landing", path: "/", params: {}, query: {}, title: "", tab: null }, toast: { message: "", error: "" }, availability: {}, calendar: {}, cancel: { reason: "", detail: "" }, auth: { mode: "login", resetToken: "" }, contact: { n: "", e: "", m: "", ok: "", err: "", busy: false }, accessDeniedOpen: false };
+// slice admin (store): isi awal dari AdminController; dibaca header admin dan guard di core.js/main.js; dikosongkan saat keluar (AuthController.logout)
+export const AD = createAdminState();
 // booking yang sedang diisi: studio, tanggal, sesi; quote = rincian harga dari /api/quote; rescheduleId = id booking yang sedang diubah jadwalnya
 export const BK = { studio: null, date: null, slot: null, quote: null, rescheduleId: null };
 
