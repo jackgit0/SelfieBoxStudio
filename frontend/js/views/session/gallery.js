@@ -25,9 +25,13 @@ export function userSessions(state) {
   return state.data.sessions.filter(session => session.user_id == state.persisted.me);
 }
 
+// sesi yang dibuka Galeri: pilihan user, selain itu sesi yang paling akhir dimulai. Sesi dibuat bersama booking dan server mengurutkan
+// menurut id, jadi sesi yang baru dimulai bisa ber-id lebih kecil daripada sesi lama (dulu: sesi terakhir di daftar, bisa sesi lama yang kosong)
 export function gallerySessionOf(state) {
   const sessions = userSessions(state);
-  return sessions.find(session => session.id == state.photo.gallerySession) || sessions[sessions.length - 1];
+  const startedAt = session => new Date(session.start_time).getTime() || 0;
+  const latest = sessions.reduce((best, session) => (!best || startedAt(session) >= startedAt(best) ? session : best), null);
+  return sessions.find(session => session.id == state.photo.gallerySession) || latest;
 }
 
 function photoTile(session, photo, { deleteMode, deleteSelection }) {

@@ -73,3 +73,17 @@ test("modal hapus foto, hapus massal dan gagal hapus", () => {
   assert.equal(deleteSelectedModal(3).title, "Konfirmasi Hapus Foto");
   assert.deepEqual({ ...deleteFailedModal("<b>x"), body: String(deleteFailedModal("<b>x").body) }, { title: "Foto Gagal Dihapus", body: "<p>&lt;b&gt;x</p>" });
 });
+
+// sesi dibuat bersama booking, jadi id tidak mengikuti urutan mulai: sesi yang baru dimulai (id 61) bisa lebih kecil
+// daripada sesi lama hasil seed (64, 65). Galeri membuka sesi yang paling akhir dimulai, bukan id terbesar.
+test("tanpa pilihan: galeri membuka sesi yang paling akhir dimulai, walau id-nya lebih kecil", () => {
+  const sessions = [
+    { id: 61, user_id: 5, pkg: 1, start_time: "2026-11-25T11:35:07.000Z", photos: photos(), confirmed: false },
+    { id: 64, user_id: 5, pkg: 2, start_time: "2026-11-21T05:00:00.000Z", photos: [], confirmed: false },
+    { id: 65, user_id: 5, pkg: 2, start_time: "2026-11-15T10:00:00.000Z", photos: [], confirmed: false },
+  ];
+  const text = render(stateWith({ sessions }));
+  assert.match(text, /<option value="61" selected>/);
+  assert.doesNotMatch(text, /Belum ada foto pada sesi ini/);
+  assert.match(render(stateWith({ sessions, current: 65 })), /<option value="65" selected>/);
+});
