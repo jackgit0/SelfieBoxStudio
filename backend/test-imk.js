@@ -153,9 +153,8 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     const dl = await call('DELETE', '/admin/packages/4', null, AD); ok(dl.s === 200 && !(await call('GET', '/master')).j.PKG.some(p => p.id === 4), 'paket yang dihapus admin tidak ada di PKG');
     ok((await call('POST', '/quote', { package_id: 2, studio_id: 1 }, U)).j.error === 'Paket tidak valid', 'quote dengan paket nonaktif: "Paket tidak valid" (pemicu popup)');
     // 1–2. frontend
-    const JS = allJs(), core = src('js/legacy/core.js'), aj = src('js/legacy/admin.js'), cj = src('js/legacy/customer.js'), boot = src('js/main.js'); // fase 2: berkas lama di js/legacy, isi boot.js di main.js
-    ok(/function modal\(/.test(core) && core.includes('aria-modal="true"') && core.includes('Escape'), 'core.js: dialog bersama modal() dengan aria-modal dan Escape'); // kode: diganti di fase 4 (test-map.md)
-    ok(core.includes('.mbtn button").focus()'), 'core.js: fokus awal dialog di tombol aksi, bukan di tombol dalam isi (mis. daftar paket)'); // kode: diganti di fase 4 (test-map.md)
+    const JS = allJs(), aj = src('js/legacy/admin.js'), cj = src('js/legacy/customer.js'), boot = src('js/main.js'); // fase 2: berkas lama di js/legacy, isi boot.js di main.js
+    // dialog bersama (aria-modal, Escape, fokus awal di tombol aksi): frontend/tests/components/modal.test.js + smoke walk K2 (refactor MVC fase 4)
     ok(!/function aModal\(/.test(aj) && /aModal\s*=.*modal\(/.test(aj), 'admin.js: aModal tidak lagi berdiri sendiri, memakai modal() bersama'); // kode: diganti di fase 8a (test-map.md)
     for (const s of ['Pilihan Paket', 'Temukan Paket Sesuai Kebutuhanmu', 'Pilih Paket Ini', 'Lihat semua paket', 'Paling Favorit', '/ sesi', 'Paket Foto Tidak Ditemukan', 'Lihat & Pilih Paket Lain', 'Hubungi Customer Service', 'Pilih studio untuk melanjutkan']) ok(JS.includes(s), `frontend memuat "${s}"`);
     for (const s of ['V.packages', 'M.favouritePackageId', 'csContact()']) ok(cj.includes(s), `customer.js memuat "${s}"`); // kode: diganti di fase 5a (test-map.md)

@@ -1,7 +1,10 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
 import { API, BK, D, M, R, ROUTER, S, V, save, saveBooking } from "./state.js";
 import { BRAND, CS_EMAIL, CS_WA } from "../config.js";
-import { esc } from "../core/html.js";
+import { esc, raw } from "../core/html.js";
+import { icon, iconFilled } from "../components/icon.js";
+import { openModal } from "../components/modal.js";
+import { renderToasts } from "../components/toast.js";
 import { SESSION_HOURS as HRS, formatRupiah as rp, parseSlot, todayIso as todayS } from "../core/format.js";
 import * as masterModel from "../models/master.js";
 import { legacyPath } from "../core/router.js";
@@ -22,23 +25,9 @@ const priceRange = s => masterModel.priceRange(M, s);
 const capLabel = s => masterModel.capacityLabel(M, s);
 
 // ---------- ikon (garis, 24px) ----------
-const IC = {
-  home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>', calendar: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/>',
-  images: '<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/>', user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
-  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z"/>', users: '<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.8c2.4.6 4 2.2 4 5.2"/>',
-  tag: '<path d="M3 12V4h8l10 10-8 8L3 12z"/><circle cx="7.5" cy="8.5" r="1.2"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
-  down: '<path d="M6 9l6 6 6-6"/>', up: '<path d="M6 15l6-6 6 6"/>', left: '<path d="M15 6l-6 6 6 6"/>', right: '<path d="M9 6l6 6-6 6"/>', check: '<path d="M5 12l5 5 9-10"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
-  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', camera: '<path d="M4 8h3l2-3h6l2 3h3v12H4z"/><circle cx="12" cy="13" r="4"/>', settings: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
-  receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6"/>', logout: '<path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/>', plus: '<path d="M12 5v14M5 12h14"/>',
-  edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/>', ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-  pin: '<path d="M12 21s7-6 7-11a7 7 0 10-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>', studio: '<path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/>',
-  glasses: '<circle cx="7" cy="14" r="4"/><circle cx="17" cy="14" r="4"/><path d="M11 14h2M3 14l2-8M21 14l-2-8"/>', run: '<circle cx="14" cy="4" r="2"/><path d="M7 21l3-6 3 2v4M10 15l1-5 4 2 3-1M9 10l-3 2"/>',
-  card: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/>', upload: '<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>', dash: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
-  download: '<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>', refresh: '<path d="M20 11a8 8 0 00-14-4M4 4v4h4M4 13a8 8 0 0014 4M20 20v-4h-4"/>', box: '<path d="M3 7l9-4 9 4v10l-9 4-9-4V7zM3 7l9 4 9-4M12 11v10"/>', menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
-  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>', alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16h.01"/>'
-};
-const ic = (n, s = 20) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[n] || ""}</svg>`;
-const icf = (n, s = 20) => ic(n, s).replace('fill="none"', 'fill="currentColor"');
+// components/icon.js; ic/icf mengembalikan string untuk template lama
+const ic = (n, s = 20) => icon(n, s).markup;
+const icf = (n, s = 20) => iconFilled(n, s).markup;
 
 // ---------- navigasi ----------
 // halaman = rute di core/router.js (path history); tamu boleh melihat studio, paket dan mengisi form booking, login diminta saat Check Out (keputusan 34–35).
@@ -69,18 +58,9 @@ function syncReschedule(id) {
 document.addEventListener("click", () => { const m = $("#menu"); if (m) m.hidden = true; });
 const toggleMenu = e => { e.stopPropagation(); const m = $("#menu"); m.hidden = !m.hidden; };
 const openAcct = tab => go("account", { tab });
-// dialog bersama (Figma "Konfirmasi …" dan popup error): resolve dengan value tombol yang ditekan, null bila ditutup (Escape / klik di luar).
-// body = HTML yang sudah di-escape pemanggil; buttons = [{ label, value, style ("ghost"/"soft"/"danger"), icon }]; kicker = HTML di atas judul; cls = kelas tambahan .mbox;
-// tombol di dalam body dengan atribut data-v="…" juga menutup dialog dan resolve dengan string itu
-function modal({ title, body = "", buttons = [{ label: "Tutup", value: null }], kicker = "", cls = "" }) {
-  return new Promise(res => { const d = document.createElement("div"), back = document.activeElement; d.className = "mdl";
-    d.innerHTML = `<div class="mbox ${cls}" role="dialog" aria-modal="true" aria-labelledby="mdl-t">${kicker}<h3 id="mdl-t">${esc(title)}</h3><div class="mtx">${body}</div><div class="row mbtn">${buttons.map((b, i) => `<button class="btn sm ${b.style || ""}" data-i="${i}">${b.icon ? ic(b.icon, 16) : ""}${esc(b.label)}</button>`).join("")}</div></div>`;
-    const key = e => { if (e.key === "Escape") done(null); else if (e.key === "Tab") { e.preventDefault(); const bs = [...d.querySelectorAll("button")], i = bs.indexOf(document.activeElement); bs[(i + (e.shiftKey ? bs.length - 1 : 1)) % bs.length].focus(); } },
-      done = v => { d.remove(); document.removeEventListener("keydown", key); if (back && back.focus && document.contains(back)) back.focus(); res(v); };
-    d.onclick = e => { const b = e.target.closest("button[data-i], button[data-v]"); if (b) done(b.dataset.i !== undefined ? buttons[b.dataset.i].value : b.dataset.v); else if (e.target === d) done(null); };
-    document.addEventListener("keydown", key); document.body.appendChild(d); d.querySelector(".mbtn button").focus(); });
-}
-const toasts = () => (R.toast.message ? `<div class="toast">${esc(R.toast.message)}</div>` : "") + (R.toast.error ? `<div class="toast err">${esc(R.toast.error)}</div>` : "");
+// dialog bersama: components/modal.js openModal(); body dan kicker kode lama berupa HTML yang sudah di-escape pemanggil, cls = kelas tambahan .mbox
+const modal = ({ body = "", kicker = "", cls = "", ...options }) => openModal({ ...options, body: raw(body), kicker: raw(kicker), className: cls });
+const toasts = () => renderToasts(R.toast).markup;
 
 const acctMenu = () => `<div class="usr">${S.staff ? '<span class="tag warn">Staf</span>' : ""}<span class="uname">${esc(me().name)}</span><button class="avatar" aria-label="Menu akun" onclick="toggleMenu(event)">${ic("user", 20)}</button>
 <div id="menu" class="menu" hidden><button onclick="openAcct('profile')">${ic("user", 18)} Pengaturan Akun</button><button onclick="openAcct('pay')">${ic("receipt", 18)} Riwayat Pembayaran</button>

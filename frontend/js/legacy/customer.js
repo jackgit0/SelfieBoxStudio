@@ -4,6 +4,7 @@ import { BRAND } from "../config.js";
 import { esc } from "../core/html.js";
 import { SESSION_HOURS as HRS, formatDayMonthYear as fmtDMY, formatDate as fmtDate, formatTime as fmtTime, isoDate as iso, padTwo as pad, parseSlot, formatRupiah as rp, slotLabel, slotRange, todayIso as todayS } from "../core/format.js";
 import { isStudioShown } from "../models/master.js";
+import { modalIcon } from "../components/modal.js";
 import { $, capLabel, csContact, eff, free, go, ic, icf, me, modal, pkOf, prefetch, priceRange, ptag, refresh, refreshMaster, render, studioOf } from "./core.js";
 import { openAuth } from "./landing.js";
 const bgi = u => u ? `background-image:url('${esc(u)}')` : "";
@@ -125,7 +126,7 @@ async function bookingErr(e, next) {
   if (["Jadwal sudah lewat", "Studio tidak tersedia", "Paket/studio tidak valid"].includes(m)) return sesiGone(); // paket masih aktif: studionya yang hilang
   await modal({ title: "Booking Gagal", cls: "center", kicker: mIcon("alert"), body: `<p>${esc(m)}</p>`, buttons: [{ label: "Tutup", value: null }] });
 }
-const mIcon = (n, cls = "no") => `<div class="mico ${cls}">${ic(n, 28)}</div>`;
+const mIcon = (n, cls = "no") => modalIcon(n, cls).markup; // components/modal.js
 // kembali ke langkah Pilih Tanggal & Waktu dengan sesi dikosongkan dan ketersediaan dimuat ulang
 function backToTime() { BK.slot = null; BK.quote = null; R.availability = {}; if (R.route.name === "time") { render(); prefetch(); } else go("time"); }
 async function inputInvalid() {
