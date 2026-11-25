@@ -49,7 +49,7 @@ async function upImg(key, input) {
   const f = input.files[0]; if (!f) return; msg = err = ""; const sn = snap();
   try {
     const url = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { const sc = Math.min(1, 1000 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * sc); c.height = Math.round(im.height * sc); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL("image/jpeg", .85)); }; im.onerror = () => no(new Error("File bukan gambar")); im.src = r.result; }; r.onerror = () => no(new Error("Gagal membaca file")); r.readAsDataURL(f); });
-    AD.imgs[key] = (await API.post("/admin/media", { data: url })).url; if (key === "sN" && AD.sterr) delete AD.sterr.img; msg = key === "sN" ? "Gambar diunggah." : "Gambar diunggah. Klik Simpan untuk menerapkan.";
+    AD.imgs[key] = (await API.post("/admin/media", { data: url })).url; if (key === "sN") AD.sterr = null; msg = key === "sN" ? "Gambar diunggah." : "Gambar diunggah. Klik Simpan untuk menerapkan.";
   } catch (e) { err = e.message; } render(); restore(sn);
 }
 
@@ -134,7 +134,7 @@ ${row("Nama", esc(b.name.trim()))}${row("Deskripsi", esc(b.description) || "-")}
 }
 const stSave = () => aDo(async () => { const b = { ...AD.stnew, name: AD.stnew.name.trim(), img: AD.imgs.sN }; let r;
   try { r = await API.post("/admin/studios", b); } catch (e) { // galat server: kembali ke form dengan pesannya
-    if (e.status == 409 && /sudah dipakai/.test(e.message)) AD.sterr = { top: ST_DUP, name: ST_DUPF };
+    if (e.status == 409 && /sudah dipakai/.test(e.message)) { AD.sterr = { top: ST_DUP, name: ST_DUPF }; AD.studios = null; } // daftar dimuat ulang: studio bernama sama ikut tampil
     else if (e.status == 400) AD.sterr = /Nama/.test(e.message) ? { top: ST_BAD, name: "Nama studio wajib diisi." } : /Angka/.test(e.message) ? { top: ST_BAD, price: "Biaya sewa harus bilangan bulat 0 atau lebih." } : { top: ST_BAD, other: e.message };
     else throw e; AD.stsum = null; return; }
   delete AD.imgs.sN; AD.open.N = false; AD.open[r.id] = true; AD.stnew = AD.stsum = AD.sterr = null;
