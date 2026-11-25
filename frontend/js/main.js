@@ -16,6 +16,7 @@ import * as accountModel from "./models/account.js";
 import * as authModel from "./models/auth.js";
 import * as contactModel from "./models/contact.js";
 import * as driveModel from "./models/drive.js";
+import * as galleryModel from "./models/gallery.js";
 import { openModal } from "./components/modal.js";
 import { createLandingPage } from "./components/landingPage.js";
 import { createBeeper, createSessionScreen } from "./components/sessionScreen.js";
@@ -27,8 +28,10 @@ import { createAccountController } from "./controllers/AccountController.js";
 import { createAuthController } from "./controllers/AuthController.js";
 import { createLandingController } from "./controllers/LandingController.js";
 import { landingView } from "./views/landing.js";
-import { createPhotoSessionController } from "./controllers/PhotoSessionController.js";
+import { createPhotoSessionController, createPhotoState } from "./controllers/PhotoSessionController.js";
+import { createGalleryController } from "./controllers/GalleryController.js";
 import { photoSessionView } from "./views/session/photoSession.js";
+import { galleryView } from "./views/session/gallery.js";
 import { browseView } from "./views/customer/browse.js";
 import { studioView } from "./views/customer/studio.js";
 import { packagesView } from "./views/customer/packages.js";
@@ -47,7 +50,6 @@ import { forgotView } from "./views/auth/forgot.js";
 import { resetView } from "./views/auth/reset.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
 import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell } from "./legacy/core.js";
-import { P } from "./legacy/session.js";
 import { AD, aDenied, adminReset } from "./legacy/admin.js";
 import { installLegacyBridge } from "./legacy-bridge.js";
 import { registerLegacyActions } from "./legacy-actions.js";
@@ -59,6 +61,16 @@ function browserStorage(name = "localStorage") {
   } catch (error) {
     return null;
   }
+}
+
+// unduh satu berkas lewat tautan sementara (Unduh Foto Terpilih di Galeri)
+function downloadFile(url, filename) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 // UI untuk controller: dialog, toast (runtime.toast, tampil di outlet), buka tautan (WhatsApp di tab baru, mailto di tab ini)
@@ -78,7 +90,7 @@ function createUi(store) {
 
 // halaman yang sudah MVC: view (state, match) → Safe dan kait after(match) per path rute; rute lain masih memakai V.<view> lama.
 // links = { invoiceUrl } untuk view yang menautkan invoice (token tetap di models/api.js, decisions.md 50)
-function pagesFor({ studio, payment, landing, photo }, links) {
+function pagesFor({ studio, payment, landing, photo, gallery }, links) {
   const showAvailability = () => studio.prefetchAvailability();
   return {
     // landing page (LandingController): scroll-spy dipasang setiap render dan dilepas saat halaman ditinggalkan
@@ -113,12 +125,23 @@ function pagesFor({ studio, payment, landing, photo }, links) {
     "/reset-password": { view: resetView },
     // Sesi Foto (PhotoSessionController): kamera dan timer berjalan selama halaman terbuka, berhenti saat ditinggalkan
     "/sessions/:id": { view: photoSessionView, after: () => photo.enter(), leave: () => photo.stopTimers() },
+    // Galeri (GalleryController)
+    "/gallery": { view: galleryView, after: () => gallery.enter() },
   };
 }
 
 // aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
-function controllerActions({ studio, package: packages, booking, payment, account, auth, landing, photo }) {
+function controllerActions({ studio, package: packages, booking, payment, account, auth, landing, photo, gallery }) {
   return {
+    "gallery:showSession": gallery.showSession,
+    "gallery:select": gallery.select,
+    "gallery:toggleFavourite": gallery.toggleFavourite,
+    "gallery:deletePhoto": gallery.deletePhoto,
+    "gallery:toggleDeleteMode": gallery.toggleDeleteMode,
+    "gallery:selectAllNonFavourite": gallery.selectAllNonFavourite,
+    "gallery:deleteSelected": gallery.deleteSelected,
+    "gallery:confirmSelection": gallery.confirmSelection,
+    "gallery:download": gallery.download,
     "photo:start": photo.start,
     "photo:open": photo.open,
     "photo:shoot": photo.shoot,
@@ -168,10 +191,10 @@ async function start() {
   const api = createApi({ base: API_BASE, storage });
   // booking berjalan (studio, tanggal, sesi, id reschedule; tanpa quote) bertahan saat dimuat ulang, hanya di tab ini (decisions.md 26)
   const session = { storage: browserStorage("sessionStorage"), key: "snapia_booking", slices: { booking: ["studio", "date", "slot", "rescheduleId"] } };
-  const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: P, admin: AD }, { storage, persistKey: "snapia", session });
+  const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: createPhotoState(), admin: AD }, { storage, persistKey: "snapia", session });
   const ui = createUi(store);
   const navigation = { navigate: path => goPath(path) };
-  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel, contact: contactModel, drive: driveModel };
+  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel, contact: contactModel, drive: driveModel, gallery: galleryModel };
   const studio = createStudioController({ api, store, ui, router: navigation, models });
   const packages = createPackageController({ store, ui, router: navigation, config: { wa: CS_WA, email: CS_EMAIL }, refreshMaster: studio.refreshMaster });
   const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster });
@@ -192,7 +215,8 @@ async function start() {
     drive: { clientId: GOOGLE_CLIENT_ID, google: () => window.google, fetch: (...request) => window.fetch(...request) },
     refreshData: booking.refreshData,
   });
-  const controllers = { studio, package: packages, booking, payment, account, auth, landing, photo };
+  const gallery = createGalleryController({ api, store, ui, models, drive: { fetch: (...request) => window.fetch(...request) }, files: { download: downloadFile }, photoSession: photo, refreshData: booking.refreshData });
+  const controllers = { studio, package: packages, booking, payment, account, auth, landing, photo, gallery };
   const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({

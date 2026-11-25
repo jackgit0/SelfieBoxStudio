@@ -1,4 +1,4 @@
-// ===== INTI (sisa): utilitas, ikon, navigasi go()/goPath(), kait render, modal dan toast untuk kode lama session.js (galeri) dan admin.js =====
+// ===== INTI (sisa): utilitas, ikon, navigasi go()/goPath(), kait render, modal dan toast untuk kode lama admin.js =====
 import { BK, CONTROLLERS, M, R, RENDERER, ROUTER, S, V, save, saveBooking } from "./state.js";
 import { raw } from "../core/html.js";
 import { icon, iconFilled } from "../components/icon.js";
@@ -70,7 +70,6 @@ function renderAfter() {
 
 // ---------- autentikasi ----------
 // views/auth/*, controllers/AuthController.js (Masuk, Daftar, Lupa/Buat Sandi, keluar, Mode Staf, pemulihan login saat dibuka)
-// muat ulang booking dan sesi foto milik user (BookingController.refreshData) dan keluar (AuthController.logout): dipakai session.js (fase 7) dan admin.js (fase 8a)
-const refresh = () => CONTROLLERS.booking.refreshData();
+// keluar (AuthController.logout): dipakai admin.js (fase 8a)
 const logout = () => CONTROLLERS.auth.logout();
-export { $, capLabel, eff, go, goPath, ic, icf, logout, me, modal, pkOf, priceRange, refresh, render, renderAfter, renderBefore, renderContent, renderShell, studioOf, toasts };
+export { $, capLabel, eff, go, goPath, ic, icf, logout, me, modal, pkOf, priceRange, render, renderAfter, renderBefore, renderContent, renderShell, studioOf, toasts };

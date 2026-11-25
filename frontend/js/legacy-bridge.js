@@ -4,17 +4,15 @@
 // Daftar = semua nama milik js/legacy yang muncul di teks string kode lama (lebih luas dari yang benar-benar dipakai atribut, tidak masalah).
 import * as state from "./legacy/state.js";
 import * as core from "./legacy/core.js";
-import * as session from "./legacy/session.js";
 import * as admin from "./legacy/admin.js";
 
 const BRIDGED = {
   state: ["R", "S"],
-  core: ["go", "ic", "logout", "me", "modal", "refresh", "render"],
-  session: ["P", "bulkDel", "confirmSel", "delPhoto", "dl", "fav", "ph", "selAllNonFav", "selPh", "toggleDel"],
+  core: ["go", "ic", "logout", "me", "modal", "render"],
   admin: ["AD", "acctSave", "bookDel", "bookSave", "delCust", "discSave", "loading", "opDel", "opEdit", "opSave", "openBook", "openCust", "pkActive", "pkAdd", "pkDel", "pkSave", "poseDel", "poseSave", "propDel", "propSave", "pthumb", "sAdd", "sDay", "sDel", "sNav", "sSave", "sel", "stCancel", "stEdit", "stReview", "stSave", "stat", "studioDel", "studioSave", "upImg"],
 };
 
-const MODULES = { state, core, session, admin };
+const MODULES = { state, core, admin };
 
 // dipanggil main.js sebelum render pertama
 export function installLegacyBridge() {
