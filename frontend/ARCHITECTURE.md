@@ -34,7 +34,7 @@ frontend/
 
 Pegangan saat ragu: *berbicara dengan server → model; mengembalikan HTML → view; sisanya → controller.*
 
-Nama controller mengikuti tabel MVC dokumen APS: `BookingController`, `PaymentController`, `StudioController` (studio dan sesi, termasuk ketersediaan), `AdminBookingController`, ditambah `AuthController`, `AccountController`, `PackageController`, `PhotoSessionController`, `GalleryController`, `LandingController`, `AdminController`.
+Nama controller mengikuti tabel MVC dokumen APS: `BookingController`, `PaymentController`, `StudioController` (studio dan sesi, termasuk ketersediaan), `AdminBookingController`, ditambah `AuthController`, `AccountController`, `PackageController`, `PhotoSessionController` (Session Assistant di tablet studio, admin), `GalleryController`, `LandingController`, `AdminController`.
 
 ## Store
 
@@ -42,12 +42,12 @@ Satu store (`core/store.js`) dengan bagian-bagian berikut:
 
 | Bagian | Isi | Disimpan |
 |---|---|---|
-| `persisted` | pengguna, paket pilihan, favorit, filter, tab, draf booking tamu | `localStorage["snapia"]` |
+| `persisted` | pengguna, paket pilihan, favorit, filter, tab, draf booking tamu, kamera tablet per studio | `localStorage["snapia"]` |
 | `master` | paket, studio, properti, pose, diskon, kebijakan | tidak (dari `/api/master`) |
 | `booking` | booking yang sedang dibuat: studio, tanggal, sesi, reschedule | per tab, `sessionStorage` |
 | `runtime` | cache ketersediaan, kalender, toast, mode login | tidak |
 | `data` | booking dan sesi foto milik pengguna | tidak |
-| `photo` | kamera, timer, pose, Google Drive, galeri | tidak |
+| `photo` | layar tablet studio (`live`: keadaan, timer foto, background, kamera), timer dan stream kamera, galeri | tidak |
 | `admin` | state panel admin | tidak |
 
 Token login tetap di `localStorage["snapia_t"]` dan hanya dibaca `models/api.js`.
@@ -76,6 +76,8 @@ Atribut `data-*` lain (`data-id="12"`) masuk ke argumen pertama method controlle
 ## Rute
 
 Setiap halaman punya URL, misalnya `/browse`, `/studios/3`, `/book/time`, `/book/pay`, `/bookings`, `/bookings/12`, `/account`, `/gallery`, `/admin/studios`. Daftar lengkap ada di `js/core/router.js`. Aturan akses sama seperti sebelumnya: tamu boleh melihat studio, paket, dan mengisi booking sampai Check Out; halaman lain perlu login; halaman admin hanya untuk admin. Tautan reset sandi dari email (`/#reset=…`) tetap berlaku.
+
+Session Assistant berjalan di tablet studio yang masuk sebagai admin: `/admin/studios/:id/live` (ikon mata di Admin → Studio) memakai layout `kiosk` di `core/render.js`, yaitu layar penuh tanpa sidebar admin, hanya toast + isi. Pelanggan tidak punya layar sesi; check-in dilakukan admin di Admin → Booking, dan pelanggan melihat statusnya di Detail Booking serta fotonya di Galeri. Keluar dari layar tablet dan Akhiri Sesi meminta password admin.
 
 ## Contoh: alur booking
 

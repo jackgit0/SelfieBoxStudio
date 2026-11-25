@@ -3,7 +3,7 @@
   "info": {
     "title": "SelfieBox Studio API",
     "version": "1.0.0",
-    "description": "REST API aplikasi SelfieBox Studio (versi IMK, Kelompok 6), ditulis dari `backend/server.js` apa adanya (bukan dari desain APS yang direvisi).\n\n**Konvensi**\n\n- Body dan respons JSON (`Content-Type: application/json`), kecuali invoice (`text/html`) dan foto (`image/jpeg`). Body pada GET dan DELETE diabaikan.\n\n- Uang dalam rupiah (bilangan bulat). Waktu `*_at`, `start_time`, `end_time`, `expire_at` dalam epoch milidetik. Tanggal dan jam dalam WIB (`TZ_OFFSET_MIN=420`).\n\n- Galat selalu `{ \"error\": \"<pesan>\" }` dengan kode HTTP-nya: 400 data tidak valid / JSON tidak valid, 401 belum login atau token kedaluwarsa, 403 bukan haknya, 404 tidak ada (termasuk `Endpoint tidak ada`), 409 bentrok status, 413 body > 8 MB, 429 terlalu banyak percobaan, 500 `Kesalahan server`.\n\n- Login, daftar, reset sandi, login admin dan ganti akun admin dibatasi `AUTH_RATE_LIMIT` (10) percobaan per IP per menit.\n\n**Autentikasi**: JWT HS256 di header `Authorization: Bearer <token>`; boleh juga sebagai query `?t=<token>` (dipakai untuk `<img>` dan tautan invoice). Peran ada di token: `customer` (24 jam), `admin` (8 jam), `staff` (8 jam). Token yang terbit sebelum password diganti ditolak. Selama admin masih memakai password bawaan, semua endpoint admin selain `/api/admin/me` dan `/api/admin/account` menjawab 403. Ekstensi `x-role` pada tiap operasi menyebut peran yang dibutuhkan.\n\n**Konfirmasi**: hapus studio, ubah/hapus sesi studio, dan hapus booking oleh admin menjawab 409 dengan `needs_confirm: true` dan `impact` sampai dipanggil ulang dengan `?confirm=1`.\n\n**Pembayaran** masih simulasi (tanpa Midtrans); booking belum dibayar dibatalkan otomatis 15 menit setelah dibuat. Email (invoice, notifikasi, reset sandi) dikirim lewat SMTP, atau ditulis ke `backend/outbox/` bila `SMTP_HOST` kosong."
+    "description": "REST API aplikasi SelfieBox Studio (versi IMK, Kelompok 6), ditulis dari `backend/server.js` apa adanya (bukan dari desain APS yang direvisi).\n\n**Konvensi**\n\n- Body dan respons JSON (`Content-Type: application/json`), kecuali invoice (`text/html`) dan foto (`image/jpeg`). Body pada GET dan DELETE diabaikan.\n\n- Uang dalam rupiah (bilangan bulat). Waktu `*_at`, `start_time`, `end_time`, `expire_at` dalam epoch milidetik. Tanggal dan jam dalam WIB (`TZ_OFFSET_MIN=420`).\n\n- Galat selalu `{ \"error\": \"<pesan>\" }` dengan kode HTTP-nya: 400 data tidak valid / JSON tidak valid, 401 belum login atau token kedaluwarsa, 403 bukan haknya, 404 tidak ada (termasuk `Endpoint tidak ada`), 409 bentrok status, 413 body > 8 MB, 429 terlalu banyak percobaan, 500 `Kesalahan server`.\n\n- Login, daftar, reset sandi, login admin dan ganti akun admin dibatasi `AUTH_RATE_LIMIT` (10) percobaan per IP per menit.\n\n**Autentikasi**: JWT HS256 di header `Authorization: Bearer <token>`; boleh juga sebagai query `?t=<token>` (dipakai untuk `<img>` dan tautan invoice). Peran ada di token: `customer` (24 jam), `admin` (8 jam). Sesi foto dijalankan admin dari tablet studio; Mode Staf (token `staff`, header `X-Staff-Token`) sudah dihapus. Token yang terbit sebelum password diganti ditolak. Selama admin masih memakai password bawaan, semua endpoint admin selain `/api/admin/me` dan `/api/admin/account` menjawab 403. Ekstensi `x-role` pada tiap operasi menyebut peran yang dibutuhkan.\n\n**Konfirmasi**: hapus studio, ubah/hapus sesi studio, dan hapus booking oleh admin menjawab 409 dengan `needs_confirm: true` dan `impact` sampai dipanggil ulang dengan `?confirm=1`.\n\n**Pembayaran** masih simulasi (tanpa Midtrans); booking belum dibayar dibatalkan otomatis 15 menit setelah dibuat. Email (invoice, notifikasi, reset sandi) dikirim lewat SMTP, atau ditulis ke `backend/outbox/` bila `SMTP_HOST` kosong."
   },
   "servers": [
     {
@@ -39,10 +39,6 @@
     {
       "name": "Sesi & Foto",
       "description": "Sesi foto, pengambilan dan pemilihan foto, galeri"
-    },
-    {
-      "name": "Staf",
-      "description": "Kontrol sesi oleh staf studio"
     },
     {
       "name": "Kontak",
@@ -87,6 +83,10 @@
     {
       "name": "Admin Booking",
       "description": "Booking (detail, ubah, batal, hapus)"
+    },
+    {
+      "name": "Admin Sesi Foto",
+      "description": "Check-in di meja depan dan Session Assistant di tablet studio (Admin → Studio → ikon mata)"
     },
     {
       "name": "Admin Transaksi",
@@ -594,7 +594,7 @@
         ],
         "operationId": "rescheduleBooking",
         "summary": "Ubah jadwal booking",
-        "description": "Untuk booking Menunggu Pembayaran atau Terbayar, tanpa batas waktu; boleh pindah studio. Slot baru terisi → 409.\n\nPerlu token customer.",
+        "description": "Untuk booking Menunggu Pembayaran atau Terbayar, tanpa batas waktu; boleh pindah studio. Slot baru terisi → 409. Ditolak (409) setelah booking check-in di studio.\n\nPerlu token customer.",
         "x-role": "customer",
         "security": [
           {
@@ -647,7 +647,7 @@
         ],
         "operationId": "deleteMyBooking",
         "summary": "Batalkan booking (lama, tanpa refund)",
-        "description": "Endpoint lama: status menjadi Dibatalkan tanpa alasan dan tanpa refund. UI memakai `POST /api/bookings/{id}/cancel`.\n\nPerlu token customer.",
+        "description": "Endpoint lama: status menjadi Dibatalkan tanpa alasan dan tanpa refund. UI memakai `POST /api/bookings/{id}/cancel`. Ditolak (409) setelah booking check-in di studio.\n\nPerlu token customer.",
         "x-role": "customer",
         "security": [
           {
@@ -689,7 +689,7 @@
         ],
         "operationId": "cancelMyBooking",
         "summary": "Batalkan booking dengan alasan + refund",
-        "description": "Untuk booking Menunggu Pembayaran atau Terbayar. Bila sudah dibayar: refund berhasil hanya bila sesi masih ≥ `REFUND_MIN_HOURS` (2) jam lagi; selain itu `refund_failed` (dana tidak dikembalikan).\n\nPerlu token customer.",
+        "description": "Untuk booking Menunggu Pembayaran atau Terbayar. Bila sudah dibayar: refund berhasil hanya bila sesi masih ≥ `REFUND_MIN_HOURS` (2) jam lagi; selain itu `refund_failed` (dana tidak dikembalikan). Ditolak (409) setelah booking check-in di studio.\n\nPerlu token customer.",
         "x-role": "customer",
         "security": [
           {
@@ -813,48 +813,6 @@
         }
       }
     },
-    "/api/bookings/{id}/start": {
-      "post": {
-        "tags": [
-          "Sesi & Foto"
-        ],
-        "operationId": "startSession",
-        "summary": "Mulai sesi foto",
-        "description": "Booking harus Terbayar; status menjadi Sesi Berjalan dan timer berjalan selama durasi paket.\n\nPerlu token customer.",
-        "x-role": "customer",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Sesi aktif",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Session"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          }
-        },
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/id"
-          }
-        ]
-      }
-    },
     "/api/sessions": {
       "get": {
         "tags": [
@@ -919,64 +877,6 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
-          }
-        },
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/id"
-          }
-        ]
-      }
-    },
-    "/api/sessions/{id}/photos": {
-      "post": {
-        "tags": [
-          "Sesi & Foto"
-        ],
-        "operationId": "uploadPhoto",
-        "summary": "Simpan foto hasil kamera",
-        "description": "Sesi harus aktif dan tidak dijeda. Kuota pengambilan = 2 × jumlah foto paket (409 bila habis).\n\nPerlu token customer.",
-        "x-role": "customer",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PhotoInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Foto tersimpan (berlaku 30 hari)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Photo"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "413": {
-            "$ref": "#/components/responses/TooLarge"
           }
         },
         "parameters": [
@@ -1214,109 +1114,6 @@
             "$ref": "#/components/responses/Gone"
           }
         }
-      }
-    },
-    "/api/staff/login": {
-      "post": {
-        "tags": [
-          "Staf"
-        ],
-        "operationId": "staffLogin",
-        "summary": "Masuk staf dengan PIN",
-        "description": "Dilakukan dari perangkat customer yang sedang login (token customer wajib). PIN dari `STAFF_PIN`.\n\nPerlu token customer.",
-        "x-role": "customer",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StaffLoginInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Token staf",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StaffToken"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "429": {
-            "$ref": "#/components/responses/TooMany"
-          }
-        }
-      }
-    },
-    "/api/sessions/{id}/control": {
-      "post": {
-        "tags": [
-          "Staf"
-        ],
-        "operationId": "controlSession",
-        "summary": "Jeda, lanjutkan, atau hentikan sesi",
-        "description": "`resume` memperpanjang waktu selesai sebanyak lama jeda; `stop` menyelesaikan sesi dan booking. Sesi siapa pun (bukan hanya milik customer itu).\n\nPerlu token customer **dan** header `X-Staff-Token`.",
-        "x-role": "customer",
-        "security": [
-          {
-            "bearerAuth": [],
-            "staffToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SessionControlInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Sesi setelah aksi",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Session"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          }
-        },
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/id"
-          }
-        ]
       }
     },
     "/api/contact": {
@@ -3352,6 +3149,391 @@
           }
         }
       }
+    },
+    "/api/admin/bookings/{id}/checkin": {
+      "post": {
+        "tags": [
+          "Admin Sesi Foto"
+        ],
+        "operationId": "adminCheckIn",
+        "summary": "Check-in booking di meja depan",
+        "description": "Booking `Terbayar`, pada hari sesi (WIB), sampai slot berakhir. Mengisi `checked_in_at`; status tetap `Terbayar`. Sesi foto kemudian dimulai dari tablet studio.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail booking terbaru",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/studios/{id}/live": {
+      "get": {
+        "tags": [
+          "Admin Sesi Foto"
+        ],
+        "operationId": "adminStudioLive",
+        "summary": "Keadaan tablet studio",
+        "description": "Sesi yang sedang berjalan di studio ini; selain itu booking terawal yang sudah check-in dan slotnya belum berakhir (`booking`), plus booking terbayar berikutnya hari ini (`next`). Sesi yang waktunya habis ditandai Selesai lebih dulu.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveState"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/bookings/{id}/start": {
+      "post": {
+        "tags": [
+          "Admin Sesi Foto"
+        ],
+        "operationId": "adminStartSession",
+        "summary": "Mulai Sesi (tablet studio)",
+        "description": "Booking `Terbayar` yang sudah check-in, mulai jam slot sampai slot berakhir, tanpa sesi lain yang berjalan di studio itu. Timer = min(sekarang + durasi paket, akhir slot). Booking menjadi `Sesi Berjalan`.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sesi berjalan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveSession"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/photo-sessions/{id}": {
+      "get": {
+        "tags": [
+          "Admin Sesi Foto"
+        ],
+        "operationId": "adminPhotoSession",
+        "summary": "Sinkron sesi foto (tablet)",
+        "description": "Sisa waktu, status, dan foto sesi; waktu habis → Selesai.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveSession"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/photo-sessions/{id}/photos": {
+      "post": {
+        "tags": [
+          "Admin Sesi Foto"
+        ],
+        "operationId": "adminUploadPhoto",
+        "summary": "Simpan foto dari kamera studio",
+        "description": "Sesi harus aktif. Kuota pengambilan = 2 × jumlah foto paket (409 bila habis). Foto masuk ke booking customer dan tampil di Galeri akunnya.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Foto tersimpan (berlaku 30 hari)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Photo"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/photos/{id}": {
+      "delete": {
+        "tags": [
+          "Admin Sesi Foto"
+        ],
+        "operationId": "adminDeletePhoto",
+        "summary": "Hapus foto dari strip tablet",
+        "description": "Hanya selama sesinya berjalan (409 setelah berakhir).\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/verify-password": {
+      "post": {
+        "tags": [
+          "Admin Sesi Foto"
+        ],
+        "operationId": "adminVerifyPassword",
+        "summary": "Cek password admin (Keluar dari layar tablet)",
+        "description": "Dipakai tombol Keluar di layar tablet. Salah → 403 \"Password admin salah\"; dibatasi per IP (429).\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          }
+        }
+      }
+    },
+    "/api/admin/photo-sessions/{id}/end": {
+      "post": {
+        "tags": [
+          "Admin Sesi Foto"
+        ],
+        "operationId": "adminEndSession",
+        "summary": "Akhiri Sesi (password admin)",
+        "description": "Butuh password admin (customer sendirian di ruang studio bersama tablet). Sesi dan booking menjadi Selesai.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesi selesai",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveSession"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3879,18 +4061,6 @@
         "required": [
           "ok",
           "username",
-          "token"
-        ]
-      },
-      "StaffToken": {
-        "type": "object",
-        "properties": {
-          "token": {
-            "type": "string",
-            "description": "Token staf (role `staff`), berlaku 8 jam; kirim di header `X-Staff-Token`"
-          }
-        },
-        "required": [
           "token"
         ]
       },
@@ -4760,6 +4930,14 @@
             ],
             "format": "int64",
             "description": "Epoch milidetik"
+          },
+          "checked_in_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Waktu check-in di meja depan (epoch ms); null = belum check-in. Setelah check-in customer tidak dapat membatalkan, menjadwal ulang, atau menghapus booking"
           }
         },
         "required": [
@@ -5936,6 +6114,14 @@
                 "type": "null"
               }
             ]
+          },
+          "checked_in_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Waktu check-in di meja depan (epoch ms); null = belum check-in. Setelah check-in customer tidak dapat membatalkan, menjadwal ulang, atau menghapus booking"
           }
         },
         "required": [
@@ -6142,6 +6328,13 @@
               },
               "impact": {
                 "$ref": "#/components/schemas/BookingDeleteImpact"
+              },
+              "checkin_block": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Alasan tombol Check-in tidak aktif (null = boleh check-in): \"Booking sudah check-in\", \"Hanya booking terbayar yang dapat check-in\", \"Check-in hanya dapat dilakukan pada hari sesi\", \"Waktu sesi sudah lewat\""
               }
             },
             "required": [
@@ -6386,6 +6579,143 @@
           "rows",
           "paid",
           "refunded"
+        ]
+      },
+      "LiveSession": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Session"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "studio_id": {
+                "type": "integer"
+              },
+              "studio_name": {
+                "type": "string"
+              },
+              "slot": {
+                "$ref": "#/components/schemas/Slot"
+              },
+              "slot_end": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Akhir slot (mulai + 50 menit, epoch ms); timer tidak melewati batas ini"
+              },
+              "customer": {
+                "type": "string",
+                "description": "Nama depan customer (tablet berada di ruang studio)"
+              },
+              "package": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "photo_count": {
+                    "type": "integer"
+                  },
+                  "dur": {
+                    "type": "integer",
+                    "description": "Menit"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "LiveCard": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "booking_id": {
+            "type": "integer"
+          },
+          "customer": {
+            "type": "string",
+            "description": "Nama depan"
+          },
+          "package": {
+            "type": "string"
+          },
+          "slot": {
+            "$ref": "#/components/schemas/Slot"
+          },
+          "time": {
+            "$ref": "#/components/schemas/TimeHM"
+          },
+          "end": {
+            "$ref": "#/components/schemas/TimeHM"
+          },
+          "checked_in": {
+            "type": "boolean"
+          },
+          "can_start": {
+            "type": "boolean",
+            "description": "Sudah check-in dan jam slot sudah tiba"
+          }
+        }
+      },
+      "LiveState": {
+        "type": "object",
+        "properties": {
+          "studio": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "ready",
+              "running"
+            ],
+            "description": "idle = menunggu check-in; ready = booking sudah check-in (Mulai Sesi); running = sesi berjalan"
+          },
+          "session": {
+            "$ref": "#/components/schemas/LiveSession"
+          },
+          "booking": {
+            "$ref": "#/components/schemas/LiveCard"
+          },
+          "next": {
+            "$ref": "#/components/schemas/LiveCard"
+          },
+          "now": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "studio",
+          "state",
+          "now"
+        ]
+      },
+      "PasswordInput": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "Password admin yang sedang masuk"
+          }
+        },
+        "required": [
+          "password"
         ]
       }
     }
