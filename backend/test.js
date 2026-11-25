@@ -12,8 +12,8 @@ const JPG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////
   const A = (await call('POST', '/auth/register', { name: 'Ana', email: 'a@x.id', phone: '0811111111', password: 'secret1' })).j, Bb = (await call('POST', '/auth/register', { name: 'Budi', email: 'b@x.id', phone: '0822222222', password: 'secret2' })).j;
   ok(A.token && Bb.token, 'register berhasil'); ok((await call('POST', '/auth/login', { email: 'a@x.id', password: 'salah' })).s === 401, 'login salah ditolak');
   ok((await call('GET', '/bookings')).s === 401, 'endpoint terproteksi');
-  const bk = await call('POST', '/bookings', { package_id: 2, studio_id: 1, date: slot, setup: { vibe: 1, bg: 2, acc: [3] } }, A.token);
-  ok(bk.s === 200 && bk.j.amount === 90000 + 10000 + 5000, 'booking dibuat; harga dihitung server (paket+add-on)');
+  const bk = await call('POST', '/bookings', { package_id: 2, studio_id: 1, date: slot }, A.token);
+  ok(bk.s === 200 && bk.j.amount === 90000, 'booking dibuat; harga dihitung server (paket)');
   ok((await call('POST', '/bookings', { package_id: 2, studio_id: 1, date: slot }, Bb.token)).s === 409, 'slot ganda ditolak (409)');
   ok(!(await call('GET', `/availability?studio_id=1&date=${day}`)).j.free.includes(11), 'availability menyembunyikan slot terisi');
   ok((await call('POST', `/bookings/${bk.j.id}/pay`, {}, Bb.token)).s === 404, 'user lain tidak bisa membayar booking orang');

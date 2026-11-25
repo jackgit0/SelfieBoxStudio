@@ -1,9 +1,9 @@
-// Kosongkan database lokal lalu isi ulang data awal (paket, studio, vibe, properti, pose dari seed.json).
+// Kosongkan database lokal lalu isi ulang data awal (paket, studio, properti, pose dari seed.json).
 // Pakai:  npm run db:reset [-- opsi]      (atau: node reset-db.js [opsi])
 //   -y, --yes       tanpa konfirmasi
 //   --demo          sesudahnya jalankan seed-demo.js (akun admin + customer dari .env.demo)
 //   --keep-files    jangan hapus isi uploads/, media/, outbox/
-// Semua customer, booking, sesi, pembayaran, promo, dan galeri HILANG. Matikan server dulu.
+// Semua customer, booking, sesi, pembayaran, dan galeri HILANG. Matikan server dulu.
 const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), { parseEnv } = require('util'), { spawnSync } = require('child_process');
 
 const args = process.argv.slice(2), has = (...f) => f.some(x => args.includes(x));
@@ -34,7 +34,7 @@ const clearDir = d => {
 
   console.log(`Database : ${DB}${fs.existsSync(DB) ? '' : ' (belum ada)'}`);
   if (!has('--keep-files')) console.log(`Berkas   : ${Object.values(dirs).join(', ')}`);
-  console.log('Semua customer, booking, sesi, pembayaran, promo, galeri, dan akun admin akan dihapus.');
+  console.log('Semua customer, booking, sesi, pembayaran, galeri, dan akun admin akan dihapus.');
   if (!has('-y', '--yes')) {
     if (!process.stdin.isTTY) { console.error('Tidak ada terminal untuk konfirmasi. Tambahkan --yes.'); process.exit(1); }
     const rl = require('readline/promises').createInterface({ input: process.stdin, output: process.stdout });
@@ -48,7 +48,7 @@ const clearDir = d => {
 
   const db = require('./db'); // membuat skema + data awal dari seed.json
   const c = t => db.prepare(`SELECT COUNT(*) n FROM ${t}`).get().n;
-  console.log(`Data awal: ${c('package')} paket, ${c('studio')} studio, ${c('vibe')} vibe, ${c('property')} properti, ${c('pose')} pose.`);
+  console.log(`Data awal: ${c('package')} paket, ${c('studio')} studio, ${c('property')} properti, ${c('pose')} pose.`);
   db.close();
 
   if (has('--demo')) {

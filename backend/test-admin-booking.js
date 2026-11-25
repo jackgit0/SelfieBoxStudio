@@ -21,7 +21,7 @@ const { DatabaseSync } = require('node:sqlite');
   // --- fixture: customer, admin, booking pada slot tetap ---
   const reg = async (c, name, email, phone) => (await c('POST', '/auth/register', { name, email, phone, password: 'secret1' })).j.token;
   const admin = async c => (await c('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token;
-  const book = async (c, tok, studio_id, date, package_id = 1, code) => (await c('POST', '/bookings', { package_id, studio_id, date, code }, tok)).j;
+  const book = async (c, tok, studio_id, date, package_id = 1) => (await c('POST', '/bookings', { package_id, studio_id, date }, tok)).j;
   const pay = async (c, tok, id) => (await c('POST', `/bookings/${id}/pay`, { method: 'QRIS' }, tok)).j;
   const sql = (k, q, ...a) => { const d = new DatabaseSync(DB(k)); try { return /^\s*SELECT/i.test(q) ? d.prepare(q).all(...a) : d.prepare(q).run(...a); } finally { d.close(); } }; // hanya untuk menyiapkan keadaan
   const A = await reg(call, 'Ana', 'ana@x.id', '0811111111'), Bt = await reg(call, 'Budi', 'budi@x.id', '0822222222'), AD = await admin(call);
@@ -38,12 +38,12 @@ const { DatabaseSync } = require('node:sqlite');
   const dt = (await det(k2.id)).j;
   ok(dt.id === k2.id && dt.customer.name === 'Budi' && dt.customer.email === 'budi@x.id' && dt.customer.phone === '0822222222' && dt.studio_name && dt.package_name && dt.slot === far + ' 9:00', 'detail booking memuat customer, studio, paket, dan jadwal');
   ok(dt.payment.status === 'paid' && dt.payment.method === 'QRIS' && dt.payment.amount === k2.amount && dt.payment.paid_at > 0 && /^INV-\d{8}-\d{4}$/.test(dt.invoice), 'detail booking memuat status pembayaran dan nomor invoice');
-  ok(dt.subtotal === k2.subtotal && dt.studio_fee === k2.studio_fee && dt.items_price === 90000 && dt.add_ons.length === 0 && dt.amount === k2.amount, 'detail booking memuat rincian biaya (harga paket tanpa add-on)');
-  { const kp = (await call('POST', '/bookings', { package_id: 1, studio_id: 1, date: far + ' 16:00', setup: { bg: 2, acc: [] } }, A)).j; sql('a', 'UPDATE property SET price=99999 WHERE id=2'); const dp = (await det(kp.id)).j; sql('a', 'UPDATE property SET price=10000 WHERE id=2');
-    ok(dp.items_price === 60000 && dp.add_ons.join() === 'Panggung Sepia' && dp.items_price + dp.studio_fee === dp.subtotal, 'rincian biaya memakai harga saat booking walau harga properti berubah');
+  ok(dt.subtotal === k2.subtotal && dt.studio_fee === k2.studio_fee && dt.items_price === 90000 && !('add_ons' in dt) && dt.amount === k2.amount, 'detail booking memuat rincian biaya (harga paket + biaya studio)');
+  { const kp = (await call('POST', '/bookings', { package_id: 1, studio_id: 1, date: far + ' 16:00' }, A)).j; sql('a', 'UPDATE package SET price=99999 WHERE id=1'); const dp = (await det(kp.id)).j; sql('a', 'UPDATE package SET price=50000 WHERE id=1');
+    ok(dp.items_price === 50000 && dp.items_price + dp.studio_fee === dp.subtotal, 'rincian biaya memakai harga saat booking walau harga paket berubah');
     ok(dp.packages.some(p => p.id === 4) && (sql('a', 'UPDATE package SET active=0 WHERE id=4'), !(await det(kp.id)).j.packages.some(p => p.id === 4)) && !dt.packages.length, 'detail booking belum dibayar memuat daftar paket aktif terbaru'); sql('a', 'UPDATE package SET active=1 WHERE id=4');
-    sql('a', 'UPDATE property SET qty=0 WHERE id=2'); const ep = await call('PATCH', `/admin/bookings/${kp.id}`, { package_id: 2 }, AD); sql('a', 'UPDATE property SET qty=1 WHERE id=2');
-    ok(ep.s === 200 && ep.j.amount === 90000 + 10000 + ep.j.studio_fee, 'ubah paket tetap bisa walau properti yang sudah dipegang booking kini habis'); }
+    const ep = await call('PATCH', `/admin/bookings/${kp.id}`, { package_id: 2 }, AD);
+    ok(ep.s === 200 && ep.j.amount === 90000 + ep.j.studio_fee && ep.j.items_price === 90000, 'ubah paket: total dihitung ulang paket + biaya studio'); }
   ok(JSON.stringify(dt.allowed) === JSON.stringify(['Sesi Berjalan', 'Selesai', 'Dibatalkan']) && JSON.stringify((await det(k1.id)).j.allowed) === JSON.stringify(['Dibatalkan']) && dt.impact.paid === true && dt.impact.refund_amount === k2.amount, 'detail booking memuat status tujuan yang diizinkan dan dampak hapus');
 
   // --- hapus booking (US-16) ---
@@ -79,7 +79,7 @@ const { DatabaseSync } = require('node:sqlite');
     ok(h9.s === 409 && d9.status === 'Selesai' && JSON.stringify(d9.allowed) === '[]' && sql('a', 'SELECT status FROM studio_session WHERE id=?', z4.id)[0].status === 'AVAILABLE', 'sesi foto yang waktunya habis menjadi Selesai sebelum hapus/ubah, sesi studionya disinkronkan'); }
 
   // --- ubah booking: paket (SR-15-04) ---
-  const be = (id, b, tok = AD, c = call) => c('PATCH', `/admin/bookings/${id}`, b, tok), qt = async (package_id, studio_id, code) => (await call('POST', '/quote', { package_id, studio_id, code }, A)).j;
+  const be = (id, b, tok = AD, c = call) => c('PATCH', `/admin/bookings/${id}`, b, tok), qt = async (package_id, studio_id) => (await call('POST', '/quote', { package_id, studio_id }, A)).j;
   const m1 = await book(call, A, 3, far + ' 9:00');
   ok((await be(9999, { status: 'Dibatalkan' })).s === 404 && (await be(m1.id, { package_id: 2 }, A)).s === 403 && (await be(m1.id, {})).s === 400, 'ubah booking: tidak ada -> 404, customer -> 403, tanpa perubahan -> 400');
   await wait(100); mails.length = 0; const e1 = await be(m1.id, { package_id: 3 }), q3 = await qt(3, 3), d1 = (await det(m1.id)).j;
@@ -88,11 +88,6 @@ const { DatabaseSync } = require('node:sqlite');
   ok((await be(m1.id, { package_id: 999 })).s === 400, 'paket yang tidak ada ditolak');
   sql('a', 'UPDATE package SET active=0 WHERE id=4'); ok((await be(m1.id, { package_id: 4 })).s === 400, 'paket nonaktif ditolak'); sql('a', 'UPDATE package SET active=1 WHERE id=4');
   const m2 = await book(call, Bt, 3, far + ' 10:00'); await pay(call, Bt, m2.id); ok((await be(m2.id, { package_id: 2 })).s === 409, 'ubah paket booking yang sudah dibayar ditolak');
-  sql('a', `INSERT INTO promo(code,kind,value,active) VALUES('HEMAT10','percent',10,1)`);
-  const m3 = await book(call, A, 3, far + ' 11:00', 1, 'HEMAT10'), e3 = await be(m3.id, { package_id: 2 }), q2p = await qt(2, 3, 'HEMAT10'); ok(m3.promo_code === 'HEMAT10' && e3.s === 200 && e3.j.promo_code === 'HEMAT10' && e3.j.amount === q2p.total, 'kode promo yang masih berlaku dipertahankan saat paket diubah');
-  sql('a', `UPDATE promo SET active=0 WHERE code='HEMAT10'`); await wait(400); mails.length = 0; const e3b = await be(m3.id, { package_id: 3 }), q3n = await qt(3, 3);
-  ok(e3b.s === 200 && e3b.j.promo_code === null && e3b.j.promo_disc === 0 && e3b.j.amount === q3n.total, 'kode promo yang tidak berlaku lagi dilepas dan total dihitung tanpa promo');
-  await wait(500); ok(mails.map(decode).some(m => /diperbarui/.test(m.subject) && m.text.includes('HEMAT10') && /tidak berlaku/.test(m.text)), 'email perubahan menyebut kode promo yang dilepas');
 
   // --- ubah booking: status (SR-15-05, SR-15-06) ---
   ok((await be(m1.id, { status: 'Terbayar' })).s === 409 && (await be(m1.id, { status: 'Selesai' })).s === 409 && (await be(m1.id, { status: 'Sesi Berjalan' })).s === 409, 'status lunas pada booking belum dibayar ditolak');
