@@ -1,5 +1,6 @@
 // Daftar Studio admin (/admin/studios): accordion per studio dengan form Detail Studio + panel Detail Sesi, lalu Tambah studio:
 // form Detail Studio Baru dengan galat isian (Figma 592:5056, 592:5140) → Ringkasan Studio (592:4329) → kartu Berhasil (592:4689).
+// Studio yang dibuka tampil hanya-baca (Detail Studio + Ubah); form dengan Simpan + Batal hanya saat admin.editing = "studio-<id>" (dev/admin-edit-mode-plan.md).
 // View murni (dulu studioForm, V.astudio, stDone, stSummary di admin.js). Form dikirim lewat data-submit (StudioController.edit / review);
 // isian form ubah yang gagal disimpan di admin.drafts["studio-<id>"], isian Tambah Studio di admin.newStudio.
 import { html } from "../../core/html.js";
@@ -29,6 +30,53 @@ function errorBanner(errors) {
   </div>`;
 }
 
+function bookingNote(studio) {
+  return html`<p class="sm m" style="margin-top:8px">
+    ${studio.active_bookings} booking aktif dari ${studio.bookings} booking (tanpa yang batal) · ${STATUS_RULE}
+    Studio tanpa slot kosong disembunyikan dari customer.
+  </p>`;
+}
+
+// baris <dl> data studio (Ringkasan Studio dan Detail Studio hanya-baca); status = teks baris Status
+function studioFacts(values, master, status) {
+  const capacity = master.peopleRanges.find(range => range.id == values.people_range_id);
+  const budget = master.budgetRanges.find(range => range.id == values.budget_range_id);
+  const row = (term, value) =>
+    html`<dt>${term}</dt>
+      <dd>${value}</dd>`;
+  return html`<dl class="sumdl">
+    ${row("Nama", String(values.name).trim())}${row("Deskripsi", values.description || "-")}${row("Status", status)}${row("Biaya sewa studio", formatRupiah(values.price))}${row("Kapasitas", capacity ? capacity.range + " orang" : "-")}${row("Rentang budget", budget ? budget.budget : "-")}
+  </dl>`;
+}
+
+// Detail Studio hanya-baca (studio yang dibuka, belum diubah): data, gambar, catatan booking, tombol Ubah
+function studioDetail(studio, master) {
+  const image = studio.img || "";
+  return html`<div class="spanel">
+    <div class="row sp">
+      <h4>Detail Studio</h4>
+      <button
+        class="btn sm ghost"
+        type="button"
+        data-action="admin:startEdit"
+        data-key="studio-${studio.id}"
+        aria-label="Ubah ${studio.name}"
+      >
+        ${icon("edit", 16)} Ubah
+      </button>
+    </div>
+    <div class="sgrid">
+      ${studioFacts(studio, master, isAvailable(studio) ? "Tersedia" : "Tidak tersedia")}
+      <div>
+        <div class="thumb" style="${backgroundImage(image)}" role="img" aria-label="Gambar ${studio.name}">
+          ${image ? "" : "Belum ada gambar"}
+        </div>
+        ${bookingNote(studio)}
+      </div>
+    </div>
+  </div>`;
+}
+
 // studio = baris daftar (null untuk studio baru); values = isian yang tampil; image = gambar yang tampil; errors hanya untuk studio baru
 function studioForm({ studio, values, image, errors, master }) {
   const id = studio ? studio.id : "N";
@@ -45,13 +93,9 @@ function studioForm({ studio, values, image, errors, master }) {
   const buttons = isNew
     ? html`<button class="btn ghost" type="button" data-action="studio:cancelNew">Batal</button
         ><button class="btn" type="submit">Lihat Ringkasan</button>`
-    : html`<button class="btn" type="submit">Simpan</button>`;
-  const note = isNew
-    ? ""
-    : html`<p class="sm m" style="margin-top:8px">
-        ${studio.active_bookings} booking aktif dari ${studio.bookings} booking (tanpa yang batal) · ${STATUS_RULE}
-        Studio tanpa slot kosong disembunyikan dari customer.
-      </p>`;
+    : html`<button class="btn ghost" type="button" data-action="admin:cancelEdit">Batal</button
+        ><button class="btn" type="submit">Simpan</button>`;
+  const note = isNew ? "" : bookingNote(studio);
   const submit = isNew ? html`data-submit="studio:review"` : html`data-submit="studio:edit" data-id="${studio.id}"`;
   return html`<form class="spanel" novalidate ${submit}>
     <h4>${isNew ? "Detail Studio Baru" : "Detail Studio"}</h4>
@@ -64,6 +108,7 @@ function studioForm({ studio, values, image, errors, master }) {
           name="name"
           class="${invalidClass(errors, "name")}"
           placeholder="Contoh: Studio Kreatif"
+          ${isNew ? "" : "data-edit-focus"}
           value="${values.name || ""}"
           ${invalidAttributes(errors, "name")}
         />${fieldError(errors, "name")}<label for="st${id}d">Deskripsi</label
@@ -116,12 +161,7 @@ function studioForm({ studio, values, image, errors, master }) {
 }
 
 function summaryCard(values, image, master) {
-  const capacity = master.peopleRanges.find(range => range.id == values.people_range_id);
-  const budget = master.budgetRanges.find(range => range.id == values.budget_range_id);
   const name = String(values.name).trim();
-  const row = (term, value) =>
-    html`<dt>${term}</dt>
-      <dd>${value}</dd>`;
   return html`<div class="body one">
     <div class="spanel">
       <h4>Ringkasan Studio</h4>
@@ -129,9 +169,7 @@ function summaryCard(values, image, master) {
         Periksa data studio baru sebelum disimpan. Pilih Ubah untuk memperbaiki isian.
       </p>
       <div class="sgrid">
-        <dl class="sumdl">
-          ${row("Nama", name)}${row("Deskripsi", values.description || "-")}${row("Status", "Otomatis dari slot kosong (14 hari ke depan)")}${row("Biaya sewa studio", formatRupiah(values.price))}${row("Kapasitas", capacity ? capacity.range + " orang" : "-")}${row("Rentang budget", budget ? budget.budget : "-")}
-        </dl>
+        ${studioFacts(values, master, "Otomatis dari slot kosong (14 hari ke depan)")}
         <div><div class="thumb" style="${backgroundImage(image)}" role="img" aria-label="Gambar ${name}"></div></div>
       </div>
       <div class="row" style="justify-content:flex-end;margin-top:18px">
@@ -146,10 +184,12 @@ function studioRow(studio, admin, master, today) {
   const open = Boolean(admin.openStudios[studio.id]);
   const free = Number.isInteger(studio.free_slots) ? ` · ${studio.free_slots} slot kosong (14 hari)` : "";
   const meta = formatRupiah(studio.price || 0) + ` · ${studio.sessions} sesi` + free;
+  const editing = admin.editing == "studio-" + studio.id;
+  const detail = editing
+    ? studioForm({ studio, values: admin.drafts["studio-" + studio.id] || studio, image: admin.images[studio.id] || studio.img || "", errors: null, master })
+    : studioDetail(studio, master);
   const body = open
-    ? html`<div class="body one">
-        ${studioForm({ studio, values: admin.drafts["studio-" + studio.id] || studio, image: admin.images[studio.id] || studio.img || "", errors: null, master })}${sessionPanel(admin, studio, today)}
-      </div>`
+    ? html`<div class="body one">${detail}${sessionPanel(admin, studio, today)}</div>`
     : "";
   return html`<div class="acc">
     <div class="acc-h">

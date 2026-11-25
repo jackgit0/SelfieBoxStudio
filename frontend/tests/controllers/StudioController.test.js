@@ -294,6 +294,21 @@ test("admin edit: PATCH dengan gambar baru, biaya tidak valid = 0, draf dan gamb
   assert.equal(failed.admin().drafts["studio-3"].name, "Mawar");
 });
 
+test("admin mode ubah studio: Simpan berhasil → kembali hanya-baca; gagal → form tetap terbuka; menutup accordion yang sedang diubah = Batal", async () => {
+  const saved = setupStudioAdmin({ admin: { studios: [studioRow()], editing: "studio-3" }, responses: { "PATCH /admin/studios/3": { body: {} } } });
+  await saved.controller.edit({ id: "3" }, newForm({ name: "Melati Baru" }));
+  assert.equal(saved.admin().editing, null);
+  const failed = setupStudioAdmin({ admin: { studios: [studioRow()], editing: "studio-3" }, responses: { "PATCH /admin/studios/3": apiFailure(409, "Nama studio sudah dipakai") } });
+  await failed.controller.edit({ id: "3" }, newForm({ name: "Mawar" }));
+  assert.equal(failed.admin().editing, "studio-3");
+  const { controller, admin } = setupStudioAdmin({ admin: { studios: [studioRow()], openStudios: { 3: true, 4: true }, editing: "studio-3", images: { 3: "/media/x.jpg" }, drafts: { "studio-3": { name: "ketikan" } } } });
+  controller.toggleStudio({ id: "4" });
+  assert.equal(admin().editing, "studio-3");
+  controller.toggleStudio({ id: "3" });
+  assert.equal(admin().editing, null);
+  assert.deepEqual([admin().images, admin().drafts, admin().openStudios[3]], [{}, {}, false]);
+});
+
 test("admin delete studio: dialog dampak lewat withConfirm, 409 dampak baru → dialog kedua → ?confirm=1, toast ringkasan pembatalan", async () => {
   const impact = { sessions: 2, active_bookings: 1, paid_bookings: 1, refund_total: 90000 };
   const { controller, ui, requests, admin, toast } = setupStudioAdmin({
