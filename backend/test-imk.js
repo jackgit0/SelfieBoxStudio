@@ -252,6 +252,13 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     for (const s of ['Konfirmasi Pembatalan', 'Yakin membatalkan booking ini?', 'Ya, Batalkan', 'Konfirmasi Pembayaran', 'Bayar sekarang via QRIS (simulasi)?']) ok(JS.includes(s), `frontend memuat "${s}"`);
   }
 
+  // ===== Refactor MVC fase 7: sesi foto dan galeri tanpa confirm()/alert() bawaan browser (decisions.md 4, 27, 63) =====
+  { const rest = fs.readdirSync(path.join(FRONT, 'js'), { recursive: true }).filter(f => f.endsWith('.js') && !/legacy[\\/]admin\.js$/.test(f)).map(f => fs.readFileSync(path.join(FRONT, 'js', f), 'utf8')).join('\n'), JS = allJs();
+    ok(!/\bconfirm\(["'`]/.test(rest), 'frontend (selain admin): tanpa confirm() bawaan browser'); // kode: diganti di fase 9 (semua berkas)
+    ok(!/\balert\(/.test(JS), 'frontend: tanpa alert() bawaan browser');
+    for (const s of ['Konfirmasi Hentikan Sesi', 'Hentikan sesi?', 'Konfirmasi Hapus Foto', 'Hapus foto ini secara permanen?', 'foto terpilih secara permanen? Foto favorit tidak ikut terhapus.', 'Foto Gagal Dihapus']) ok(JS.includes(s), `frontend memuat "${s}"`);
+  }
+
   // ===== Fase refactor 3: fallback SPA (rute frontend dengan path history disajikan index.html) =====
   srv = start('spa'); await up();
   { const index = fs.readFileSync(path.join(FRONT, 'index.html'), 'utf8');
