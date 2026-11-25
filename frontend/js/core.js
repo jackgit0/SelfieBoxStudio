@@ -7,8 +7,10 @@ const V = {};
 let S; try { S = JSON.parse(localStorage.getItem("snapia")); } catch (e) {}
 S = Object.assign({ user: null, me: null, admin: false, view: "landing", p: {}, pkg: null, bm: [], staff: false, log: [] }, S || {}); delete S.quiz; delete S.setup; // sisa state lama (kuis rekomendasi paket dan pilihan setup properti sudah dihapus)
 if (S.acct === "pref") S.acct = "profile";
-S.bookings = []; S.sessions = [];
-const save = () => { try { localStorage.setItem("snapia", JSON.stringify({ ...S, bookings: [], sessions: [] })); } catch (e) {} };
+["bookings", "sessions"].forEach(k => delete S[k]); // state lama menyimpan keduanya (sebagai array kosong); kini di objek D
+// booking dan sesi foto milik user yang masuk (dari /api/bookings dan /api/sessions; tidak disimpan)
+const D = { bookings: [], sessions: [] };
+const save = () => { try { localStorage.setItem("snapia", JSON.stringify(S)); } catch (e) {} };
 // state sementara (tidak disimpan): toast, cache ketersediaan slot, bulan kalender, isian pembatalan, mode form masuk + token reset, form Contact Us di landing, dialog Akses Ditolak yang sedang terbuka
 const R = { toast: { message: "", error: "" }, availability: {}, calendar: {}, cancel: { reason: "", detail: "" }, auth: { mode: "login", resetToken: "" }, contact: { n: "", e: "", m: "", ok: "", err: "", busy: false }, accessDeniedOpen: false };
 // booking yang sedang diisi: studio, tanggal, sesi; quote = rincian harga dari /api/quote; rescheduleId = id booking yang sedang diubah jadwalnya
@@ -132,10 +134,10 @@ V.auth = () => {
 };
 const fixS = s => { s.photos.forEach(p => p.img = p.img || API.imgUrl(p.id)); return s; };
 async function refresh() {
-  S.bookings = await API.get("/bookings"); S.sessions = (await API.get("/sessions")).map(fixS);
+  D.bookings = await API.get("/bookings"); D.sessions = (await API.get("/sessions")).map(fixS);
 }
 async function afterAuth(r) { API.token = r.token; localStorage.setItem("snapia_t", r.token); S.admin = false; S.user = r.user; S.me = r.user.id; await refresh(); if (S.draft) return resumeDraft(); go("home"); } // draf booking tamu: kembali ke Paket & Pembayaran
-function logout() { API.token = ""; API.staff = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; S.staff = false; S.admin = false; S.draft = null; S.bookings = []; S.sessions = []; if (typeof adminReset === "function") adminReset(); R.auth.mode = "login"; go("landing"); }
+function logout() { API.token = ""; API.staff = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; S.staff = false; S.admin = false; S.draft = null; D.bookings = []; D.sessions = []; if (typeof adminReset === "function") adminReset(); R.auth.mode = "login"; go("landing"); }
 async function staffToggle() { if (S.staff) { S.staff = false; API.staff = ""; } else { const pin = prompt("PIN staf:"); if (!pin) return; try { API.staff = (await API.post("/staff/login", { pin })).token; S.staff = true; } catch (e) { R.toast.error = e.message; } } save(); render(); }
 async function reg() {
   const n = $("#n").value.trim(), e = $("#e").value.trim(), p = $("#p").value.trim(), pw = $("#pw").value;

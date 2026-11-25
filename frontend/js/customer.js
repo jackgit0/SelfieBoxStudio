@@ -141,7 +141,7 @@ async function needLogin() {
   const v = await modal({ title: "Masuk untuk melanjutkan booking", cls: "center", kicker: mIcon("info", "blue"), body: "<p>Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.</p>",
     buttons: [{ label: "Masuk", value: "login", icon: "user" }, { label: "Daftar", value: "register", style: "ghost" }] });
   if (!v) return;
-  if (S.me) { API.token = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; S.bookings = []; S.sessions = []; } // token kedaluwarsa (401 saat booking)
+  if (S.me) { API.token = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; D.bookings = []; D.sessions = []; } // token kedaluwarsa (401 saat booking)
   openAuth(v);
 }
 
@@ -183,7 +183,7 @@ function payRows(b) {
 const kvs = rows => rows.map(r => `<div class="kv ${r[2] || ""}"><span>${r[0]}</span><b>${r[1]}</b></div>`).join("");
 const bookRows = b => { const s = studioOf(b.studio), pt = parseSlot(b.date); return kvs([["Studio", esc(s.name)], ["Paket", esc(pkOf(b.package_id).name)], ["Tanggal", fmtDMY(pt.date)], ["Jam", slotRange(b.date)], ["Lokasi", esc(s.address || "-")]]); };
 const payDetail = b => kvs([["Waktu", fmtTime(b.paid_at)], ["Status", PAYLBL[b.pay_status] || b.pay_status], ["Metode", esc(b.method || "-")], ...payRows(b)]);
-const bookOf = () => S.bookings.find(x => x.id == (S.p && S.p.id));
+const bookOf = () => D.bookings.find(x => x.id == (S.p && S.p.id));
 V.success = () => {
   const b = bookOf(); if (!b) return `<div class="card">Memuat…</div>`;
   return `<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Studio Berhasil Direservasi</h1><img class="ill" src="img/ill-booking.png" alt="">
@@ -201,14 +201,14 @@ async function mailInv(id) { R.toast.message = R.toast.error = ""; try { const r
 const UPCOMING = ["Menunggu Pembayaran", "Terbayar", "Sesi Berjalan"];
 const stTag = b => `<span class="tag ${["Terbayar", "Selesai", "Sesi Berjalan"].includes(b.status) ? "ok" : b.status == "Dibatalkan" ? "no" : "warn"}">${b.status}</span>`;
 V.my = () => {
-  const tab = S.myTab || "up"; S.bookings.forEach(b => { if (b.status == "Menunggu Pembayaran" && Date.now() > b.expire_at) b.status = "Dibatalkan"; });
-  let L = S.bookings.filter(b => b.user_id == S.me && (tab == "up" ? UPCOMING.includes(b.status) : !UPCOMING.includes(b.status))); L.sort((a, b) => tab == "up" ? (a.date < b.date ? -1 : 1) : (a.date < b.date ? 1 : -1));
+  const tab = S.myTab || "up"; D.bookings.forEach(b => { if (b.status == "Menunggu Pembayaran" && Date.now() > b.expire_at) b.status = "Dibatalkan"; });
+  let L = D.bookings.filter(b => b.user_id == S.me && (tab == "up" ? UPCOMING.includes(b.status) : !UPCOMING.includes(b.status))); L.sort((a, b) => tab == "up" ? (a.date < b.date ? -1 : 1) : (a.date < b.date ? 1 : -1));
   const groups = {}; L.forEach(b => (groups[parseSlot(b.date).date] = groups[parseSlot(b.date).date] || []).push(b));
   return `<div class="panel"><h1 class="h1">Booking Saya</h1><div class="seg"><button class="${tab == "up" ? "on" : ""}" onclick="S.myTab='up';render()">Mendatang</button><button class="${tab == "hist" ? "on" : ""}" onclick="S.myTab='hist';render()">Riwayat</button></div>
 ${Object.keys(groups).map(d => `<div class="dayh">${fmtDate(d)}</div>${groups[d].map(b => `<button class="brow" onclick="go('bdetail',{id:${b.id}})"><div><b>${esc(studioOf(b.studio).name)}</b><div class="sub">${esc(pkOf(b.package_id).name)} · ${stTag(b)}</div></div><b>${slotRange(b.date)}</b></button>`).join("")}`).join("") || `<div class="card center m" style="margin-top:12px">${tab == "up" ? "Belum ada booking mendatang." : "Belum ada riwayat booking."}<div style="margin-top:12px"><button class="btn" onclick="go('home')">Cari studio</button></div></div>`}</div>`;
 };
 const canChange = b => ["Menunggu Pembayaran", "Terbayar"].includes(b.status);
-function startReschedule(id) { const b = S.bookings.find(x => x.id == id); BK.rescheduleId = id; Object.assign(BK, { studio: b.studio, date: parseSlot(b.date).date, slot: null }); go("time"); }
+function startReschedule(id) { const b = D.bookings.find(x => x.id == id); BK.rescheduleId = id; Object.assign(BK, { studio: b.studio, date: parseSlot(b.date).date, slot: null }); go("time"); }
 async function payNow(id) { if (!confirm("Bayar sekarang via QRIS (simulasi)?")) return; try { await API.post(`/bookings/${id}/pay`, { method: "QRIS" }); await refresh(); S.payOpen = false; go("success", { id }); } catch (e) { R.toast.error = e.message; render(); } }
 V.bdetail = () => {
   const b = bookOf(); if (!b) return `<div class="panel"><button class="back" onclick="go('my')">${ic("left", 16)} Kembali</button><div class="card">Booking tidak ditemukan.</div></div>`;
@@ -250,7 +250,7 @@ V.account = () => {
   let body = "";
   if (tab == "profile") body = `<div class="card"><h3 class="h3">Edit Profil</h3><label>Nama</label><input id="pn" value="${esc(u.name)}"><label>Telepon</label><input id="pp" value="${esc(u.phone || "")}" inputmode="numeric"><label>Email</label><input value="${esc(u.email)}" disabled>
 <div class="row" style="margin-top:18px"><button class="btn" onclick="saveProfile()">Simpan</button><button class="btn ghost" onclick="changePw()">${ic("mail", 16)} Ubah sandi via email</button></div></div>`;
-  if (tab == "pay") { const L = S.bookings.filter(b => b.pay_status && !["pending", "batal"].includes(b.pay_status)).sort((a, b) => (b.paid_at || 0) - (a.paid_at || 0));
+  if (tab == "pay") { const L = D.bookings.filter(b => b.pay_status && !["pending", "batal"].includes(b.pay_status)).sort((a, b) => (b.paid_at || 0) - (a.paid_at || 0));
     body = `<div class="card"><h3 class="h3">Riwayat Pembayaran</h3>${L.length ? `<div class="tbl"><table><tr><th>Waktu</th><th>Studio</th><th>Paket</th><th>Total</th><th>Status</th><th></th></tr>${L.map(b => `<tr><td>${fmtTime(b.paid_at)}</td><td>${esc(studioOf(b.studio).name)}</td><td>${esc(pkOf(b.package_id).name)}</td><td>${rp(b.amount)}</td><td><span class="tag ${b.pay_status == "paid" ? "ok" : b.pay_status == "refunded" ? "" : "no"}">${PAYLBL[b.pay_status]}</span></td>
 <td>${b.paid && b.status != "Dibatalkan" ? `<a class="btn sm ghost" href="${API.invUrl(b.id, 0)}" target="_blank" rel="noopener">${ic("receipt", 14)} Kwitansi Digital</a>` : ""}</td></tr>`).join("")}</table></div>` : `<p class="m" style="margin-top:8px">Belum ada transaksi.</p>`}</div>`; }
   return `<div class="panel"><h1 class="h1">Pengaturan Akun</h1><div class="seg">${tabs.map(t => `<button class="${t[0] == tab ? "on" : ""}" onclick="S.acct='${t[0]}';R.toast.message=R.toast.error='';render()">${t[1]}</button>`).join("")}</div>${body}<div style="margin-top:18px"><button class="btn ghost" onclick="logout()">${ic("logout", 16)} Keluar</button></div></div>`;
