@@ -74,7 +74,7 @@ V.adash = () => {
 V.adash_after = () => { aLoad("dash", () => API.get("/admin/revenue"), {}); aLoad("ops", () => API.get("/admin/ops?period=" + AD.opPeriod), { period: "", items: [] }); };
 const opEdit = id => { AD.opEdit = AD.ops.items.find(i => i.id == id); render(); window.scrollTo(0, document.body.scrollHeight); };
 const opSave = () => aDo(async () => { const b = { date: val("o_date"), label: val("o_label"), kind: val("o_kind"), amount: +val("o_amt"), note: val("o_note") }; if (AD.opEdit) await API.patch("/admin/ops/" + AD.opEdit.id, b); else await API.post("/admin/ops", b); AD.opEdit = null; AD.ops = null; }, "Rekap operasional disimpan.");
-const opDel = id => confirm("Hapus item rekap ini?") && aDo(async () => { await API.del("/admin/ops/" + id); AD.ops = null; AD.opEdit = null; }, "Item dihapus.");
+const opDel = async id => await aModal("Konfirmasi Hapus Item Rekap", "<p>Hapus item rekap ini?</p>", "Ya, Hapus Item") && aDo(async () => { await API.del("/admin/ops/" + id); AD.ops = null; AD.opEdit = null; }, "Item dihapus.");
 
 // ---------- Pengguna ----------
 V.acust = () => {
@@ -89,7 +89,7 @@ ${c.bookings.map(b => `<tr><td>${wib(b.created_at)}</td><td>${esc(b.package)}</t
 const aImg = id => `${API_BASE}/api/admin/photos/${id}/image?t=${API.token}`;
 V.acust_after = () => aLoad("cust", () => API.get("/admin/customers"), []);
 const openCust = id => aDo(async () => { const [b, p] = await Promise.all([API.get(`/admin/customers/${id}/bookings`), API.get(`/admin/customers/${id}/photos`)]); AD.cdet = { customer: b.customer, bookings: b.bookings, photos: p.photos }; window.scrollTo(0, document.body.scrollHeight); });
-const delCust = (id, name) => confirm(`Hapus akun "${name}" beserta SELURUH booking, pembayaran, dan foto miliknya?\nTindakan ini tidak dapat dibatalkan.`) && aDo(async () => { const r = await API.del("/admin/customers/" + id); AD.cust = AD.cdet = AD.dash = AD.ops = AD.studios = AD.books = AD.trx = null; AD.sess = {}; R.toast.message = `Akun dihapus (${r.photos_deleted} foto ikut terhapus).`; });
+const delCust = async (id, name) => await aModal("Konfirmasi Hapus Akun", `<p>Hapus akun "${esc(name)}" beserta SELURUH booking, pembayaran, dan foto miliknya?</p><p>Tindakan ini tidak dapat dibatalkan.</p>`, "Ya, Hapus Akun") && aDo(async () => { const r = await API.del("/admin/customers/" + id); AD.cust = AD.cdet = AD.dash = AD.ops = AD.studios = AD.books = AD.trx = null; AD.sess = {}; R.toast.message = `Akun dihapus (${r.photos_deleted} foto ikut terhapus).`; });
 
 // ---------- Studio (accordion) ----------
 // galat isian Tambah Studio (Figma 592:5056 Input Tidak Valid, 592:5140 Nama Sudah Digunakan)
@@ -282,7 +282,7 @@ const pkBody = p => ({ name: val(`pk${p}n`), price: +val(`pk${p}p`), photo_count
 const pkSave = id => aDo(async () => { await API.patch("/admin/packages/" + id, pkBody(id)); AD.pkgs = null; }, "Paket disimpan. Harga baru berlaku untuk booking berikutnya.");
 const pkAdd = () => aDo(async () => { await API.post("/admin/packages", pkBody("N")); AD.pkgs = null; }, "Paket baru ditambahkan.");
 const pkActive = id => aDo(async () => { await API.patch("/admin/packages/" + id, { active: true }); AD.pkgs = null; }, "Paket diaktifkan.");
-const pkDel = id => confirm("Hapus paket ini? (Jika pernah dibeli, paket hanya dinonaktifkan.)") && aDo(async () => { const r = await API.del("/admin/packages/" + id); AD.pkgs = null; R.toast.message = r.deactivated ? "Paket pernah dibeli, jadi dinonaktifkan (riwayat tetap utuh)." : "Paket dihapus."; });
+const pkDel = async id => await aModal("Konfirmasi Hapus Paket", "<p>Hapus paket ini? (Jika pernah dibeli, paket hanya dinonaktifkan.)</p>", "Ya, Hapus Paket") && aDo(async () => { const r = await API.del("/admin/packages/" + id); AD.pkgs = null; R.toast.message = r.deactivated ? "Paket pernah dibeli, jadi dinonaktifkan (riwayat tetap utuh)." : "Paket dihapus."; });
 const discSave = () => aDo(async () => { await API.put("/admin/discount", { pct: +val("d_pct"), label: val("d_lbl") }); AD.disc = null; }, "Diskon utama disimpan.");
 
 // ---------- Akun Admin (tersimpan di database; ganti username/password) ----------
