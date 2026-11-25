@@ -63,3 +63,8 @@ export function formatTime(milliseconds) {
     .replace(/\./g, ":")
     .replace(",", " -");
 }
+
+// waktu (milidetik) dalam WIB dengan format Indonesia, mis. "25/11/2026, 10.04.05"; kosong → "-" (dulu wib() di admin.js)
+export function formatDateTimeWib(milliseconds) {
+  return milliseconds ? new Date(milliseconds).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) : "-";
+}

@@ -180,3 +180,117 @@ test("setSearch: query admin disimpan dan outlet dirender", () => {
   assert.equal(store.get().admin.query, "walk");
   assert.deepEqual(log, ["render"]);
 });
+
+// ---------- Dashboard ----------
+const operationsData = { period: "month", items: [{ id: 4, date: "2026-11-20", label: "Sewa", kind: "biaya", amount: 200000, note: "" }] };
+
+test("loadDashboard: pendapatan dan rekap periode terpilih dimuat sekali", async () => {
+  const { controller, api, store } = setupAdmin({ admin: { operationsPeriod: "week" }, responses: { "GET /admin/revenue": { body: { today: {} } }, "GET /admin/ops?period=week": { body: operationsData } } });
+  await controller.loadDashboard();
+  await controller.loadDashboard();
+  assert.deepEqual(api.calls.map(call => call.path), ["/admin/revenue", "/admin/ops?period=week"]);
+  assert.deepEqual(store.get().admin.operations, operationsData);
+});
+
+test("setOperationsPeriod: periode baru, rekap dikosongkan (dimuat ulang oleh after), render", () => {
+  const { controller, store, log } = setupAdmin({ admin: { operations: operationsData } });
+  controller.setOperationsPeriod("day");
+  assert.equal(store.get().admin.operationsPeriod, "day");
+  assert.equal(store.get().admin.operations, null);
+  assert.deepEqual(log, ["render"]);
+});
+
+test("editOperation: item masuk mode ubah (draf lama dibuang), render lalu gulir ke form; cancel keluar dari mode ubah", () => {
+  const { controller, store, log } = setupAdmin({ admin: { operations: operationsData, drafts: { operation: { label: "lama" } } } });
+  controller.editOperation({ id: "4" });
+  assert.equal(store.get().admin.editingOperation.id, 4);
+  assert.equal(store.get().admin.drafts.operation, undefined);
+  assert.deepEqual(log, ["render", "scroll"]);
+  controller.cancelOperationEdit();
+  assert.equal(store.get().admin.editingOperation, null);
+});
+
+test("saveOperation: tambah (POST, nominal angka), rekap dimuat ulang, toast", async () => {
+  const { controller, api, store } = setupAdmin({ admin: { operations: operationsData }, responses: { "POST /admin/ops": { body: { id: 9 } } } });
+  await controller.saveOperation({ date: "2026-11-25", label: "Listrik", kind: "biaya", amount: "30000", note: "" });
+  assert.deepEqual(api.calls[0], { method: "POST", path: "/admin/ops", body: { date: "2026-11-25", label: "Listrik", kind: "biaya", amount: 30000, note: "" } });
+  assert.equal(store.get().admin.operations, null);
+  assert.equal(store.get().runtime.toast.message, "Rekap operasional disimpan.");
+});
+
+test("saveOperation: mode ubah → PATCH item itu, keluar dari mode ubah; galat → draf disimpan, mode ubah tetap", async () => {
+  let setup = setupAdmin({ admin: { operations: operationsData, editingOperation: operationsData.items[0] }, responses: { "PATCH /admin/ops/4": { body: { ok: true } } } });
+  await setup.controller.saveOperation({ date: "2026-11-20", label: "Sewa", kind: "biaya", amount: "1", note: "" });
+  assert.equal(setup.api.calls[0].path, "/admin/ops/4");
+  assert.equal(setup.store.get().admin.editingOperation, null);
+  setup = setupAdmin({ admin: { operations: operationsData, editingOperation: operationsData.items[0] }, responses: { "PATCH /admin/ops/4": { status: 400, body: { error: "Nominal tidak valid" } } } });
+  const values = { date: "2026-11-20", label: "Sewa", kind: "biaya", amount: "-1", note: "" };
+  await setup.controller.saveOperation(values);
+  assert.equal(setup.store.get().runtime.toast.error, "Nominal tidak valid");
+  assert.deepEqual(setup.store.get().admin.drafts.operation, values);
+  assert.equal(setup.store.get().admin.editingOperation.id, 4);
+  assert.notEqual(setup.store.get().admin.operations, null);
+});
+
+test("deleteOperation: modal Konfirmasi Hapus Item Rekap; Kembali → tanpa permintaan; ya → DELETE, toast Item dihapus.", async () => {
+  let setup = setupAdmin({ modalAnswers: [false], admin: { operations: operationsData } });
+  await setup.controller.deleteOperation({ id: "4" });
+  assert.equal(setup.api.calls.length, 0);
+  assert.equal(setup.ui.modals[0].title, "Konfirmasi Hapus Item Rekap");
+  assert.equal(String(setup.ui.modals[0].body), "<p>Hapus item rekap ini?</p>");
+  setup = setupAdmin({ modalAnswers: [true], admin: { operations: operationsData, editingOperation: operationsData.items[0] }, responses: { "DELETE /admin/ops/4": { body: { ok: true } } } });
+  await setup.controller.deleteOperation({ id: "4" });
+  assert.equal(setup.api.calls[0].method, "DELETE");
+  assert.equal(setup.store.get().admin.operations, null);
+  assert.equal(setup.store.get().admin.editingOperation, null);
+  assert.equal(setup.store.get().runtime.toast.message, "Item dihapus.");
+});
+
+// ---------- Pengguna ----------
+test("loadUsers: daftar pelanggan dimuat sekali", async () => {
+  const { controller, api, store } = setupAdmin({ responses: { "GET /admin/customers": { body: [{ id: 3 }] } } });
+  await controller.loadUsers();
+  await controller.loadUsers();
+  assert.equal(api.calls.length, 1);
+  assert.deepEqual(store.get().admin.customers, [{ id: 3 }]);
+});
+
+test("openCustomer: detail (booking + foto) masuk slice, render lalu gulir; closeCustomer menutupnya", async () => {
+  const { controller, store, log } = setupAdmin({ responses: { "GET /admin/customers/3/bookings": { body: { customer: { id: 3 }, bookings: [] } }, "GET /admin/customers/3/photos": { body: { photos: [{ id: 7 }] } } } });
+  await controller.openCustomer({ id: "3" });
+  assert.deepEqual(store.get().admin.customerDetail, { customer: { id: 3 }, bookings: [], photos: [{ id: 7 }] });
+  assert.deepEqual(log, ["render", "scroll"]);
+  controller.closeCustomer();
+  assert.equal(store.get().admin.customerDetail, null);
+});
+
+test("deleteCustomer: modal Konfirmasi Hapus Akun dengan nama (di-escape) sekali; ya → DELETE, daftar terkait dikosongkan, toast jumlah foto", async () => {
+  const { controller, api, store, ui } = setupAdmin({ modalAnswers: [true], admin: { customers: [{ id: 3 }], customerDetail: { customer: { id: 3 } }, revenue: {}, operations: {}, studios: [], books: [], transactions: {}, sess: { "1|2026-11": [] } }, responses: { "DELETE /admin/customers/3": { body: { ok: true, photos_deleted: 2 } } } });
+  await controller.deleteCustomer({ id: "3", name: "Dewi <i>" });
+  assert.equal(ui.modals.length, 1);
+  assert.equal(ui.modals[0].title, "Konfirmasi Hapus Akun");
+  assert.equal(String(ui.modals[0].body), "<p>Hapus akun \"Dewi &lt;i&gt;\" beserta SELURUH booking, pembayaran, dan foto miliknya?</p><p>Tindakan ini tidak dapat dibatalkan.</p>");
+  assert.deepEqual(ui.modals[0].buttons.map(button => button.label), ["Kembali", "Ya, Hapus Akun"]);
+  assert.deepEqual(api.calls.map(call => `${call.method} ${call.path}`), ["DELETE /admin/customers/3"]);
+  const admin = store.get().admin;
+  assert.deepEqual([admin.customers, admin.customerDetail, admin.revenue, admin.operations, admin.studios, admin.books, admin.transactions], [null, null, null, null, null, null, null]);
+  assert.deepEqual(admin.sess, {});
+  assert.equal(store.get().runtime.toast.message, "Akun dihapus (2 foto ikut terhapus).");
+});
+
+test("deleteCustomer: Kembali → tanpa permintaan, daftar tetap", async () => {
+  const { controller, api, store } = setupAdmin({ modalAnswers: [false], admin: { customers: [{ id: 3 }] } });
+  await controller.deleteCustomer({ id: "3", name: "Dewi" });
+  assert.equal(api.calls.length, 0);
+  assert.deepEqual(store.get().admin.customers, [{ id: 3 }]);
+});
+
+// ---------- Transaksi ----------
+test("loadTransactions: dimuat sekali; galat → cadangan kosong + toast", async () => {
+  let setup = setupAdmin({ responses: { "GET /admin/transactions": { body: { rows: [{ id: 1 }], paid: 1, refunded: 0 } } } });
+  await setup.controller.loadTransactions();
+  assert.equal(setup.store.get().admin.transactions.paid, 1);
+  setup = setupAdmin({ responses: { "GET /admin/transactions": { status: 500, body: { error: "Rusak" } } } });
+  await setup.controller.loadTransactions();
+  assert.deepEqual(setup.store.get().admin.transactions, { rows: [], paid: 0, refunded: 0 });
+});

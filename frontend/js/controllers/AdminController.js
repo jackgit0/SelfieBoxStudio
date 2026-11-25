@@ -3,7 +3,7 @@
 // - run(action, okMessage, what, { draft }): aksi admin dengan toast hasil; galat lewat handleError, isian form yang gagal disimpan sebagai draf
 // - handleError: 401 → keluar; 403 "Hanya admin" → dialog Akses ditolak; 403 "Ganti password" → Akun Admin; selain itu toast galat
 // logout = AuthController.logout (main.js). Halaman Studio, Booking, Properti dan Pose masih kode lama (fase 8b) dan memakai inti ini lewat CONTROLLERS.admin.
-import { DEFAULT_DENIED, accessDeniedModal, confirmModal } from "../views/admin/dialogs.js";
+import { DEFAULT_DENIED, accessDeniedModal, confirmModal, deleteCustomerBody, deleteOperationBody } from "../views/admin/dialogs.js";
 
 // isi awal slice admin (dulu objek AD dan adminReset); kunci tanpa nama lengkap masih milik kode lama fase 8b
 export function createAdminState() {
@@ -46,11 +46,18 @@ export function createAdminState() {
 export function createAdminController({ api, store, ui, router, models, logout }) {
   const state = () => store.get();
   const admin = () => state().admin;
+  const pages = models.admin;
   // dialog Akses ditolak yang sedang terbuka (handleError, load dan run menunggunya selesai)
   let denial = Promise.resolve();
 
   function setToast(toast, { silent = true } = {}) {
     store.update("runtime", { toast: { message: "", error: "", ...toast } }, { silent });
+  }
+
+  // drafts tanpa satu form (setelah berhasil disimpan atau form dibuka ulang)
+  function withoutDraft(key) {
+    const { [key]: dropped, ...rest } = admin().drafts;
+    return rest;
   }
 
   function setLoading(key, flag) {
@@ -150,6 +157,85 @@ export function createAdminController({ api, store, ui, router, models, logout }
     // kotak cari di header admin (data-change="admin:search")
     setSearch(query) {
       store.update("admin", { query });
+    },
+
+    // ---------- Dashboard (/admin) ----------
+    loadDashboard() {
+      return Promise.all([controller.load("revenue", () => pages.dashboard.loadRevenue(api), {}), controller.load("operations", () => pages.dashboard.loadOperations(api, admin().operationsPeriod), { period: "", items: [] })]);
+    },
+
+    // periode rekap: rekap dikosongkan lalu dimuat ulang oleh kait after halaman
+    setOperationsPeriod(period) {
+      store.update("admin", { operationsPeriod: period, operations: null });
+    },
+
+    editOperation({ id }) {
+      const item = admin().operations.items.find(entry => entry.id == id);
+      store.update("admin", { editingOperation: item, drafts: withoutDraft("operation") });
+      ui.scrollToEnd();
+    },
+
+    cancelOperationEdit() {
+      store.update("admin", { editingOperation: null, drafts: withoutDraft("operation") });
+    },
+
+    // values = isian form Tambah/Ubah item (data-submit, formValues)
+    saveOperation(values) {
+      const editing = admin().editingOperation;
+      return controller.run(
+        async () => {
+          await pages.dashboard.saveOperation(api, editing && editing.id, pages.dashboard.operationBody(values));
+          store.update("admin", { editingOperation: null, operations: null, drafts: withoutDraft("operation") }, { silent: true });
+        },
+        "Rekap operasional disimpan.",
+        undefined,
+        { draft: { key: "operation", values } },
+      );
+    },
+
+    async deleteOperation({ id }) {
+      if (!(await controller.confirm({ title: "Konfirmasi Hapus Item Rekap", body: deleteOperationBody(), okLabel: "Ya, Hapus Item" }))) {
+        return;
+      }
+      await controller.run(async () => {
+        await pages.dashboard.deleteOperation(api, id);
+        store.update("admin", { operations: null, editingOperation: null }, { silent: true });
+      }, "Item dihapus.");
+    },
+
+    // ---------- Pengguna (/admin/users) ----------
+    loadUsers() {
+      return controller.load("customers", () => pages.users.loadCustomers(api), []);
+    },
+
+    async openCustomer({ id }) {
+      const opened = await controller.run(async () => {
+        store.update("admin", { customerDetail: await pages.users.loadCustomerDetail(api, id) }, { silent: true });
+      });
+      if (opened) {
+        ui.scrollToEnd();
+      }
+    },
+
+    closeCustomer() {
+      store.update("admin", { customerDetail: null });
+    },
+
+    // hapus akun beserta seluruh booking, pembayaran dan fotonya; data turunan (ringkasan, studio, booking, transaksi) dimuat ulang
+    deleteCustomer({ id, name }) {
+      return controller.run(async () => {
+        const answer = await pages.confirmable.withConfirm(confirmed => pages.users.deleteCustomer(api, id, confirmed), { ui, title: "Konfirmasi Hapus Akun", okLabel: "Ya, Hapus Akun", describeImpact: () => deleteCustomerBody(name), known: null });
+        if (!answer) {
+          return;
+        }
+        store.update("admin", { customers: null, customerDetail: null, revenue: null, operations: null, studios: null, books: null, transactions: null, sess: {} }, { silent: true });
+        setToast({ message: `Akun dihapus (${answer.photos_deleted} foto ikut terhapus).` });
+      });
+    },
+
+    // ---------- Transaksi (/admin/transactions) ----------
+    loadTransactions() {
+      return controller.load("transactions", () => pages.transactions.loadTransactions(api), { rows: [], paid: 0, refunded: 0 });
     },
   };
   return controller;

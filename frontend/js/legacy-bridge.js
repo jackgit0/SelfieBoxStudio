@@ -9,7 +9,7 @@ import * as admin from "./legacy/admin.js";
 const BRIDGED = {
   state: ["R", "S"],
   core: ["go", "ic", "me", "modal", "render"],
-  admin: ["AD", "acctSave", "bookDel", "bookSave", "delCust", "discSave", "loading", "opDel", "opEdit", "opSave", "openBook", "openCust", "pkActive", "pkAdd", "pkDel", "pkSave", "poseDel", "poseSave", "propDel", "propSave", "pthumb", "sAdd", "sDay", "sDel", "sNav", "sSave", "sel", "stCancel", "stEdit", "stReview", "stSave", "stat", "studioDel", "studioSave", "upImg"],
+  admin: ["AD", "acctSave", "bookDel", "bookSave", "discSave", "loading", "openBook", "pkActive", "pkAdd", "pkDel", "pkSave", "poseDel", "poseSave", "propDel", "propSave", "pthumb", "sAdd", "sDay", "sDel", "sNav", "sSave", "sel", "stCancel", "stEdit", "stReview", "stSave", "studioDel", "studioSave", "upImg"],
 };
 
 const MODULES = { state, core, admin };

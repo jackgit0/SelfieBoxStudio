@@ -34,6 +34,9 @@ import { createAdminController } from "./controllers/AdminController.js";
 import * as adminModels from "./models/admin/index.js";
 import { photoSessionView } from "./views/session/photoSession.js";
 import { galleryView } from "./views/session/gallery.js";
+import { dashboardView } from "./views/admin/dashboard.js";
+import { usersView } from "./views/admin/users.js";
+import { transactionsView } from "./views/admin/transactions.js";
 import { browseView } from "./views/customer/browse.js";
 import { studioView } from "./views/customer/studio.js";
 import { packagesView } from "./views/customer/packages.js";
@@ -80,6 +83,8 @@ function createUi(store) {
   return {
     modal: openModal,
     toast: message => store.update("runtime", { toast: { message, error: "" } }),
+    // gulir ke bawah halaman (form Ubah item rekap, detail pelanggan di panel admin)
+    scrollToEnd: () => window.scrollTo(0, document.body.scrollHeight),
     openUrl: (url, { newTab = false } = {}) => {
       if (newTab) {
         window.open(url, "_blank");
@@ -92,7 +97,7 @@ function createUi(store) {
 
 // halaman yang sudah MVC: view (state, match) → Safe dan kait after(match) per path rute; rute lain masih memakai V.<view> lama.
 // links = { invoiceUrl } untuk view yang menautkan invoice (token tetap di models/api.js, decisions.md 50)
-function pagesFor({ studio, payment, landing, photo, gallery }, links) {
+function pagesFor({ studio, payment, landing, photo, gallery, admin }, links) {
   const showAvailability = () => studio.prefetchAvailability();
   return {
     // landing page (LandingController): scroll-spy dipasang setiap render dan dilepas saat halaman ditinggalkan
@@ -129,6 +134,10 @@ function pagesFor({ studio, payment, landing, photo, gallery }, links) {
     "/sessions/:id": { view: photoSessionView, after: match => photo.enter(match), leave: () => photo.stopTimers() },
     // Galeri (GalleryController)
     "/gallery": { view: galleryView },
+    // panel admin yang sudah MVC (AdminController); Studio, Booking, Properti, Pose masih V.<view> lama (fase 8b)
+    "/admin": { view: dashboardView, after: () => admin.loadDashboard() },
+    "/admin/users": { view: (state, match) => usersView(state, match, links), after: () => admin.loadUsers() },
+    "/admin/transactions": { view: transactionsView, after: () => admin.loadTransactions() },
   };
 }
 
@@ -136,6 +145,14 @@ function pagesFor({ studio, payment, landing, photo, gallery }, links) {
 function controllerActions({ studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin }) {
   return {
     "admin:search": (dataset, event) => admin.setSearch(event.target.value),
+    "admin:setOperationsPeriod": (dataset, event) => admin.setOperationsPeriod(event.target.value),
+    "admin:editOperation": admin.editOperation,
+    "admin:cancelOperationEdit": admin.cancelOperationEdit,
+    "admin:saveOperation": (dataset, event) => admin.saveOperation(formValues(event.target)),
+    "admin:deleteOperation": admin.deleteOperation,
+    "admin:openCustomer": admin.openCustomer,
+    "admin:closeCustomer": admin.closeCustomer,
+    "admin:deleteCustomer": admin.deleteCustomer,
     "gallery:showSession": gallery.showSession,
     "gallery:select": gallery.select,
     "gallery:toggleFavourite": gallery.toggleFavourite,
@@ -224,7 +241,7 @@ async function start() {
   });
   const gallery = createGalleryController({ api, store, ui, models, drive: { fetch: (...request) => window.fetch(...request) }, files: { download: downloadFile }, photoSession: photo, refreshData: booking.refreshData, brand: BRAND });
   const controllers = { studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin };
-  const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl });
+  const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl, adminPhotoUrl: api.adminPhotoUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({
     routes,

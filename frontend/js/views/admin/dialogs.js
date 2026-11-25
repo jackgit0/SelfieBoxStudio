@@ -17,3 +17,8 @@ export function accessDeniedModal(what = DEFAULT_DENIED) {
 export function confirmModal({ title, body, okLabel }) {
   return { title, body, buttons: [{ label: "Kembali", value: false, style: "ghost" }, { label: okLabel, value: true }] };
 }
+
+// isi konfirmasi hapus di halaman admin umum (dulu confirm() bawaan browser, decisions.md 4, 27)
+export const deleteOperationBody = () => html`<p>Hapus item rekap ini?</p>`;
+export const deleteCustomerBody = name => html`<p>Hapus akun "${name}" beserta SELURUH booking, pembayaran, dan foto miliknya?</p><p>Tindakan ini tidak dapat dibatalkan.</p>`;
+export const deletePackageBody = () => html`<p>Hapus paket ini? (Jika pernah dibeli, paket hanya dinonaktifkan.)</p>`;

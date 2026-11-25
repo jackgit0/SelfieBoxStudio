@@ -41,3 +41,12 @@ test("formatTime memakai WIB", () => {
   assert.equal(format.formatTime(0), "-");
   assert.equal(format.formatTime(null), "-");
 });
+
+test("formatDateTimeWib: waktu WIB (Asia/Jakarta) dalam format Indonesia, kosong → \"-\"", async () => {
+  const { formatDateTimeWib } = await import("../../js/core/format.js");
+  assert.equal(formatDateTimeWib(0), "-");
+  assert.equal(formatDateTimeWib(null), "-");
+  const ms = Date.UTC(2026, 10, 25, 3, 4, 5);
+  assert.equal(formatDateTimeWib(ms), new Date(ms).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }));
+  assert.match(formatDateTimeWib(ms), /10\.04\.05/);
+});

@@ -1,8 +1,7 @@
 // ===== PANEL ADMIN: Dashboard, Pengguna, Studio, Booking, Properti, Pose, Transaksi, Paket & Diskon =====
-import { API, CONTROLLERS, M, R, S, V } from "./state.js";
+import { API, CONTROLLERS, M, R, V } from "./state.js";
 import { createAdminState } from "../controllers/AdminController.js";
 import { uploadImage } from "../models/admin/uploads.js";
-import { API_BASE } from "../config.js";
 import { esc, raw } from "../core/html.js";
 import { formatDate as fmtDate, formatTime as fmtTime, padTwo as pad, formatRupiah as rp, todayIso as todayS } from "../core/format.js";
 import { $, ic, modal, render } from "./core.js";
@@ -36,7 +35,6 @@ async function aConfirmReq(method, path, body, title, describe, okLabel, known, 
     return API.request(method, path + (path.includes("?") ? "&" : "?") + "confirm=1", body); }
 }
 const aConfirmDel = (path, title, describe, okLabel, known) => aConfirmReq("DELETE", path, undefined, title, describe, okLabel, known);
-const wib = ms => ms ? new Date(ms).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) : "-";
 const match = (...f) => { const q = AD.query.trim().toLowerCase(); return !q || f.some(x => String(x ?? "").toLowerCase().includes(q)); };
 const loading = `<div class="card m">Memuat…</div>`;
 const sel = (id, opts, cur) => `<select id="${id}">${opts.map(o => `<option value="${o[0]}" ${o[0] == cur ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
@@ -49,41 +47,7 @@ async function upImg(key, input) {
   } catch (e) { R.toast.error = e.message; } render(); restore(sn);
 }
 
-// ---------- Dashboard: pendapatan + rekap operasional ----------
-const stat = (t, r, sub = "") => `<div class="stat"><small class="m">${t}</small><b>${rp(r.total)}</b><small class="m">${r.n} transaksi${sub}</small></div>`;
-const PERIODS = [["day", "Hari ini"], ["week", "7 hari terakhir"], ["month", "30 hari terakhir"], ["all", "Sejak pemesanan pertama"]];
-V.adash = () => {
-  const d = AD.revenue, o = AD.operations; if (!d || !d.today || !o || !o.period) return loading;
-  const e = AD.editingOperation || {}, kind = e.kind || "biaya";
-  return `<div class="stats">${stat("Hari ini", d.today)}${stat("7 hari terakhir", d.week)}${stat("30 hari terakhir", d.month)}${stat("Sejak pemesanan pertama", d.all, d.first_date ? " · mulai " + d.first_date : "")}</div>
-<div class="card" style="margin-bottom:16px"><h3 class="h3" style="margin-bottom:8px">Pendapatan 7 hari terakhir</h3><div class="tbl"><table><tr><th>Tanggal</th><th>Transaksi</th><th>Pendapatan</th></tr>${d.daily.map(x => `<tr><td>${x.date}</td><td>${x.n}</td><td>${rp(x.total)}</td></tr>`).join("")}</table></div>
-<p class="sm m" style="margin-top:8px">Pendapatan = pembayaran lunas (setelah diskon). Pembayaran yang sudah di-refund tidak dihitung; refund gagal tetap dihitung.</p></div>
-<div class="card"><div class="row sp"><h3 class="h3">Rekapitulasi Operasional</h3><select style="width:auto" onchange="AD.operationsPeriod=this.value;AD.operations=null;render()">${PERIODS.map(p => `<option value="${p[0]}" ${o.period == p[0] ? "selected" : ""}>${p[1]}</option>`).join("")}</select></div>
-<div class="stats" style="margin-top:12px"><div class="stat"><small class="m">Pendapatan booking</small><b>${rp(o.booking_revenue)}</b></div><div class="stat"><small class="m">Pemasukan lain</small><b>${rp(o.other_income)}</b></div><div class="stat"><small class="m">Omset kotor</small><b>${rp(o.gross)}</b></div><div class="stat"><small class="m">Biaya operasional</small><b>${rp(o.costs)}</b></div><div class="stat"><small class="m">Omset bersih</small><b style="color:${o.net < 0 ? "var(--red)" : "var(--green)"}">${rp(o.net)}</b></div></div>
-<div class="tbl"><table><tr><th>Tanggal</th><th>Keterangan</th><th>Jenis</th><th>Nominal</th><th>Catatan</th><th></th></tr>${o.items.map(i => `<tr><td>${i.date}</td><td>${esc(i.label)}</td><td><span class="tag ${i.kind == "biaya" ? "no" : "ok"}">${i.kind}</span></td><td>${rp(i.amount)}</td><td>${esc(i.note || "")}</td><td><button class="btn sm ghost" onclick="opEdit(${i.id})">Ubah</button> <button class="btn sm ghost" onclick="opDel(${i.id})">Hapus</button></td></tr>`).join("") || `<tr><td colspan="6" class="m">Belum ada item pada periode ini.</td></tr>`}</table></div>
-<h3 class="h3" style="margin:16px 0 4px">${AD.editingOperation ? "Ubah item" : "Tambah item"}</h3><div class="row"><input id="o_date" type="date" value="${e.date || todayS()}" style="width:auto"><input id="o_label" placeholder="Keterangan (mis. Sewa studio)" value="${esc(e.label || "")}" style="flex:1;min-width:160px">
-<select id="o_kind" style="width:auto"><option value="biaya" ${kind == "biaya" ? "selected" : ""}>Biaya</option><option value="pemasukan" ${kind == "pemasukan" ? "selected" : ""}>Pemasukan lain</option></select><input id="o_amt" type="number" min="0" placeholder="Nominal" value="${e.amount ?? ""}" style="width:140px"><input id="o_note" placeholder="Catatan" value="${esc(e.note || "")}" style="width:170px"></div>
-<div class="row" style="margin-top:10px"><button class="btn" onclick="opSave()">${AD.editingOperation ? "Simpan perubahan" : "Tambah"}</button>${AD.editingOperation ? `<button class="btn ghost" onclick="AD.editingOperation=null;render()">Batal</button>` : ""}</div></div>`;
-};
-V.adash_after = () => { aLoad("revenue", () => API.get("/admin/revenue"), {}); aLoad("operations", () => API.get("/admin/ops?period=" + AD.operationsPeriod), { period: "", items: [] }); };
-const opEdit = id => { AD.editingOperation = AD.operations.items.find(i => i.id == id); render(); window.scrollTo(0, document.body.scrollHeight); };
-const opSave = () => aDo(async () => { const b = { date: val("o_date"), label: val("o_label"), kind: val("o_kind"), amount: +val("o_amt"), note: val("o_note") }; if (AD.editingOperation) await API.patch("/admin/ops/" + AD.editingOperation.id, b); else await API.post("/admin/ops", b); AD.editingOperation = null; AD.operations = null; }, "Rekap operasional disimpan.");
-const opDel = async id => await aModal("Konfirmasi Hapus Item Rekap", "<p>Hapus item rekap ini?</p>", "Ya, Hapus Item") && aDo(async () => { await API.del("/admin/ops/" + id); AD.operations = null; AD.editingOperation = null; }, "Item dihapus.");
-
-// ---------- Pengguna ----------
-V.acust = () => {
-  const L = AD.customers; if (!L) return loading; const c = AD.customerDetail, rows = L.filter(u => match(u.name, u.email, u.phone));
-  let out = `<div class="card"><div class="tbl"><table><tr><th>Nama</th><th>Email</th><th>Telepon</th><th>Booking</th><th>Total belanja</th><th>Foto</th><th></th></tr>${rows.map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(u.phone)}</td><td>${u.bookings}</td><td>${rp(u.spent)}</td><td>${u.photos}</td><td style="white-space:nowrap"><button class="btn sm" onclick="openCust(${u.id})">Detail</button> <button class="btn sm ghost" onclick="delCust(${u.id},'${esc(u.name).replace(/'/g, "")}')">Hapus akun</button></td></tr>`).join("") || `<tr><td colspan="7" class="m">Tidak ada pengguna.</td></tr>`}</table></div></div>`;
-  if (c) out += `<div class="card" style="margin-top:16px"><div class="row sp"><h3 class="h3">${esc(c.customer.name)} <small class="m">· ${esc(c.customer.email)} · ${esc(c.customer.phone)}</small></h3><button class="btn sm ghost" onclick="AD.customerDetail=null;render()">Tutup</button></div>
-<h4 style="margin:14px 0 6px">Riwayat pembelian</h4><div class="tbl"><table><tr><th>Dipesan</th><th>Paket</th><th>Studio</th><th>Jadwal</th><th>Subtotal</th><th>Diskon</th><th>Total</th><th>Metode</th><th>Status</th></tr>
-${c.bookings.map(b => `<tr><td>${wib(b.created_at)}</td><td>${esc(b.package)}</td><td>${esc(b.studio)}</td><td>${b.slot}</td><td>${rp(b.subtotal ?? b.amount)}</td><td>${b.main_disc ? "-" + rp(b.main_disc) : "-"}</td><td><b>${rp(b.amount)}</b></td><td>${b.method || "-"}</td><td><span class="tag ${["Terbayar", "Selesai", "Sesi Berjalan"].includes(b.status) ? "ok" : b.status == "Dibatalkan" ? "no" : ""}">${b.status}</span></td></tr>`).join("") || `<tr><td colspan="9" class="m">Belum ada pembelian.</td></tr>`}</table></div>
-<h4 style="margin:16px 0 8px">Foto (${c.photos.length})</h4><div class="gal">${c.photos.map(p => `<div class="ph"><a href="${aImg(p.id)}" target="_blank" rel="noopener"><img src="${aImg(p.id)}" loading="lazy" alt=""></a><span class="f">${p.fav ? "⭐" : ""}</span><small>${wib(p.taken_at)}</small></div>`).join("") || `<p class="m">Belum ada foto.</p>`}</div></div>`;
-  return out;
-};
-const aImg = id => `${API_BASE}/api/admin/photos/${id}/image?t=${API.token}`;
-V.acust_after = () => aLoad("customers", () => API.get("/admin/customers"), []);
-const openCust = id => aDo(async () => { const [b, p] = await Promise.all([API.get(`/admin/customers/${id}/bookings`), API.get(`/admin/customers/${id}/photos`)]); AD.customerDetail = { customer: b.customer, bookings: b.bookings, photos: p.photos }; window.scrollTo(0, document.body.scrollHeight); });
-const delCust = async (id, name) => await aModal("Konfirmasi Hapus Akun", `<p>Hapus akun "${esc(name)}" beserta SELURUH booking, pembayaran, dan foto miliknya?</p><p>Tindakan ini tidak dapat dibatalkan.</p>`, "Ya, Hapus Akun") && aDo(async () => { const r = await API.del("/admin/customers/" + id); AD.customers = AD.customerDetail = AD.revenue = AD.operations = AD.studios = AD.books = AD.transactions = null; AD.sess = {}; R.toast.message = `Akun dihapus (${r.photos_deleted} foto ikut terhapus).`; });
+// Dashboard, Pengguna dan Transaksi: views/admin/*.js + AdminController (refactor MVC fase 8a)
 
 // ---------- Studio (accordion) ----------
 // galat isian Tambah Studio (Figma 592:5056 Input Tidak Valid, 592:5140 Nama Sudah Digunakan)
@@ -251,14 +215,6 @@ V.apose_after = () => aLoad("poses", () => API.get("/admin/poses"), []);
 const poseSave = id => aDo(async () => { const n = id || "N", b = { nama: val(`po${n}n`), people_range_id: +val(`po${n}r`) }; if (id) await API.patch("/admin/poses/" + id, b); else await API.post("/admin/poses", b); AD.poses = null; }, "Pose disimpan.");
 const poseDel = id => confirm("Hapus pose ini?") && aDo(async () => { await API.del("/admin/poses/" + id); AD.poses = null; }, "Pose dihapus.");
 
-// ---------- Transaksi ----------
-V.atrx = () => {
-  const T = AD.transactions; if (!T) return loading; const rows = T.rows.filter(r => match(r.customer, r.email, r.invoice, r.status, r.method));
-  return `<div class="stats"><div class="stat"><small class="m">Total pembayaran masuk</small><b>${rp(T.paid)}</b></div><div class="stat"><small class="m">Total refund</small><b>${rp(T.refunded)}</b></div></div>
-<div class="card"><div class="tbl"><table><tr><th>Invoice</th><th>Waktu bayar</th><th>Pelanggan</th><th>Metode</th><th>Nominal</th><th>Status</th><th>Refund</th></tr>${rows.map(r => `<tr><td>${esc(r.invoice)}</td><td>${wib(r.paid_at)}</td><td>${esc(r.customer)}<br><small class="m">${esc(r.email)}</small></td><td>${esc(r.method || "-")}</td><td>${rp(r.amount)}</td><td><span class="tag ${r.status == "paid" ? "ok" : r.status == "refunded" ? "" : "no"}">${PAYLBL[r.status] || r.status}</span></td><td>${r.refunded_at ? wib(r.refunded_at) : "-"}</td></tr>`).join("") || `<tr><td colspan="7" class="m">Belum ada transaksi.</td></tr>`}</table></div></div>`;
-};
-V.atrx_after = () => aLoad("transactions", () => API.get("/admin/transactions"), { rows: [], paid: 0, refunded: 0 });
-
 // ---------- Paket dan diskon utama ----------
 V.apkg = () => {
   const P = AD.packages, D = AD.discount; if (!P || !D) return loading;
@@ -292,4 +248,4 @@ const acctSave = () => {
   if (AD.me && AD.me.must_change && !n) { R.toast.error = "Password baru wajib diisi."; R.toast.message = ""; return render(); }
   return aDo(async () => { const r = await API.patch("/admin/account", { current_password: val("ac_c"), username: val("ac_u"), new_password: n || undefined }); API.token = r.token; localStorage.setItem("snapia_t", r.token); AD.me = { username: r.username, must_change: false }; }, "Akun admin diperbarui.");
 };
-export { AD, acctSave, bookDel, bookSave, delCust, discSave, loading, opDel, opEdit, opSave, openBook, openCust, pkActive, pkAdd, pkDel, pkSave, poseDel, poseSave, propDel, propSave, pthumb, sAdd, sDay, sDel, sNav, sSave, sel, stCancel, stEdit, stReview, stSave, stat, studioDel, studioSave, upImg };
+export { AD, acctSave, bookDel, bookSave, discSave, loading, openBook, pkActive, pkAdd, pkDel, pkSave, poseDel, poseSave, propDel, propSave, pthumb, sAdd, sDay, sDel, sNav, sSave, sel, stCancel, stEdit, stReview, stSave, studioDel, studioSave, upImg };
