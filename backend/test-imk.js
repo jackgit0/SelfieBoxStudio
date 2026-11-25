@@ -221,6 +221,8 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(/studioSave = id =>/.test(aj) && /stSummary|AD\.stsum/.test(aj), 'admin.js: tambah studio lewat langkah ringkasan');
     ok(/if \(!S\.admin && ADMIN_VIEWS\.includes\(S\.view\)\) S\.view = S\.me \? "home" : "auth";/.test(core), 'core.js: customer tetap dialihkan diam-diam dari halaman admin');
     ok(/aDenied/.test(boot), 'boot.js: sesi admin dengan token bukan admin juga memunculkan Akses Ditolak');
+    ok(/if \(key === "sN"\) AD\.sterr = null;/.test(aj), 'admin.js: unggah gambar studio baru menghapus tanda galat lama (dicek ulang di Lihat Ringkasan)');
+    ok(/sudah dipakai\/\.test\(e\.message\)\) \{ AD\.sterr = \{ top: ST_DUP, name: ST_DUPF \}; AD\.studios = null;/.test(aj), 'admin.js: nama ganda dari server memuat ulang daftar studio');
     ok(!/gradient/i.test(aj), 'admin.js tanpa gradient'); }
   await down(srv);
 
