@@ -14,13 +14,17 @@ import * as paymentModel from "./models/payment.js";
 import * as photoSessionModel from "./models/photoSession.js";
 import * as accountModel from "./models/account.js";
 import * as authModel from "./models/auth.js";
+import * as contactModel from "./models/contact.js";
 import { openModal } from "./components/modal.js";
+import { createLandingPage } from "./components/landingPage.js";
 import { createStudioController } from "./controllers/StudioController.js";
 import { createPackageController } from "./controllers/PackageController.js";
 import { createBookingController } from "./controllers/BookingController.js";
 import { createPaymentController } from "./controllers/PaymentController.js";
 import { createAccountController } from "./controllers/AccountController.js";
 import { createAuthController } from "./controllers/AuthController.js";
+import { createLandingController } from "./controllers/LandingController.js";
+import { landingView } from "./views/landing.js";
 import { browseView } from "./views/customer/browse.js";
 import { studioView } from "./views/customer/studio.js";
 import { packagesView } from "./views/customer/packages.js";
@@ -39,7 +43,6 @@ import { forgotView } from "./views/auth/forgot.js";
 import { resetView } from "./views/auth/reset.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
 import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell } from "./legacy/core.js";
-import "./legacy/landing.js";
 import { P } from "./legacy/session.js";
 import { AD, aDenied, adminReset } from "./legacy/admin.js";
 import { installLegacyBridge } from "./legacy-bridge.js";
@@ -71,9 +74,11 @@ function createUi(store) {
 
 // halaman yang sudah MVC: view (state, match) → Safe dan kait after(match) per path rute; rute lain masih memakai V.<view> lama.
 // links = { invoiceUrl } untuk view yang menautkan invoice (token tetap di models/api.js, decisions.md 50)
-function pagesFor({ studio, payment }, links) {
+function pagesFor({ studio, payment, landing }, links) {
   const showAvailability = () => studio.prefetchAvailability();
   return {
+    // landing page (LandingController): scroll-spy dipasang setiap render dan dilepas saat halaman ditinggalkan
+    "/": { view: landingView, after: () => landing.startScrollSpy(), leave: () => landing.stopScrollSpy() },
     "/browse": {
       view: browseView,
       after: () => {
@@ -106,8 +111,13 @@ function pagesFor({ studio, payment }, links) {
 }
 
 // aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
-function controllerActions({ studio, package: packages, booking, payment, account, auth }) {
+function controllerActions({ studio, package: packages, booking, payment, account, auth, landing }) {
   return {
+    "landing:scrollTo": landing.scrollTo,
+    "landing:toggleMenu": landing.toggleMenu,
+    "landing:openAuth": landing.openAuth,
+    "landing:setContactField": landing.setContactField,
+    "landing:sendContact": landing.sendContact,
     "auth:login": (dataset, event) => auth.login(formValues(event.target)),
     "auth:register": (dataset, event) => auth.register(formValues(event.target)),
     "auth:forgot": (dataset, event) => auth.forgot(formValues(event.target)),
@@ -150,14 +160,15 @@ async function start() {
   const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: P, admin: AD }, { storage, persistKey: "snapia", session });
   const ui = createUi(store);
   const navigation = { navigate: path => goPath(path) };
-  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel };
+  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel, contact: contactModel };
   const studio = createStudioController({ api, store, ui, router: navigation, models });
   const packages = createPackageController({ store, ui, router: navigation, config: { wa: CS_WA, email: CS_EMAIL }, refreshMaster: studio.refreshMaster });
   const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster });
   const payment = createPaymentController({ api, store, ui, router: navigation, models, booking, refresh: booking.refreshData });
   const account = createAccountController({ api, store, models });
   const auth = createAuthController({ api, store, ui, router: navigation, models, booking, resetAdmin: () => adminReset(), accessDenied: () => aDenied() });
-  const controllers = { studio, package: packages, booking, payment, account, auth };
+  const landing = createLandingController({ api, store, router: navigation, models, page: createLandingPage({ document, window }), timers: { setTimeout: (callback, delay) => window.setTimeout(callback, delay) } });
+  const controllers = { studio, package: packages, booking, payment, account, auth, landing };
   const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({

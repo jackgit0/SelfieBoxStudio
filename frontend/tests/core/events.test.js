@@ -183,3 +183,15 @@ test("formValues: isian bernama dan tidak disabled dari form.elements (tombol ta
   const form = { elements: [{ name: "name", value: "Dewi" }, { name: "phone", value: "0812" }, { name: "email", value: "d@x.id", disabled: true }, { name: "", value: "Simpan" }] };
   assert.deepEqual(formValues(form), { name: "Dewi", phone: "0812" });
 });
+
+test("tautan <a href> dengan data-action menjalankan aksinya tanpa mengikuti href (fase 7: tautan bagian landing)", () => {
+  const { root, calls } = setup();
+  const link = el({ action: "studio:open", section: "kontak" }, null, "A");
+  const event = fakeEvent(link);
+  root.fire("click", event);
+  assert.equal(calls.length, 1);
+  assert.equal(event.defaultPrevented, true);
+  const button = fakeEvent(el({ action: "studio:open" }));
+  root.fire("click", button);
+  assert.equal(button.defaultPrevented, false);
+});

@@ -5,18 +5,16 @@
 import * as state from "./legacy/state.js";
 import * as core from "./legacy/core.js";
 import * as session from "./legacy/session.js";
-import * as landing from "./legacy/landing.js";
 import * as admin from "./legacy/admin.js";
 
 const BRIDGED = {
   state: ["R", "S"],
   core: ["go", "ic", "logout", "me", "modal", "refresh", "render"],
   session: ["P", "bulkDel", "confirmSel", "delPhoto", "dl", "fav", "nextPose", "ph", "selAllNonFav", "selPh", "shoot", "staffAct", "startSession", "toggleDel", "warn"],
-  landing: ["lpMenu", "openAuth", "sendContact", "toSec"],
   admin: ["AD", "acctSave", "bookDel", "bookSave", "delCust", "discSave", "loading", "opDel", "opEdit", "opSave", "openBook", "openCust", "pkActive", "pkAdd", "pkDel", "pkSave", "poseDel", "poseSave", "propDel", "propSave", "pthumb", "sAdd", "sDay", "sDel", "sNav", "sSave", "sel", "stCancel", "stEdit", "stReview", "stSave", "stat", "studioDel", "studioSave", "upImg"],
 };
 
-const MODULES = { state, core, session, landing, admin };
+const MODULES = { state, core, session, admin };
 
 // dipanggil main.js sebelum render pertama
 export function installLegacyBridge() {

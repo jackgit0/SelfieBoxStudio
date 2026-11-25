@@ -68,6 +68,10 @@ export function createEvents({ navigate = null, logger = console } = {}) {
       }
       return;
     }
+    // tautan dengan data-action (mis. tautan bagian landing) = aksi, bukan pindah ke href
+    if (type === "click" && dataset.action && element.tagName === "A") {
+      event.preventDefault();
+    }
     if (dataset[attribute]) {
       run(dataset[attribute], element, event);
     }

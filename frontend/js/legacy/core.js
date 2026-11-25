@@ -54,7 +54,6 @@ const render = () => RENDERER.render();
 const layoutNow = () => layoutOf(R.route.name, { admin: S.admin });
 function renderBefore(m) {
   syncRoute(m); saveBooking(); const view = R.route.name;
-  if (view !== "landing") window.onscroll = null;
   if (view !== "session" && typeof stopSessionTimers === "function") stopSessionTimers();
   if (layoutNow() === "admin" && view !== "astudio") AD.stdone = null; // notifikasi "Studio berhasil ditambahkan" hanya di halaman Studio
 }

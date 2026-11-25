@@ -307,3 +307,57 @@ test("#reset= yang dibuka di tab yang sudah memuat aplikasi (hashchange) juga di
   browser.events.dispatchEvent(new Event("hashchange")); // hash lain (mis. tautan bagian landing) diabaikan
   assert.deepEqual(changes, ["reset"]);
 });
+
+// ---------- leave(): kait rute yang ditinggalkan (fase 7, decisions.md 61) ----------
+
+// rute dengan leave/after yang mencatat urutan; render() meniru core/render.js: resolve() lalu after() rute baru
+function hookedRoutes(log) {
+  return ROUTES.map(route => ({
+    ...route,
+    leave: previous => log.push(`leave ${previous.path}`),
+    after: matched => log.push(`after ${matched.path}`),
+  }));
+}
+
+test("leave() rute sebelumnya berjalan sebelum after() rute berikutnya", () => {
+  const browser = fakeBrowser("/");
+  const log = [];
+  const session = { loggedIn: true, admin: false, mustChange: false };
+  let router;
+  const render = () => {
+    const matched = router.resolve();
+    matched.route.after(matched);
+  };
+  router = createRouter({ routes: hookedRoutes(log), history: browser.history, location: browser.location, events: browser.events, getSession: () => session, onChange: render });
+  router.start();
+  render();
+  router.navigate("/sessions/41");
+  router.navigate("/gallery");
+  assert.deepEqual(log, ["after /", "leave /", "after /sessions/41", "leave /sessions/41", "after /gallery"]);
+});
+
+test("leave() tidak berjalan saat rute yang sama dirender ulang, tetapi berjalan saat id path berubah", () => {
+  const browser = fakeBrowser("/sessions/1");
+  const log = [];
+  const { router } = routerFor(browser, { loggedIn: true, admin: false, mustChange: false }, { routes: hookedRoutes(log) });
+  router.start();
+  router.resolve();
+  router.resolve();
+  assert.deepEqual(log, []);
+  router.navigate("/sessions/2");
+  router.resolve();
+  assert.deepEqual(log, ["leave /sessions/1"]);
+});
+
+test("leave() juga berjalan saat guard mengalihkan (keluar dari sesi foto → landing)", () => {
+  const browser = fakeBrowser("/sessions/1");
+  const log = [];
+  const session = { loggedIn: true, admin: false, mustChange: false };
+  const { router } = routerFor(browser, session, { routes: hookedRoutes(log) });
+  router.start();
+  router.resolve();
+  session.loggedIn = false;
+  router.resolve();
+  assert.deepEqual(log, ["leave /sessions/1"]);
+  assert.equal(router.current().path, "/");
+});

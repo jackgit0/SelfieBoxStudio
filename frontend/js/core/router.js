@@ -5,7 +5,7 @@
 // access: public = tamu dan customer (admin dialihkan ke /admin); guest = hanya tamu (yang sudah masuk ke berandanya);
 //         customer = harus masuk sebagai customer; admin = hanya admin.
 // params = parameter tetap milik rute (mis. mode form masuk); title dan tab = judul navbar dan tab yang menyala (dulu TITLES/TABGROUP).
-// after (opsional) = fungsi yang dijalankan setelah outlet dirender (core/render.js).
+// after (opsional) = fungsi yang dijalankan setelah outlet dirender (core/render.js); leave (opsional) = saat halaman rute ini ditinggalkan (resolve()).
 // Rute admin: menu = { label, icon } di sidebar (dulu AMENU), searchable = kotak cari di header (dulu SEARCHABLE),
 //             count = slice admin yang jumlahnya ditambahkan ke judul, mis. "Daftar Studio (4)" (components/adminSidebar.js).
 export const ROUTES = [
@@ -218,7 +218,12 @@ export function createRouter({ routes = ROUTES, history, location, events, getSe
       changeUrl("replaceState", redirect);
       matched = match(redirect, routes);
     }
+    // halaman ditinggalkan (path berubah): kait leave() rute sebelumnya, mis. hentikan scroll-spy landing atau timer sesi foto (decisions.md 61)
+    const previous = currentMatch;
     currentMatch = matched;
+    if (previous && (!matched || previous.path !== matched.path) && typeof previous.route.leave === "function") {
+      previous.route.leave(previous);
+    }
     return matched;
   }
 

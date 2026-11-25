@@ -7,7 +7,6 @@ import { $, go, ic, logout, modal, render } from "./core.js";
 import { PAYMENT_LABELS as PAYLBL } from "../models/booking.js";
 import { keyValueRows } from "../components/keyValueRows.js";
 import { backgroundImage as bgi } from "../components/propertyVisual.js";
-import { openAuth } from "./landing.js";
 // baris "label — nilai" untuk detail booking admin (nilai dari kode lama sudah berupa HTML; dulu di customer.js, fase 8b memindahkannya)
 const kvs = rows => keyValueRows(rows.map(([label, value, cls]) => [raw(String(label)), raw(String(value)), cls])).markup;
 const AD = { loading: {}, imgs: {}, open: {}, q: "", opPeriod: "month", opEdit: null, cdet: null, bdet: null, bst: null, bstatus: "", scal: {}, sday: {}, sess: {}, sedit: null, sadd: null, stnew: null, stsum: null, sterr: null, stdone: null };
@@ -19,7 +18,7 @@ const aAuthErr = (e, what) => { if (e.status == 401) { logout(); return true; } 
 async function aDenied(what = "Hanya admin yang dapat membuka halaman admin.") { // what = kalimat pertama (Figma: "Hanya admin yang dapat menambahkan studio.")
   if (R.accessDeniedOpen) return; R.accessDeniedOpen = true; logout(); // keluar dulu: data admin tidak tertinggal di balik dialog
   const v = await modal({ title: "Akses ditolak", body: `<p>${esc(what)} Akun yang sedang masuk adalah akun pelanggan. Masuk dengan akun admin untuk melanjutkan.</p>`, buttons: [{ label: "Kembali ke Beranda", value: "home", style: "ghost" }, { label: "Masuk sebagai Admin", value: "login" }] });
-  R.accessDeniedOpen = false; if (v !== "home") openAuth("login"); // Escape / klik di luar: ke form masuk
+  R.accessDeniedOpen = false; if (v !== "home") go("auth", { mode: "login" }); // Escape / klik di luar: ke form masuk
 }
 async function aLoad(k, fn, def) {
   if (AD[k] || AD.loading[k]) return; AD.loading[k] = 1;

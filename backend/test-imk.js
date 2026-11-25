@@ -184,7 +184,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     { const r = await B({ studio_id: 2 }, U2); ok(r.s === 400 && r.j.error === 'Studio tidak tersedia', 'booking studio tidak tersedia: "Studio tidak tersedia" (Sesi Tidak Tersedia)'); }
     ok((await call('POST', '/quote', { package_id: 1, studio_id: 2 })).j.error === 'Studio tidak tersedia', 'quote studio tidak tersedia: "Studio tidak tersedia"');
     // 3. guard tamu: frontend/tests/core/router.test.js (tabel guard rute × tamu/customer/admin, refactor MVC fase 3)
-    const JS = allJs(), lj = src('js/legacy/landing.js');
+    const JS = allJs();
     // navbar: tamu tanpa nama user dengan Masuk (/login) dan Daftar (/register), nama customer di-escape sekali: frontend/tests/components/navbar.test.js (refactor MVC fase 4)
     // masuk dengan draf booking tamu kembali ke Paket & Pembayaran: frontend/tests/controllers/AuthController.test.js (refactor MVC fase 6)
     // 4. pemetaan galat dan lima popup (judul dan pesan dari Figma)
@@ -194,7 +194,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
       'Masuk untuk melanjutkan booking', 'Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.', 'Jadwal sudah tidak tersedia', 'Format/jam slot tidak valid', 'Jadwal sudah lewat', 'Studio tidak tersedia']) ok(JS.includes(s), `frontend memuat "${s}"`);
     // tamu yang menekan Check Out mendapat popup Belum Login sebelum booking dibuat: frontend/tests/controllers/PaymentController.test.js (refactor MVC fase 5b)
     // tombol Lanjut ke Pembayaran tidak pernah disabled: frontend/tests/views/time.test.js; galat langkah booking ke popup, bukan teks merah: frontend/tests/controllers/BookingController.test.js (refactor MVC fase 5b)
-    ok(lj.includes('Lihat Studio') && /go\('home'\)/.test(lj), 'landing.js: tautan "Lihat Studio" membuka Browse'); // kode: diganti di fase 7 (test-map.md)
+    // tautan "Lihat Studio" di landing membuka Browse: frontend/tests/views/landing.test.js (refactor MVC fase 7)
     ok(!uiGradient(JS), 'frontend (JS) tetap tanpa gradient'); }
   await down(srv);
 
