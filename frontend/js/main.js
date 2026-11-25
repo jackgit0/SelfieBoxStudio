@@ -37,6 +37,8 @@ import { galleryView } from "./views/session/gallery.js";
 import { dashboardView } from "./views/admin/dashboard.js";
 import { usersView } from "./views/admin/users.js";
 import { transactionsView } from "./views/admin/transactions.js";
+import { packagesView as adminPackagesView } from "./views/admin/packages.js";
+import { accountView as adminAccountView } from "./views/admin/account.js";
 import { browseView } from "./views/customer/browse.js";
 import { studioView } from "./views/customer/studio.js";
 import { packagesView } from "./views/customer/packages.js";
@@ -138,6 +140,8 @@ function pagesFor({ studio, payment, landing, photo, gallery, admin }, links) {
     "/admin": { view: dashboardView, after: () => admin.loadDashboard() },
     "/admin/users": { view: (state, match) => usersView(state, match, links), after: () => admin.loadUsers() },
     "/admin/transactions": { view: transactionsView, after: () => admin.loadTransactions() },
+    "/admin/packages": { view: adminPackagesView, after: () => admin.loadPackagesPage() },
+    "/admin/account": { view: adminAccountView },
   };
 }
 
@@ -153,6 +157,12 @@ function controllerActions({ studio, package: packages, booking, payment, accoun
     "admin:openCustomer": admin.openCustomer,
     "admin:closeCustomer": admin.closeCustomer,
     "admin:deleteCustomer": admin.deleteCustomer,
+    "admin:savePackage": (dataset, event) => admin.savePackage(dataset, formValues(event.target)),
+    "admin:addPackage": (dataset, event) => admin.addPackage(formValues(event.target)),
+    "admin:activatePackage": admin.activatePackage,
+    "admin:deletePackage": admin.deletePackage,
+    "admin:saveDiscount": (dataset, event) => admin.saveDiscount(formValues(event.target)),
+    "admin:saveAccount": (dataset, event) => admin.saveAccount(formValues(event.target)),
     "gallery:showSession": gallery.showSession,
     "gallery:select": gallery.select,
     "gallery:toggleFavourite": gallery.toggleFavourite,

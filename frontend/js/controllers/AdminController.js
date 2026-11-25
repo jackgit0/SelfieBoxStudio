@@ -3,7 +3,7 @@
 // - run(action, okMessage, what, { draft }): aksi admin dengan toast hasil; galat lewat handleError, isian form yang gagal disimpan sebagai draf
 // - handleError: 401 → keluar; 403 "Hanya admin" → dialog Akses ditolak; 403 "Ganti password" → Akun Admin; selain itu toast galat
 // logout = AuthController.logout (main.js). Halaman Studio, Booking, Properti dan Pose masih kode lama (fase 8b) dan memakai inti ini lewat CONTROLLERS.admin.
-import { DEFAULT_DENIED, accessDeniedModal, confirmModal, deleteCustomerBody, deleteOperationBody } from "../views/admin/dialogs.js";
+import { DEFAULT_DENIED, accessDeniedModal, confirmModal, deleteCustomerBody, deleteOperationBody, deletePackageBody } from "../views/admin/dialogs.js";
 
 // isi awal slice admin (dulu objek AD dan adminReset); kunci tanpa nama lengkap masih milik kode lama fase 8b
 export function createAdminState() {
@@ -237,6 +237,89 @@ export function createAdminController({ api, store, ui, router, models, logout }
     loadTransactions() {
       return controller.load("transactions", () => pages.transactions.loadTransactions(api), { rows: [], paid: 0, refunded: 0 });
     },
+
+    // ---------- Paket & Diskon (/admin/packages) ----------
+    loadPackagesPage() {
+      return Promise.all([controller.load("packages", () => pages.packages.loadPackages(api), []), controller.load("discount", () => pages.packages.loadDiscount(api), { pct: 0, label: "" })]);
+    },
+
+    // values = isian baris paket (form package-form-<id>)
+    savePackage({ id }, values) {
+      return savePackageForm("package-" + id, values, () => pages.packages.savePackage(api, id, pages.packages.packageBody(values)), "Paket disimpan. Harga baru berlaku untuk booking berikutnya.");
+    },
+
+    addPackage(values) {
+      return savePackageForm("package-new", values, () => pages.packages.addPackage(api, pages.packages.packageBody(values)), "Paket baru ditambahkan.");
+    },
+
+    activatePackage({ id }) {
+      return controller.run(async () => {
+        await pages.packages.activatePackage(api, id);
+        store.update("admin", { packages: null }, { silent: true });
+      }, "Paket diaktifkan.");
+    },
+
+    async deletePackage({ id }) {
+      if (!(await controller.confirm({ title: "Konfirmasi Hapus Paket", body: deletePackageBody(), okLabel: "Ya, Hapus Paket" }))) {
+        return;
+      }
+      await controller.run(async () => {
+        const answer = await pages.packages.deletePackage(api, id);
+        store.update("admin", { packages: null }, { silent: true });
+        setToast({ message: answer.deactivated ? "Paket pernah dibeli, jadi dinonaktifkan (riwayat tetap utuh)." : "Paket dihapus." });
+      });
+    },
+
+    saveDiscount(values) {
+      return controller.run(
+        async () => {
+          await pages.packages.saveDiscount(api, pages.packages.discountBody(values));
+          store.update("admin", { discount: null, drafts: withoutDraft("discount") }, { silent: true });
+        },
+        "Diskon utama disimpan.",
+        undefined,
+        { draft: { key: "discount", values } },
+      );
+    },
+
+    // ---------- Akun Admin (/admin/account) ----------
+    // values = { username, current_password, new_password, new_password_repeat }; setelah galat hanya username yang tetap
+    async saveAccount(values) {
+      const draft = { key: "account", values: { username: values.username } };
+      const fail = error => {
+        store.update("admin", { drafts: { ...admin().drafts, account: draft.values } }, { silent: true });
+        setToast({ error }, { silent: false });
+      };
+      if (values.new_password !== values.new_password_repeat) {
+        return fail("Pengulangan password baru tidak sama.");
+      }
+      if (admin().me && admin().me.must_change && !values.new_password) {
+        return fail("Password baru wajib diisi.");
+      }
+      await controller.run(
+        async () => {
+          const answer = await pages.account.saveAccount(api, values);
+          api.token = answer.token;
+          store.update("admin", { me: { username: answer.username, must_change: false }, drafts: withoutDraft("account") }, { silent: true });
+        },
+        "Akun admin diperbarui.",
+        undefined,
+        { draft },
+      );
+    },
   };
+
+  // simpan satu baris paket: daftar dimuat ulang; galat → isian baris itu disimpan sebagai draf
+  function savePackageForm(key, values, request, okMessage) {
+    return controller.run(
+      async () => {
+        await request();
+        store.update("admin", { packages: null, drafts: withoutDraft(key) }, { silent: true });
+      },
+      okMessage,
+      undefined,
+      { draft: { key, values } },
+    );
+  }
   return controller;
 }

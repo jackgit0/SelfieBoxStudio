@@ -1,4 +1,4 @@
-// ===== PANEL ADMIN: Dashboard, Pengguna, Studio, Booking, Properti, Pose, Transaksi, Paket & Diskon =====
+// ===== PANEL ADMIN (sisa kode lama, fase 8b): Studio + Sesi, Booking, Properti, Pose =====
 import { API, CONTROLLERS, M, R, V } from "./state.js";
 import { createAdminState } from "../controllers/AdminController.js";
 import { uploadImage } from "../models/admin/uploads.js";
@@ -47,7 +47,7 @@ async function upImg(key, input) {
   } catch (e) { R.toast.error = e.message; } render(); restore(sn);
 }
 
-// Dashboard, Pengguna dan Transaksi: views/admin/*.js + AdminController (refactor MVC fase 8a)
+// Dashboard, Pengguna, Transaksi, Paket & Diskon dan Akun Admin: views/admin/*.js + AdminController (refactor MVC fase 8a)
 
 // ---------- Studio (accordion) ----------
 // galat isian Tambah Studio (Figma 592:5056 Input Tidak Valid, 592:5140 Nama Sudah Digunakan)
@@ -215,37 +215,4 @@ V.apose_after = () => aLoad("poses", () => API.get("/admin/poses"), []);
 const poseSave = id => aDo(async () => { const n = id || "N", b = { nama: val(`po${n}n`), people_range_id: +val(`po${n}r`) }; if (id) await API.patch("/admin/poses/" + id, b); else await API.post("/admin/poses", b); AD.poses = null; }, "Pose disimpan.");
 const poseDel = id => confirm("Hapus pose ini?") && aDo(async () => { await API.del("/admin/poses/" + id); AD.poses = null; }, "Pose dihapus.");
 
-// ---------- Paket dan diskon utama ----------
-V.apkg = () => {
-  const P = AD.packages, D = AD.discount; if (!P || !D) return loading;
-  const inp = (id, v, t = "text", w = 90) => `<input id="${id}" type="${t}" value="${esc(v)}" ${t == "number" ? 'min="0"' : ""} style="width:${w}px">`;
-  return `<div class="card" style="margin-bottom:16px"><h3 class="h3">Diskon utama</h3><p class="m sm">Potongan persen untuk harga semua paket (biaya studio tidak didiskon). Isi 0 untuk menonaktifkan.</p>
-<div class="row" style="margin-top:8px"><input id="d_pct" type="number" min="0" max="100" value="${D.pct}" style="width:90px"> %<input id="d_lbl" placeholder="Label (mis. Promo Kemerdekaan)" value="${esc(D.label)}" style="flex:1;min-width:160px"><button class="btn" onclick="discSave()">Simpan</button></div></div>
-<div class="card" style="margin-bottom:16px"><h3 class="h3">Paket</h3><div class="tbl"><table><tr><th>Nama</th><th>Harga (Rp)</th><th>Jml foto</th><th>Durasi (mnt)</th><th>Ukuran strip</th><th>Material</th><th>Status</th><th></th></tr>
-${P.map(p => `<tr><td>${inp("pk" + p.id + "n", p.name)}</td><td>${inp("pk" + p.id + "p", p.price, "number", 110)}</td><td>${inp("pk" + p.id + "c", p.photo_count, "number", 70)}</td><td>${inp("pk" + p.id + "d", p.dur, "number", 70)}</td><td>${inp("pk" + p.id + "s", p.strip_size, "text", 70)}</td><td>${inp("pk" + p.id + "m", p.strip_material)}</td>
-<td><span class="tag ${p.active ? "ok" : "no"}">${p.active ? "aktif" : "nonaktif"}</span></td><td style="white-space:nowrap"><button class="btn sm" onclick="pkSave(${p.id})">Simpan</button> ${p.active ? "" : `<button class="btn sm soft" onclick="pkActive(${p.id})">Aktifkan</button> `}<button class="btn sm ghost" onclick="pkDel(${p.id})">Hapus</button></td></tr>`).join("")}
-<tr><td>${inp("pkNn", "")}</td><td>${inp("pkNp", "", "number", 110)}</td><td>${inp("pkNc", "", "number", 70)}</td><td>${inp("pkNd", "", "number", 70)}</td><td>${inp("pkNs", "", "text", 70)}</td><td>${inp("pkNm", "")}</td><td></td><td><button class="btn sm" onclick="pkAdd()">+ Tambah paket</button></td></tr></table></div>
-<p class="sm m" style="margin-top:8px">Harga baru hanya berlaku untuk booking berikutnya. Paket yang pernah dibeli hanya dinonaktifkan agar riwayat tetap utuh.</p></div>`;
-};
-V.apkg_after = () => { aLoad("packages", () => API.get("/admin/packages"), []); aLoad("discount", () => API.get("/admin/discount"), { pct: 0, label: "" }); };
-const pkBody = p => ({ name: val(`pk${p}n`), price: +val(`pk${p}p`), photo_count: +val(`pk${p}c`), dur: +val(`pk${p}d`), strip_size: val(`pk${p}s`), strip_material: val(`pk${p}m`) });
-const pkSave = id => aDo(async () => { await API.patch("/admin/packages/" + id, pkBody(id)); AD.packages = null; }, "Paket disimpan. Harga baru berlaku untuk booking berikutnya.");
-const pkAdd = () => aDo(async () => { await API.post("/admin/packages", pkBody("N")); AD.packages = null; }, "Paket baru ditambahkan.");
-const pkActive = id => aDo(async () => { await API.patch("/admin/packages/" + id, { active: true }); AD.packages = null; }, "Paket diaktifkan.");
-const pkDel = async id => await aModal("Konfirmasi Hapus Paket", "<p>Hapus paket ini? (Jika pernah dibeli, paket hanya dinonaktifkan.)</p>", "Ya, Hapus Paket") && aDo(async () => { const r = await API.del("/admin/packages/" + id); AD.packages = null; R.toast.message = r.deactivated ? "Paket pernah dibeli, jadi dinonaktifkan (riwayat tetap utuh)." : "Paket dihapus."; });
-const discSave = () => aDo(async () => { await API.put("/admin/discount", { pct: +val("d_pct"), label: val("d_lbl") }); AD.discount = null; }, "Diskon utama disimpan.");
-
-// ---------- Akun Admin (tersimpan di database; ganti username/password) ----------
-V.aacct = () => {
-  const me = AD.me || { username: "", must_change: false };
-  return `<div class="card" style="max-width:560px"><h3 class="h3">Akun Admin</h3><p class="m sm" style="margin-top:4px">Akun admin tersimpan di database dengan password ter-hash. Password baru minimal 8 karakter dan mengandung huruf serta angka. Setelah password diganti, semua sesi admin lama otomatis keluar.</p>
-<label>Username</label><input id="ac_u" value="${esc(me.username)}" autocomplete="username"><label>Password saat ini</label><input id="ac_c" type="password" autocomplete="current-password">
-<label>Password baru ${me.must_change ? "(wajib)" : "(kosongkan jika tidak diganti)"}</label><input id="ac_n" type="password" autocomplete="new-password"><label>Ulangi password baru</label><input id="ac_n2" type="password" autocomplete="new-password">
-<div class="row" style="margin-top:18px"><button class="btn" onclick="acctSave()">Simpan</button></div></div>`;
-};
-const acctSave = () => {
-  const n = val("ac_n"), n2 = val("ac_n2"); if (n !== n2) { R.toast.error = "Pengulangan password baru tidak sama."; R.toast.message = ""; return render(); }
-  if (AD.me && AD.me.must_change && !n) { R.toast.error = "Password baru wajib diisi."; R.toast.message = ""; return render(); }
-  return aDo(async () => { const r = await API.patch("/admin/account", { current_password: val("ac_c"), username: val("ac_u"), new_password: n || undefined }); API.token = r.token; localStorage.setItem("snapia_t", r.token); AD.me = { username: r.username, must_change: false }; }, "Akun admin diperbarui.");
-};
-export { AD, acctSave, bookDel, bookSave, discSave, loading, openBook, pkActive, pkAdd, pkDel, pkSave, poseDel, poseSave, propDel, propSave, pthumb, sAdd, sDay, sDel, sNav, sSave, sel, stCancel, stEdit, stReview, stSave, studioDel, studioSave, upImg };
+export { AD, bookDel, bookSave, loading, openBook, poseDel, poseSave, propDel, propSave, pthumb, sAdd, sDay, sDel, sNav, sSave, sel, stCancel, stEdit, stReview, stSave, studioDel, studioSave, upImg };

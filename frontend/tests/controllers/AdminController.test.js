@@ -294,3 +294,102 @@ test("loadTransactions: dimuat sekali; galat → cadangan kosong + toast", async
   await setup.controller.loadTransactions();
   assert.deepEqual(setup.store.get().admin.transactions, { rows: [], paid: 0, refunded: 0 });
 });
+
+// ---------- Paket & Diskon ----------
+const packageValues = { name: "Basic", price: "60000", photo_count: "3", dur: "15", strip_size: "2x6", strip_material: "Glossy" };
+const packageBody = { name: "Basic", price: 60000, photo_count: 3, dur: 15, strip_size: "2x6", strip_material: "Glossy" };
+
+test("loadPackagesPage: paket dan diskon dimuat sekali", async () => {
+  const { controller, api, store } = setupAdmin({ responses: { "GET /admin/packages": { body: [{ id: 1 }] }, "GET /admin/discount": { body: { pct: 0, label: "" } } } });
+  await controller.loadPackagesPage();
+  await controller.loadPackagesPage();
+  assert.equal(api.calls.length, 2);
+  assert.deepEqual(store.get().admin.packages, [{ id: 1 }]);
+});
+
+test("savePackage: PATCH dengan angka, daftar dimuat ulang, toast harga baru; galat → draf baris itu", async () => {
+  let setup = setupAdmin({ admin: { packages: [{ id: 1 }] }, responses: { "PATCH /admin/packages/1": { body: { ok: true } } } });
+  await setup.controller.savePackage({ id: "1" }, packageValues);
+  assert.deepEqual(setup.api.calls[0], { method: "PATCH", path: "/admin/packages/1", body: packageBody });
+  assert.equal(setup.store.get().admin.packages, null);
+  assert.equal(setup.store.get().runtime.toast.message, "Paket disimpan. Harga baru berlaku untuk booking berikutnya.");
+  setup = setupAdmin({ admin: { packages: [{ id: 1 }] }, responses: { "PATCH /admin/packages/1": { status: 400, body: { error: "Harga tidak valid" } } } });
+  await setup.controller.savePackage({ id: "1" }, packageValues);
+  assert.deepEqual(setup.store.get().admin.drafts["package-1"], packageValues);
+  assert.equal(setup.store.get().runtime.toast.error, "Harga tidak valid");
+});
+
+test("addPackage: POST, toast Paket baru ditambahkan., draf baris baru dibuang", async () => {
+  const { controller, api, store } = setupAdmin({ admin: { packages: [], drafts: { "package-new": { name: "x" } } }, responses: { "POST /admin/packages": { body: { id: 5 } } } });
+  await controller.addPackage(packageValues);
+  assert.deepEqual(api.calls[0], { method: "POST", path: "/admin/packages", body: packageBody });
+  assert.equal(store.get().admin.drafts["package-new"], undefined);
+  assert.equal(store.get().runtime.toast.message, "Paket baru ditambahkan.");
+});
+
+test("activatePackage: PATCH active true, toast Paket diaktifkan.", async () => {
+  const { controller, api, store } = setupAdmin({ admin: { packages: [] }, responses: { "PATCH /admin/packages/3": { body: { ok: true } } } });
+  await controller.activatePackage({ id: "3" });
+  assert.deepEqual(api.calls[0].body, { active: true });
+  assert.equal(store.get().runtime.toast.message, "Paket diaktifkan.");
+});
+
+test("deletePackage: modal Konfirmasi Hapus Paket; dinonaktifkan atau dihapus sesuai jawaban server; Kembali → tanpa permintaan", async () => {
+  let setup = setupAdmin({ modalAnswers: [true], admin: { packages: [] }, responses: { "DELETE /admin/packages/1": { body: { deactivated: true } } } });
+  await setup.controller.deletePackage({ id: "1" });
+  assert.equal(setup.ui.modals[0].title, "Konfirmasi Hapus Paket");
+  assert.equal(String(setup.ui.modals[0].body), "<p>Hapus paket ini? (Jika pernah dibeli, paket hanya dinonaktifkan.)</p>");
+  assert.equal(setup.store.get().runtime.toast.message, "Paket pernah dibeli, jadi dinonaktifkan (riwayat tetap utuh).");
+  setup = setupAdmin({ modalAnswers: [true], admin: { packages: [] }, responses: { "DELETE /admin/packages/1": { body: { ok: true } } } });
+  await setup.controller.deletePackage({ id: "1" });
+  assert.equal(setup.store.get().runtime.toast.message, "Paket dihapus.");
+  setup = setupAdmin({ modalAnswers: [false] });
+  await setup.controller.deletePackage({ id: "1" });
+  assert.equal(setup.api.calls.length, 0);
+});
+
+test("saveDiscount: PUT persen angka + label, diskon dimuat ulang, toast", async () => {
+  const { controller, api, store } = setupAdmin({ admin: { discount: { pct: 0, label: "" } }, responses: { "PUT /admin/discount": { body: { ok: true } } } });
+  await controller.saveDiscount({ pct: "15", label: "Akhir Tahun" });
+  assert.deepEqual(api.calls[0].body, { pct: 15, label: "Akhir Tahun" });
+  assert.equal(store.get().admin.discount, null);
+  assert.equal(store.get().runtime.toast.message, "Diskon utama disimpan.");
+});
+
+// ---------- Akun Admin ----------
+const accountValues = { username: "admin2", current_password: "Lama1234", new_password: "Baru1234", new_password_repeat: "Baru1234" };
+
+test("saveAccount: pengulangan berbeda → toast galat tanpa permintaan, username tetap (draf tanpa password)", async () => {
+  const { controller, api, store, log } = setupAdmin();
+  await controller.saveAccount({ ...accountValues, new_password_repeat: "Lain1234" });
+  assert.equal(api.calls.length, 0);
+  assert.deepEqual(store.get().runtime.toast, { message: "", error: "Pengulangan password baru tidak sama." });
+  assert.deepEqual(store.get().admin.drafts.account, { username: "admin2" });
+  assert.deepEqual(log, ["render"]);
+});
+
+test("saveAccount: must_change tanpa password baru → toast Password baru wajib diisi.", async () => {
+  const { controller, api, store } = setupAdmin({ admin: { me: { username: "admin", must_change: true } } });
+  await controller.saveAccount({ ...accountValues, new_password: "", new_password_repeat: "" });
+  assert.equal(api.calls.length, 0);
+  assert.equal(store.get().runtime.toast.error, "Password baru wajib diisi.");
+});
+
+test("saveAccount: berhasil → token baru disimpan, must_change dilepas, toast", async () => {
+  const { controller, api, store } = setupAdmin({ admin: { me: { username: "admin", must_change: true }, drafts: { account: { username: "x" } } }, responses: { "PATCH /admin/account": { body: { token: "baru", username: "admin2" } } } });
+  await controller.saveAccount(accountValues);
+  assert.deepEqual(api.calls[0].body, { current_password: "Lama1234", username: "admin2", new_password: "Baru1234" });
+  assert.equal(api.token, "baru");
+  assert.deepEqual(store.get().admin.me, { username: "admin2", must_change: false });
+  assert.equal(store.get().admin.drafts.account, undefined);
+  assert.equal(store.get().runtime.toast.message, "Akun admin diperbarui.");
+});
+
+test("saveAccount: 403 Password saat ini salah → toast galat, admin tetap masuk, username tetap", async () => {
+  const { controller, api, store, log } = setupAdmin({ responses: { "PATCH /admin/account": { status: 403, body: { error: "Password saat ini salah" } } } });
+  await controller.saveAccount(accountValues);
+  assert.equal(api.token, "lama");
+  assert.equal(store.get().runtime.toast.error, "Password saat ini salah");
+  assert.ok(!log.includes("logout"));
+  assert.deepEqual(store.get().admin.drafts.account, { username: "admin2" });
+});
