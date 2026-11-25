@@ -1,18 +1,19 @@
 # SelfieBox Studio
 
 ```
-frontend/  index.html · css/style.css · img/ (aset dari Figma)
-           js/config.js (API, Google Drive, kontak CS) · api.js · core.js (shell, navigasi, login)
-           landing.js (homepage sebelum login)
-           customer.js (Beranda, Studio, Booking, Booking Saya, Pembatalan/Refund, Akun)
-           session.js (Sesi foto, Google Drive, Galeri) · admin.js (panel admin) · boot.js
+frontend/  index.html · img/ (aset dari Figma) · ARCHITECTURE.md (struktur MVC, cara menambah halaman)
+           css/  tokens.css · base.css · components.css · pages/ (landing, booking, account, session, admin)
+           js/   main.js (titik masuk) · config.js (API, Google Drive, kontak CS)
+                 core/ (router, store, html, events, render, format) · models/ · views/ · components/
+                 controllers/ (Booking, Payment, Studio, AdminBooking, Auth, Account, Package, PhotoSession, Gallery, Landing, Admin)
+           tests/ (tes unit node --test, tanpa browser)
 backend/   server.js (REST API + file statis) · db.js (skema + migrasi) · mailer.js (SMTP) · seed.json
            reset-admin.js · reset-db.js · seed-demo.js · test.js · test-admin.js · test-v3.js · test-v4.js
            test-admin-studio.js · test-admin-session.js · test-admin-booking.js (fitur admin studio, sesi, booking)
            test-imk.js (lingkup IMK: tanpa onboarding/promo/add-on, Pilihan Paket, popup booking, Ringkasan Studio, Akses Ditolak)
 ```
 
-Branch `refactor/frontend-mvc` (tidak digabung ke `main`) memindahkan frontend ke struktur MVC dengan modul ES; arsitektur tujuannya ada di [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md).
+Branch `refactor/frontend-mvc` memakai frontend MVC dengan modul ES (HTML/CSS/JS murni, tanpa build step); strukturnya dijelaskan di [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md). Branch ini **tidak digabung ke `main`** dan tidak disinkronkan dengannya; Render tetap menyajikan `main`, jadi branch ini dijalankan secara lokal.
 
 ## Menjalankan
 Node.js >= 22.5 (tanpa `npm install`).
@@ -25,6 +26,10 @@ npm test                  # = node test.js
 File tes lain dijalankan langsung dengan node (tiap file menyalakan server sendiri dengan database sementara):
 ```
 for f in test-admin test-v3 test-v4 test-admin-studio test-admin-session test-admin-booking test-imk; do node --disable-warning=ExperimentalWarning $f.js || break; done
+```
+Tes unit frontend (dari folder aplikasi, tanpa server atau browser):
+```
+node --test "frontend/tests/**/*.test.js"
 ```
 Database lama (`snapia.db`) otomatis dimigrasi saat server dinyalakan; data tidak hilang.
 

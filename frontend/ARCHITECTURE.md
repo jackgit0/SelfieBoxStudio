@@ -1,21 +1,25 @@
 # Arsitektur frontend SelfieBox Studio
 
-> **Target arsitektur, migrasi sedang berjalan di branch `refactor/frontend-mvc`.** Kode di branch ini dipindahkan bertahap dari skrip global lama ke struktur di bawah. Sejak fase 2 aplikasi dimuat sebagai modul ES dari `js/main.js`; kode lama yang belum dipindahkan ada di `js/legacy/` (`core.js`, `customer.js`, `session.js`, `landing.js`, `admin.js`, dengan state bersamanya di `legacy/state.js`), dan `js/legacy-bridge.js` memasang ke `window` nama-nama yang masih dipanggil atribut `onclick="…"`. Setiap tahap tetap membuat aplikasi berjalan. Branch ini tidak digabung ke `main`.
+> Struktur ini ada di branch `refactor/frontend-mvc`. Branch ini **tidak digabung ke `main`**: Render tetap menyajikan `main`, jadi branch ini dijalankan secara lokal (`cd backend && npm start`).
 
 Frontend ini HTML, CSS, dan JavaScript murni: tanpa framework, tanpa build step, tanpa dependensi npm. Browser memuat modul ES langsung dari `js/main.js`.
 
-## Susunan folder (tujuan akhir)
+## Susunan folder
 
 ```
 frontend/
 ├── index.html          # <div id="app">, CSS, <script type="module" src="/js/main.js">
 ├── package.json        # hanya {"type": "module"} agar tes Node bisa mengimpor modul
-├── css/                # tokens.css · base.css · components.css · pages/*.css
+├── css/
+│   ├── tokens.css      # variabel :root (warna, radius, bayangan) dari file Figma IMK
+│   ├── base.css        # reset, tipografi, pembantu tata letak, tombol, isian form
+│   ├── components.css  # tag, toast, navbar + bilah bawah, kartu, segmen, kalender, sidebar admin, modal
+│   └── pages/          # landing.css · booking.css · account.css (form masuk) · session.css · admin.css
 ├── tests/              # tes unit node --test, tests/helpers/ berisi API/UI/storage palsu
 └── js/
     ├── main.js         # titik masuk: siapkan API, muat data master, pulihkan login, jalankan router
     ├── config.js       # API_BASE, GOOGLE_CLIENT_ID, CS_WA, CS_EMAIL, BRAND
-    ├── core/           # router, store, html, events, render, format
+    ├── core/           # router, store, state (isi awal), navigation, html, events, render, format
     ├── models/         # MODEL: data dan panggilan ke server
     ├── controllers/    # CONTROLLER: aksi pengguna → model → store
     ├── views/          # VIEW: fungsi murni state → HTML
@@ -50,7 +54,7 @@ Satu store (`core/store.js`) dengan bagian-bagian berikut:
 
 Token login tetap di `localStorage["snapia_t"]` dan hanya dibaca `models/api.js`.
 
-Perubahan store hanya me-render ulang isi `<main id="outlet">`; navbar/sidebar dipasang sekali per halaman. Form yang sedang diisi tidak di-render ulang: pesan galat, total, dan tombol diperbarui di tempat.
+Isi awal setiap bagian ada di `core/state.js` (`photo` dan `admin` dari controller pemiliknya). Perubahan store hanya me-render ulang isi `<main id="outlet">`; navbar/sidebar dipasang ulang hanya saat halaman atau isinya berubah. Form ditulis sebagai `<form novalidate data-submit="controller:method">` dengan field bernama; `main.js` meneruskan `formValues(form)` ke controller, dan isian yang gagal disimpan dikembalikan ke form sebagai draf. Mengetik tanpa mengirim memakai `store.update(…, { silent: true })` agar tidak me-render ulang.
 
 ## HTML dan event
 
@@ -61,7 +65,7 @@ html`<b>${studio.name}</b>`                              // nama di-escape
 html`<ul>${items.map(item => html`<li>${item}</li>`)}</ul>`  // array html digabung
 ```
 
-Tidak ada lagi `onclick="…"`. Tombol memakai atribut data, dan satu pendengar di `core/events.js` meneruskannya ke controller:
+Tidak ada atribut handler inline (`on…`) dan tidak ada nama aplikasi di `window`. Tombol memakai atribut data, dan satu pendengar di `core/events.js` meneruskannya ke controller:
 
 | Atribut | Saat | Contoh |
 |---|---|---|
@@ -69,7 +73,7 @@ Tidak ada lagi `onclick="…"`. Tombol memakai atribut data, dan satu pendengar 
 | `data-change` / `data-input` / `data-enter` / `data-submit` | change / input / Enter / submit | `<select data-change="payment:setMethod">` |
 | `data-route="/path"` | klik, pindah halaman | `<a href="/packages" data-route="/packages">` |
 
-Atribut `data-*` lain (`data-id="12"`) masuk ke argumen pertama method controller.
+Atribut `data-*` lain (`data-id="12"`) masuk ke argumen pertama method controller. `innerHTML` hanya ditulis oleh `core/render.js`, `components/modal.js` dan adaptor layar sesi foto (`components/sessionScreen.js`).
 
 ## Rute
 
@@ -77,7 +81,7 @@ Setiap halaman punya URL, misalnya `/browse`, `/studios/3`, `/book/time`, `/book
 
 ## Contoh: alur booking
 
-Fitur booking sudah sepenuhnya MVC (fase 5a–5b), jadi dipakai sebagai contoh. Berikut perjalanan satu klik, tombol **Check Out** di langkah Paket & Pembayaran, sampai halaman **Studio Berhasil Direservasi**.
+Fitur booking dipakai sebagai contoh. Berikut perjalanan satu klik, tombol **Check Out** di langkah Paket & Pembayaran, sampai halaman **Studio Berhasil Direservasi**.
 
 **1. View menandai tombolnya** (`js/views/customer/pay.js`). View hanya mengembalikan HTML dari state; tidak ada `onclick`, hanya nama aksinya:
 
@@ -124,7 +128,7 @@ export function pay(api, id, method) {
 }
 ```
 
-**5. Store diperbarui.** `booking.clearBooking()` mengosongkan slice `booking` (juga dari `sessionStorage`), `refresh()` memuat ulang slice `data` (booking dan sesi foto milik pelanggan; sampai fase 6 masih `refresh()` dari `js/legacy/core.js`). Pembaruan dengan `{ silent: true }` tidak merender; render terjadi sekali saat pindah halaman.
+**5. Store diperbarui.** `booking.clearBooking()` mengosongkan slice `booking` (juga dari `sessionStorage`), `refresh()` (`BookingController.refreshData`) memuat ulang slice `data` (booking dan sesi foto milik pelanggan). Pembaruan dengan `{ silent: true }` tidak merender; render terjadi sekali saat pindah halaman.
 
 **6. Router pindah halaman.** `router.navigate("/bookings/12/success")` mengganti URL; rute `/bookings/:id/success` di `core/router.js` hanya untuk pelanggan, dan `main.js` memberinya view:
 
@@ -161,6 +165,17 @@ test("confirm sebagai tamu: popup Masuk untuk melanjutkan booking, belum ada POS
 ```
 
 Fitur lain mengikuti pola yang sama: view menandai aksi dengan `data-*`, `main.js` mendaftarkan method controller dan view per rute, controller memanggil model lalu `store.update` / `router.navigate`.
+
+## Menambah halaman baru
+
+Urutannya selalu rute → model → view → controller → aksi → tes. Contoh: halaman "Voucher Saya" di `/vouchers`.
+
+1. **Rute** (`js/core/router.js`, `ROUTES`): `{ path: "/vouchers", name: "vouchers", access: "customer", title: "Voucher", tab: null }`. `access` menentukan siapa yang boleh membuka (`public`, `guest`, `customer`, `admin`); guard yang sudah ada mengalihkan yang lain. Path baru otomatis disajikan `index.html` oleh server.
+2. **Model** (`js/models/voucher.js`): fungsi murni yang menerima `api`, mis. `export function listMine(api) { return api.get("/vouchers"); }`. Tanpa DOM, tanpa store.
+3. **View** (`js/views/customer/vouchers.js`): `export function vouchersView(state, match) { return html`…`; }`, membaca state yang diberikan saja. Teks UI dalam bahasa Indonesia; tombol diberi `data-action="voucher:use"` dan `data-id`.
+4. **Controller** (`js/controllers/VoucherController.js`): `export function createVoucherController({ api, store, ui, router, models })` mengembalikan method seperti `async load()` dan `async use(dataset)`. Konfirmasi lewat `ui.modal`, hasil ke `store.update`, pindah halaman lewat `router.navigate`.
+5. **Sambungkan di `main.js`**: buat controller-nya di `start()`, tambahkan halaman di `pagesFor()` (`"/vouchers": { view: vouchersView, after: () => voucher.load() }`), daftarkan aksinya di `controllerActions()` (`"voucher:use": voucher.use`), dan tambahkan kontrolernya ke objek `controllers`. Gaya halaman masuk ke `css/pages/` (atau `components.css` bila dipakai ulang), tanpa gradient.
+6. **Tes** (ditulis lebih dulu): `tests/models/voucher.test.js` dengan `createFakeApi`, `tests/views/vouchers.test.js` dengan `sampleState()`, `tests/controllers/VoucherController.test.js` dengan store asli + `createFakeUi`/`createFakeApi`. `tests/main.test.js` gagal bila sebuah `data-action` di view belum terdaftar di `controllerActions()`, dan `tests/imports.test.js` memastikan modul baru bisa diimpor tanpa browser.
 
 ## Menjalankan tes
 
