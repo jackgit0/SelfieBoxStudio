@@ -51,10 +51,7 @@ export function createSessionScreen({ document }) {
       if (video && video.videoWidth) {
         context.drawImage(video, 0, 0, width, height);
       } else {
-        const fill = context.createLinearGradient(0, 0, width, height);
-        fill.addColorStop(0, "hsl(" + Math.random() * 360 + ",70%,60%)");
-        fill.addColorStop(1, "#222");
-        context.fillStyle = fill;
+        context.fillStyle = "hsl(" + Math.random() * 360 + ",70%,60%)"; // satu warna datar (decisions.md 64)
         context.fillRect(0, 0, width, height);
         context.font = "90px serif";
         context.fillText("😄", width / 2 - 45, height / 2 + 30);

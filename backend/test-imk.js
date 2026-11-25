@@ -15,7 +15,7 @@ const file = async p => (await fetch(`http://localhost:${PORT}` + p)).text();
 const FRONT = path.join(__dirname, '..', 'frontend');
 const readAll = (dir, ext) => fs.readdirSync(path.join(FRONT, dir), { recursive: true }).filter(f => f.endsWith(ext)).sort().map(f => fs.readFileSync(path.join(FRONT, dir, f), 'utf8')).join('\n');
 const allJs = () => readAll('js', '.js'), allCss = () => readAll('css', '.css'), src = rel => fs.readFileSync(path.join(FRONT, rel), 'utf8');
-// gradient di JS = gaya UI; create*Gradient milik canvas (foto contoh tanpa kamera di session.js, fitur rekan) tidak dihitung, dulu session.js memang tidak dicek
+// gradient di JS = gaya UI; create*Gradient milik canvas tidak dihitung di cek lama ini (sejak fase 7 foto simulasi sesi foto pun datar, dicek ketat di blok fase 7)
 const uiGradient = js => /gradient/i.test(js.replace(/\.create(Linear|Radial|Conic)Gradient\(/g, ''));
 const tables = k => { const D = new DatabaseSync(DB(k)); const t = D.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name); D.close(); return t; };
 let srv = null;
@@ -256,6 +256,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
   { const rest = fs.readdirSync(path.join(FRONT, 'js'), { recursive: true }).filter(f => f.endsWith('.js') && !/legacy[\\/]admin\.js$/.test(f)).map(f => fs.readFileSync(path.join(FRONT, 'js', f), 'utf8')).join('\n'), JS = allJs();
     ok(!/\bconfirm\(["'`]/.test(rest), 'frontend (selain admin): tanpa confirm() bawaan browser'); // kode: diganti di fase 9 (semua berkas)
     ok(!/\balert\(/.test(JS), 'frontend: tanpa alert() bawaan browser');
+    ok(!/gradient/i.test(JS), 'frontend (JS): tanpa gradient sama sekali, juga foto simulasi canvas di sesi foto (decisions.md 64)');
     for (const s of ['Konfirmasi Hentikan Sesi', 'Hentikan sesi?', 'Konfirmasi Hapus Foto', 'Hapus foto ini secara permanen?', 'foto terpilih secara permanen? Foto favorit tidak ikut terhapus.', 'Foto Gagal Dihapus']) ok(JS.includes(s), `frontend memuat "${s}"`);
   }
 
