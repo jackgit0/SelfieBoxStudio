@@ -109,7 +109,17 @@ async function refresh() {
 }
 async function afterAuth(r) { API.token = r.token; S.admin = false; S.user = r.user; S.me = r.user.id; await refresh(); if (S.draft) return resumeDraft(); go("home"); } // draf booking tamu: kembali ke Paket & Pembayaran
 function logout() { API.token = ""; API.staffToken = ""; S.user = S.me = null; S.staff = false; S.admin = false; S.draft = null; D.bookings = []; D.sessions = []; if (typeof adminReset === "function") adminReset(); R.auth.mode = "login"; go("landing"); }
-async function staffToggle() { if (S.staff) { S.staff = false; API.staffToken = ""; } else { const pin = prompt("PIN staf:"); if (!pin) return; try { API.staffToken = (await API.post("/staff/login", { pin })).token; S.staff = true; } catch (e) { R.toast.error = e.message; } } save(); render(); }
+// Mode Staf: PIN lewat modal "Masuk Mode Staf" (dulu dialog bawaan browser, decisions.md 4, 27, 41); fokus awal di isian PIN, Enter = Masuk
+const STAFF_PIN_BODY = `<p>Masukkan PIN staf untuk mengaktifkan Mode Staf.</p><label for="staff-pin">PIN staf</label><input id="staff-pin" type="password" inputmode="numeric" autocomplete="off">`;
+async function staffToggle() {
+  if (S.staff) { S.staff = false; API.staffToken = ""; }
+  else {
+    const answer = await modal({ title: "Masuk Mode Staf", body: STAFF_PIN_BODY, buttons: [{ label: "Batal", value: null, style: "ghost" }, { label: "Masuk", value: "ok" }], initialFocus: "#staff-pin", enterValue: "ok", read: box => box.querySelector("#staff-pin").value.trim() });
+    const pin = answer.value === "ok" ? answer.data : ""; if (!pin) return;
+    try { API.staffToken = (await API.post("/staff/login", { pin })).token; S.staff = true; } catch (e) { R.toast.error = e.message; }
+  }
+  save(); render();
+}
 async function reg() {
   const n = $("#n").value.trim(), e = $("#e").value.trim(), p = $("#p").value.trim(), pw = $("#pw").value;
   if (!n || !/\S+@\S+\.\S+/.test(e) || !/^\d{8,15}$/.test(p) || pw.length < 6) { R.toast.error = "Lengkapi data: email valid, telepon 8-15 digit, password min. 6 karakter."; return render(); }
@@ -133,5 +143,5 @@ async function adminLogin(username, password) {
   const r = await API.post("/admin/login", { username, password }); API.token = r.token; S.admin = true; S.draft = null; S.user = { name: "Admin", id: 0 }; S.me = "admin"; AD.me = r.admin; go(r.admin.must_change ? "aacct" : "adash");
 }
 async function changePw() { try { await API.post("/auth/forgot", { email: me().email }); R.toast.message = "Tautan untuk mengubah sandi telah dikirim ke " + me().email; } catch (x) { R.toast.error = x.message; } render(); }
-function csContact() { const wa = CS_WA, mail = CS_EMAIL; if (wa) window.open("https://wa.me/" + wa, "_blank"); else if (mail) location.href = "mailto:" + mail; else alert("Silakan hubungi staf di studio atau kontak Customer Service Anda. (Atur nomor di frontend/js/config.js)"); }
+function csContact() { const wa = CS_WA, mail = CS_EMAIL; if (wa) window.open("https://wa.me/" + wa, "_blank"); else if (mail) location.href = "mailto:" + mail; else modal({ title: "Hubungi Customer Service", body: "<p>Silakan hubungi staf di studio atau kontak Customer Service Anda. (Atur nomor di frontend/js/config.js)</p>" }); } // dulu dialog bawaan browser (decisions.md 4, 27)
 export { $, capLabel, changePw, csContact, doReset, eff, forgot, free, go, goPath, ic, icf, login, logout, me, modal, pkOf, prefetch, priceRange, ptag, refresh, refreshMaster, reg, render, renderAfter, renderBefore, renderContent, renderShell, staffToggle, studioOf, toasts };

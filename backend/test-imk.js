@@ -239,6 +239,13 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!old, 'frontend: tidak ada lagi rujukan ke nama global lama' + (old ? ` (masih ada "${old[0]}")` : '')); // kode: diganti di fase 9
   }
 
+  // ===== Refactor MVC fase 4: shell tanpa dialog bawaan browser (decisions.md 4, 27, 41) =====
+  { const JS = allJs(), core = src('js/legacy/core.js');
+    ok(!/\bprompt\(/.test(JS), 'frontend: tanpa prompt() bawaan browser (PIN staf lewat modal)');
+    ok(!/\balert\(/.test(core), 'core.js: tanpa alert() bawaan browser (kontak CS lewat modal)'); // kode: diganti di fase 9 (semua berkas tanpa dialog bawaan)
+    for (const s of ['Masuk Mode Staf', 'Masukkan PIN staf', 'inputmode="numeric"', 'Hubungi Customer Service', 'Silakan hubungi staf di studio atau kontak Customer Service Anda.']) ok(JS.includes(s), `frontend memuat "${s}"`);
+  }
+
   // ===== Fase refactor 3: fallback SPA (rute frontend dengan path history disajikan index.html) =====
   srv = start('spa'); await up();
   { const index = fs.readFileSync(path.join(FRONT, 'index.html'), 'utf8');
