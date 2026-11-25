@@ -200,7 +200,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
       'Paket Tidak Ditemukan', 'Paket tidak ditemukan. Silakan pilih paket lain.', 'Maaf, Sesi Sudah Dibooking', 'Sesi ini sudah memiliki booking aktif. Silakan pilih sesi lain.', 'Pilih Sesi Lain',
       'Masuk untuk melanjutkan booking', 'Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.', 'Jadwal sudah tidak tersedia', 'Format/jam slot tidak valid', 'Jadwal sudah lewat', 'Studio tidak tersedia']) ok(JS.includes(s), `frontend memuat "${s}"`);
     ok(/async function confirmPay\(\) \{\s*if \(!S\.me\)/.test(cj), 'customer.js: tamu yang menekan Check Out mendapat popup Belum Login sebelum booking dibuat'); // kode: diganti di fase 5b (test-map.md)
-    ok(!/\$\{B\.slot \? "" : "disabled"\} onclick="nextTime\(\)"/.test(cj), 'customer.js: tombol Lanjut ke Pembayaran tidak lagi dinonaktifkan (validasi lewat popup Input Tidak Valid)'); // kode: diganti di fase 5b (test-map.md)
+    ok(!/\$\{BK\.slot \? "" : "disabled"\} onclick="nextTime\(\)"/.test(cj), 'customer.js: tombol Lanjut ke Pembayaran tidak lagi dinonaktifkan (validasi lewat popup Input Tidak Valid)'); // kode: diganti di fase 5b (test-map.md)
     ok(!/catch \(e\) \{[^}]*err = e\.message; (AV = \{\}; )?(return )?render\(\)/.test(cj.slice(cj.indexOf('async function nextTime'), cj.indexOf('// ---------- halaman hasil'))), 'customer.js: galat langkah booking tidak lagi ditampilkan sebagai teks merah'); // kode: diganti di fase 5b (test-map.md)
     ok(lj.includes('Lihat Studio') && /go\('home'\)/.test(lj), 'landing.js: tautan "Lihat Studio" membuka Browse'); // kode: diganti di fase 7 (test-map.md)
     ok(!uiGradient(JS), 'frontend (JS) tetap tanpa gradient'); }
@@ -239,6 +239,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
   // asg(names) = pola penugasan ulang sebuah global (bukan properti: "x.err =" tidak dihitung), termasuk di dalam atribut onclick="…"
   { const JS = allJs(), asg = names => new RegExp(`(^|[;{(,\\s"'\`])(${names})\\s*=[^=]`, 'm');
     ok(!asg('PKG|ALLPKG|FAV_PKG|DISC|PEOPLE|BUDGET|STUDIOS|ALLSTUDIOS|PROP|POSES|POLICY|_mj').test(JS) && !/\(\{\s*PKG/.test(JS), 'frontend: data master hanya di objek M (tanpa global PKG/STUDIOS/… yang di-assign ulang)'); // kode: diganti di fase 9
+    ok(!asg('B|Q|editId').test(JS), 'frontend: booking berjalan hanya di objek BK (tanpa B/Q/editId yang di-assign ulang)'); // kode: diganti di fase 9
   }
 
   console.log(`\n${n} tes lulus`); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);

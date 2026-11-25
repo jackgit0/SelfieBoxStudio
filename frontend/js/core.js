@@ -9,7 +9,9 @@ S = Object.assign({ user: null, me: null, admin: false, view: "landing", p: {}, 
 if (S.acct === "pref") S.acct = "profile";
 S.bookings = []; S.sessions = [];
 const save = () => { try { localStorage.setItem("snapia", JSON.stringify({ ...S, bookings: [], sessions: [] })); } catch (e) {} };
-let msg = "", err = "", AV = {}, CAL = {}, B = { studio: null, date: null, slot: null }, editId = null, Q = null;
+let msg = "", err = "", AV = {}, CAL = {};
+// booking yang sedang diisi: studio, tanggal, sesi; quote = rincian harga dari /api/quote; rescheduleId = id booking yang sedang diubah jadwalnya
+const BK = { studio: null, date: null, slot: null, quote: null, rescheduleId: null };
 const me = () => S.user;
 
 // ---------- utilitas ----------
@@ -111,7 +113,7 @@ function render() {
   if (["home", "time"].includes(S.view)) prefetch();
 }
 async function prefetch() {
-  const home = S.view === "home", d = home ? (S.hDate || todayS()) : (B.date || todayS()), ids = home ? M.studios.map(s => s.id) : (B.studio ? [B.studio] : []); let ch = 0;
+  const home = S.view === "home", d = home ? (S.hDate || todayS()) : (BK.date || todayS()), ids = home ? M.studios.map(s => s.id) : (BK.studio ? [BK.studio] : []); let ch = 0;
   for (const id of ids) { const k = id + "|" + d; if (AV[k]) continue; try { AV[k] = (await API.get(`/availability?studio_id=${id}&date=${d}`)).free; ch = 1; } catch (e) { if (e.status == 400) { AV[k] = []; ch = 1; } } } // studio ditolak (mis. tidak tersedia): tidak ada slot
   if (ch && ["home", "time"].includes(S.view)) render();
 }
@@ -120,7 +122,7 @@ async function prefetch() {
 let authMode = "login", resetTok = "";
 V.auth = () => {
   const tabs = `<div class="seg">${[["login", "Masuk"], ["register", "Daftar"]].map(t => `<button class="${authMode == t[0] ? "on" : ""}" onclick="authMode='${t[0]}';msg=err='';render()">${t[1]}</button>`).join("")}</div>`;
-  const draft = S.draft && ["login", "register"].includes(authMode), back = draft && B.slot && Q; // datang dari popup Belum Login (Figma 585:4400)
+  const draft = S.draft && ["login", "register"].includes(authMode), back = draft && BK.slot && BK.quote; // datang dari popup Belum Login (Figma 585:4400)
   const wrap = h => `<div class="authcard"><button class="back" onclick="${back ? "go('pay')" : "go('landing')"}">${ic("left", 16)} ${back ? "Kembali ke booking" : "Beranda"}</button><div class="brand">${esc(BRAND)}</div><p class="sub center" style="margin-bottom:14px">Sesi foto self-service, tinggal pilih dan datang.</p>${toasts()}${draft ? `<h2 class="h3">Masuk untuk melanjutkan booking</h2><div class="mnote" style="margin:8px 0 14px">${ic("info", 16)} Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.</div>` : ""}${h}</div>`;
   const key = 'onkeydown="if(event.key===\'Enter\')';
   if (authMode == "reset") return wrap(`<h2 class="h2">Buat Sandi Baru</h2><label>Password baru</label><input id="pw" type="password" autocomplete="new-password"><label>Ulangi password</label><input id="pw2" type="password" autocomplete="new-password" ${key}doReset()"><div style="margin-top:18px"><button class="btn block" onclick="doReset()">Simpan Sandi</button></div>`);
