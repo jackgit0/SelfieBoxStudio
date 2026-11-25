@@ -12,6 +12,8 @@ backend/   server.js (REST API + file statis) · db.js (skema + migrasi) · mail
            test-imk.js (lingkup IMK: tanpa onboarding/promo/add-on, Pilihan Paket, popup booking, Ringkasan Studio, Akses Ditolak)
 ```
 
+Branch `refactor/frontend-mvc` (tidak digabung ke `main`) memindahkan frontend ke struktur MVC dengan modul ES; arsitektur tujuannya ada di [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md).
+
 ## Menjalankan
 Node.js >= 22.5 (tanpa `npm install`).
 ```
