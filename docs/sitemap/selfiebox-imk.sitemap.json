@@ -12,316 +12,316 @@
           "id": "h",
           "type": "sm-home",
           "label": "Beranda",
-          "x": 964,
-          "y": 642
+          "x": 1324,
+          "y": 40
         },
         {
           "id": "browse",
           "type": "sm-page",
           "label": "Browse Studio",
-          "x": 1150,
-          "y": 1114
+          "x": 900,
+          "y": 200
         },
         {
           "id": "studio",
           "type": "sm-page",
           "label": "Detail Studio",
-          "x": 1060,
-          "y": 1244
+          "x": 940,
+          "y": 300
         },
         {
           "id": "create",
           "type": "sm-page",
           "label": "Create Booking",
-          "x": 1060,
-          "y": 1374
+          "x": 1120,
+          "y": 300
         },
         {
           "id": "mybook",
           "type": "sm-page",
           "label": "Booking Saya",
-          "x": 1570,
-          "y": 1114
+          "x": 1560,
+          "y": 200
         },
         {
           "id": "bdet",
           "type": "sm-page",
           "label": "Booking Details",
-          "x": 1570,
-          "y": 1244
+          "x": 1600,
+          "y": 300
         },
         {
           "id": "resch",
           "type": "sm-page",
           "label": "Reschedule",
-          "x": 1480,
-          "y": 1374
+          "x": 1780,
+          "y": 300
         },
         {
           "id": "cancel",
           "type": "sm-page",
           "label": "Pembatalan & Refund",
-          "x": 1660,
-          "y": 1374
+          "x": 1780,
+          "y": 385
         },
         {
           "id": "sa",
           "type": "sm-page",
           "label": "Session Assistant",
-          "x": 310,
-          "y": 1114
+          "x": 1320,
+          "y": 200
         },
         {
           "id": "cam",
           "type": "sm-page",
           "label": "Camera Preview & Timer",
-          "x": 40,
-          "y": 1244
+          "x": 1360,
+          "y": 300
         },
         {
           "id": "bg",
           "type": "sm-page",
           "label": "Background",
-          "x": 220,
-          "y": 1244
+          "x": 1360,
+          "y": 385
         },
         {
           "id": "pose",
           "type": "sm-page",
           "label": "Pose Ideas",
-          "x": 400,
-          "y": 1244
+          "x": 1360,
+          "y": 470
         },
         {
           "id": "staff",
           "type": "sm-page",
           "label": "Panggil Staff",
-          "x": 580,
-          "y": 1244
+          "x": 1360,
+          "y": 555
         },
         {
           "id": "gal",
           "type": "sm-page",
           "label": "Galeri",
-          "x": 1900,
-          "y": 1114
+          "x": 1980,
+          "y": 200
         },
         {
           "id": "album",
           "type": "sm-page",
           "label": "Album Sesi",
-          "x": 1900,
-          "y": 1244
+          "x": 2020,
+          "y": 300
         },
         {
           "id": "photo",
           "type": "sm-page",
           "label": "Preview Foto",
-          "x": 1900,
-          "y": 1374
+          "x": 2200,
+          "y": 300
         },
         {
           "id": "acc",
           "type": "sm-page",
           "label": "Account",
-          "x": 1240,
-          "y": 642
+          "x": 2400,
+          "y": 200
         },
         {
           "id": "set",
           "type": "sm-page",
           "label": "Settings",
-          "x": 1480,
-          "y": 602
+          "x": 2440,
+          "y": 300
         },
         {
           "id": "edit",
           "type": "sm-page",
           "label": "Edit Profile",
-          "x": 1720,
-          "y": 442
+          "x": 2620,
+          "y": 300
         },
         {
           "id": "pref",
           "type": "sm-page",
           "label": "Preference",
-          "x": 1720,
-          "y": 522
+          "x": 2620,
+          "y": 385
         },
         {
           "id": "pm",
           "type": "sm-page",
           "label": "Payment Method",
-          "x": 1720,
-          "y": 602
+          "x": 2620,
+          "y": 470
         },
         {
           "id": "pw",
           "type": "sm-page",
           "label": "Change Password",
-          "x": 1720,
-          "y": 682
+          "x": 2620,
+          "y": 555
         },
         {
           "id": "priv",
           "type": "sm-page",
           "label": "Privacy Policy",
-          "x": 1720,
-          "y": 762
+          "x": 2620,
+          "y": 640
         },
         {
           "id": "ph",
           "type": "sm-page",
           "label": "Payment History",
-          "x": 1480,
-          "y": 842
+          "x": 2440,
+          "y": 725
         },
         {
           "id": "rcpt",
           "type": "sm-page",
           "label": "Receipt",
-          "x": 1720,
-          "y": 842
+          "x": 2620,
+          "y": 725
         },
         {
           "id": "help",
           "type": "sm-page",
           "label": "Help",
-          "x": 1480,
-          "y": 922
+          "x": 2440,
+          "y": 810
         },
         {
           "id": "logout",
           "type": "sm-page",
           "label": "Konfirmasi Log Out",
-          "x": 1480,
-          "y": 362
+          "x": 2440,
+          "y": 895
         },
         {
           "id": "auth",
           "type": "sm-section",
           "label": "Autentikasi",
-          "x": 970,
-          "y": 170
+          "x": 460,
+          "y": 200
         },
         {
           "id": "login",
           "type": "sm-page",
           "label": "Log In",
-          "x": 1060,
-          "y": 40
+          "x": 500,
+          "y": 300
         },
         {
           "id": "signup",
           "type": "sm-page",
           "label": "Sign Up",
-          "x": 1240,
-          "y": 40
+          "x": 500,
+          "y": 385
         },
         {
           "id": "forgot",
           "type": "sm-page",
           "label": "Lupa Sandi",
-          "x": 880,
-          "y": 40
+          "x": 500,
+          "y": 470
         },
         {
           "id": "reset",
           "type": "sm-page",
           "label": "Buat Sandi Baru",
-          "x": 700,
-          "y": 40
+          "x": 500,
+          "y": 555
         },
         {
           "id": "adm",
           "type": "sm-section",
           "label": "Admin",
-          "x": 700,
-          "y": 642
+          "x": 40,
+          "y": 200
         },
         {
           "id": "au",
           "type": "sm-page",
           "label": "User Management",
-          "x": 460,
-          "y": 402
+          "x": 80,
+          "y": 385
         },
         {
           "id": "as",
           "type": "sm-page",
           "label": "Studio Management",
-          "x": 460,
-          "y": 482
+          "x": 80,
+          "y": 470
         },
         {
           "id": "ass",
           "type": "sm-page",
           "label": "Session Management",
-          "x": 220,
-          "y": 482
+          "x": 260,
+          "y": 470
         },
         {
           "id": "ab",
           "type": "sm-page",
           "label": "Booking Management",
-          "x": 460,
-          "y": 562
+          "x": 80,
+          "y": 555
         },
         {
           "id": "ap",
           "type": "sm-page",
           "label": "Property Management",
-          "x": 460,
-          "y": 642
+          "x": 80,
+          "y": 640
         },
         {
           "id": "apo",
           "type": "sm-page",
           "label": "Pose Management",
-          "x": 460,
-          "y": 722
+          "x": 80,
+          "y": 725
         },
         {
           "id": "apay",
           "type": "sm-page",
           "label": "Payment Dashboard",
-          "x": 460,
-          "y": 802
+          "x": 80,
+          "y": 810
         },
         {
           "id": "landing",
           "type": "sm-page",
           "label": "Landing Page",
-          "x": 820,
-          "y": 1114
+          "x": 700,
+          "y": 200
         },
         {
           "id": "pkg",
           "type": "sm-page",
           "label": "Pilihan Paket",
-          "x": 1240,
-          "y": 1244
+          "x": 940,
+          "y": 385
         },
         {
           "id": "adash",
           "type": "sm-page",
           "label": "Revenue Dashboard",
-          "x": 460,
-          "y": 322
+          "x": 80,
+          "y": 300
         },
         {
           "id": "apk",
           "type": "sm-page",
           "label": "Package Management",
-          "x": 460,
-          "y": 882
+          "x": 80,
+          "y": 895
         },
         {
           "id": "aacc",
           "type": "sm-page",
           "label": "Admin Account",
-          "x": 460,
-          "y": 962
+          "x": 80,
+          "y": 980
         },
         {
           "id": "n1",
