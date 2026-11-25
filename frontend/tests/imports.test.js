@@ -1,4 +1,4 @@
-// Setiap modul inti, model, komponen, dan config dapat diimpor di Node tanpa window/document/localStorage (architecture.md → Code style).
+// Setiap modul inti, model, komponen, view, controller, dan config dapat diimpor di Node tanpa window/document/localStorage (architecture.md → Code style).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const js = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "js");
-const modules = ["config.js", ...["core", "models", "components"].flatMap(dir => fs.readdirSync(path.join(js, dir), { recursive: true }).filter(file => file.endsWith(".js")).map(file => `${dir}/${file}`))];
+const modules = ["config.js", ...["core", "models", "components", "views", "controllers"].flatMap(dir => fs.readdirSync(path.join(js, dir), { recursive: true }).filter(file => file.endsWith(".js")).map(file => `${dir}/${file}`))];
 
 test("tidak ada window/document/localStorage di lingkungan tes", () => {
   for (const name of ["window", "document", "localStorage", "location"]) assert.equal(typeof globalThis[name], "undefined", name);

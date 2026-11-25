@@ -4,7 +4,8 @@ import { BRAND, CS_EMAIL, CS_WA } from "../config.js";
 import { esc } from "../core/html.js";
 import { SESSION_HOURS as HRS, padTwo as pad, formatRupiahShort as rpk } from "../core/format.js";
 import { $, capLabel, eff, go, ic, priceRange, render } from "./core.js";
-import { bgi, pkgCards } from "./customer.js";
+import { backgroundImage as bgi } from "../components/propertyVisual.js";
+import { packageStrip } from "../components/packageCards.js";
 const LSECS = [["home", "Home"], ["about", "About"], ["fasilitas", "Fasilitas"], ["keterangan", "Keterangan"], ["kontak", "Contact Us"]];
 const openAuth = mode => { if (R.route.name === "landing") S.draft = null; R.auth.mode = mode; go("auth"); }; // dari landing: draf booking lama tidak dilanjutkan
 function toSec(id) { const m = $("#lmenu"); if (m) m.hidden = true; const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }
@@ -62,7 +63,7 @@ ${propImgs.length ? `<h3 class="h2" style="margin:44px 0 6px">Properti & backgro
 
 <section id="keterangan" class="sec"><div class="lw"><span class="eyebrow">Keterangan</span><h2 class="sec-h">Cara kerja, paket, dan ketentuan</h2>
 <div class="steps4">${STEPS.map((s, i) => `<div class="stp"><div class="num">${i + 1}</div><div class="fic">${ic(s[0], 22)}</div><h3>${s[1]}</h3><p>${s[2]}</p></div>`).join("")}</div>
-<h3 class="h2" style="margin:44px 0 6px">Paket & harga</h3><p class="sub">${M.discount.pct ? `Diskon ${M.discount.pct}%${M.discount.label ? " — " + esc(M.discount.label) : ""} sudah termasuk pada harga di bawah.` : "Pilih paket saat memesan."}</p><div class="pk-grid">${pkgCards()}</div><div style="margin-top:14px"><button class="btn sm ghost" onclick="go('packages')">Lihat semua paket ${ic("right", 16)}</button></div>
+<h3 class="h2" style="margin:44px 0 6px">Paket & harga</h3><p class="sub">${M.discount.pct ? `Diskon ${M.discount.pct}%${M.discount.label ? " — " + esc(M.discount.label) : ""} sudah termasuk pada harga di bawah.` : "Pilih paket saat memesan."}</p><div class="pk-grid">${packageStrip(M, S.pkg)}</div><div style="margin-top:14px"><button class="btn sm ghost" onclick="go('packages')">Lihat semua paket ${ic("right", 16)}</button></div>
 <h3 class="h2" style="margin:44px 0 12px">Informasi penting</h3><div class="info">
 <div class="card"><h4>${ic("clock", 18)} Jam operasional</h4><p>Setiap hari ${pad(first)}.00 – ${pad(last)}.50 WIB. Satu sesi berlangsung 50 menit.</p></div>
 <div class="card"><h4>${ic("card", 18)} Pembayaran</h4><p>QRIS atau transfer bank. Invoice dikirim ke email dan dapat diunduh dari menu Booking.</p></div>

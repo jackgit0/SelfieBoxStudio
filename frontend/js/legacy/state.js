@@ -21,11 +21,14 @@ export let API = null;
 export let ROUTER = null;
 // renderer (core/render.js) yang dipakai render() lama
 export let RENDERER = null;
+// controller baru (js/controllers) yang dipanggil kode lama: { studio, package } (decisions.md 43)
+export let CONTROLLERS = {};
 let store = null;
-export function connectLegacy({ api, store: appStore, router, renderer }) {
+export function connectLegacy({ api, store: appStore, router, renderer, controllers = {} }) {
   API = api;
   ROUTER = router;
   RENDERER = renderer;
+  CONTROLLERS = controllers;
   store = appStore;
 }
 // simpan S (state tersimpan) dan booking berjalan (BK, per tab) lewat store

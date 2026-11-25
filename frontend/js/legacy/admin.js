@@ -4,7 +4,8 @@ import { API_BASE } from "../config.js";
 import { esc } from "../core/html.js";
 import { formatDate as fmtDate, formatTime as fmtTime, padTwo as pad, formatRupiah as rp, todayIso as todayS } from "../core/format.js";
 import { $, go, ic, logout, modal, render } from "./core.js";
-import { PAYLBL, bgi, kvs } from "./customer.js";
+import { PAYLBL, kvs } from "./customer.js";
+import { backgroundImage as bgi } from "../components/propertyVisual.js";
 import { openAuth } from "./landing.js";
 const AD = { loading: {}, imgs: {}, open: {}, q: "", opPeriod: "month", opEdit: null, cdet: null, bdet: null, bst: null, bstatus: "", scal: {}, sday: {}, sess: {}, sedit: null, sadd: null, stnew: null, stsum: null, sterr: null, stdone: null };
 function adminReset() { Object.keys(AD).forEach(k => { if (!["loading", "imgs", "open"].includes(k) && !["q", "opPeriod", "bstatus"].includes(k)) AD[k] = null; }); AD.q = ""; AD.opPeriod = "month"; AD.bstatus = ""; AD.imgs = {}; AD.open = {}; AD.loading = {}; AD.scal = {}; AD.sday = {}; AD.sess = {}; }

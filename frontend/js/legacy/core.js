@@ -5,7 +5,7 @@ import { esc, raw } from "../core/html.js";
 import { icon, iconFilled } from "../components/icon.js";
 import { openModal } from "../components/modal.js";
 import { renderToasts } from "../components/toast.js";
-import { SESSION_HOURS as HRS, formatRupiah as rp, parseSlot, todayIso as todayS } from "../core/format.js";
+import { parseSlot } from "../core/format.js";
 import * as masterModel from "../models/master.js";
 import { legacyPath } from "../core/router.js";
 import { resumeDraft } from "./customer.js";
@@ -20,9 +20,7 @@ const me = () => S.user;
 // esc dan format (rp, pad, slotLabel, …) dari core/html.js dan core/format.js; pencarian data master dari models/master.js
 const pkOf = id => masterModel.packageOf(M, id);
 const eff = p => masterModel.effectivePrice(M, p);
-const ptag = p => M.discount.pct ? `<s class="m">${rp(p.price)}</s> ${rp(eff(p))}` : rp(p.price);
 const studioOf = id => masterModel.studioOf(M, id);
-const free = (sid, d) => R.availability[sid + "|" + d] || HRS.filter(h => d > todayS() || h > new Date().getHours());
 const priceRange = s => masterModel.priceRange(M, s);
 const capLabel = s => masterModel.capacityLabel(M, s);
 
@@ -62,9 +60,6 @@ function syncReschedule(id) {
 const modal = ({ body = "", kicker = "", cls = "", ...options }) => openModal({ ...options, body: raw(body), kicker: raw(kicker), className: cls });
 const toasts = () => renderToasts(R.toast).markup;
 
-// muat ulang data master (studio/properti/paket) bila admin mengubahnya; render ulang hanya jika berbeda
-async function refreshMaster() { try { const m = await masterModel.loadMaster(API); if (m.json === M.json) return; Object.assign(M, m); render(); } catch (e) {} }
-V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
 // ---------- render (core/render.js; main.js membuat renderer dengan keempat kait di bawah) ----------
 // render() lama = render ulang lewat renderer: shell dipasang ulang hanya bila rute atau isinya berubah, selain itu hanya outlet
 const render = () => RENDERER.render();
@@ -76,20 +71,17 @@ function renderBefore(m) {
   if (layoutNow() === "admin" && view !== "astudio") AD.stdone = null; // notifikasi "Studio berhasil ditambahkan" hanya di halaman Studio
 }
 const renderShell = m => shellMarkup({ layout: layoutNow(), route: m.route, session: { user: S.me ? me() : null, staff: S.staff } });
-function renderContent(m) {
-  const layout = layoutNow(), content = raw((V[R.route.name] || V.auth)());
+// content = isi dari view baru (route.view, main.js); tanpa itu V.<view>() lama
+function renderContent(m, content = null) {
+  const layout = layoutNow();
+  if (!content) content = raw((V[R.route.name] || V.auth)());
   const header = layout === "admin" ? adminHeader({ route: m.route, title: adminTitle(m.route, AD), mustChange: Boolean(AD.me && AD.me.must_change), query: AD.q }) : "";
   return composeOutlet({ layout, content, toast: R.toast, header });
 }
+// jam kosong Browse/Pilih Waktu dan muat ulang data master: kait route.after (main.js, StudioController)
 function renderAfter() {
   const view = R.route.name;
   if (V[view + "_after"]) V[view + "_after"]();
-  if (["home", "time"].includes(view)) prefetch();
-}
-async function prefetch() {
-  const home = R.route.name === "home", d = home ? (S.hDate || todayS()) : (BK.date || todayS()), ids = home ? M.studios.map(s => s.id) : (BK.studio ? [BK.studio] : []); let ch = 0;
-  for (const id of ids) { const k = id + "|" + d; if (R.availability[k]) continue; try { R.availability[k] = (await API.get(`/availability?studio_id=${id}&date=${d}`)).free; ch = 1; } catch (e) { if (e.status == 400) { R.availability[k] = []; ch = 1; } } } // studio ditolak (mis. tidak tersedia): tidak ada slot
-  if (ch && ["home", "time"].includes(R.route.name)) render();
 }
 
 // ---------- autentikasi ----------
@@ -145,4 +137,4 @@ async function adminLogin(username, password) {
 }
 async function changePw() { try { await API.post("/auth/forgot", { email: me().email }); R.toast.message = "Tautan untuk mengubah sandi telah dikirim ke " + me().email; } catch (x) { R.toast.error = x.message; } render(); }
 function csContact() { const wa = CS_WA, mail = CS_EMAIL; if (wa) window.open("https://wa.me/" + wa, "_blank"); else if (mail) location.href = "mailto:" + mail; else modal({ title: "Hubungi Customer Service", body: "<p>Silakan hubungi staf di studio atau kontak Customer Service Anda. (Atur nomor di frontend/js/config.js)</p>" }); } // dulu dialog bawaan browser (decisions.md 4, 27)
-export { $, capLabel, changePw, csContact, doReset, eff, forgot, free, go, goPath, ic, icf, login, logout, me, modal, pkOf, prefetch, priceRange, ptag, refresh, refreshMaster, reg, render, renderAfter, renderBefore, renderContent, renderShell, staffToggle, studioOf, toasts };
+export { $, capLabel, changePw, csContact, doReset, eff, forgot, go, goPath, ic, icf, login, logout, me, modal, pkOf, priceRange, refresh, reg, render, renderAfter, renderBefore, renderContent, renderShell, staffToggle, studioOf, toasts };

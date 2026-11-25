@@ -1,49 +1,34 @@
 // ===== SISI CUSTOMER: Beranda (Browse), Studio, Booking, Booking Saya, Pembatalan/Refund, Akun =====
-import { API, BK, D, M, R, S, V, save } from "./state.js";
+import { API, BK, CONTROLLERS, D, M, R, S, V, save } from "./state.js";
 import { BRAND } from "../config.js";
 import { esc } from "../core/html.js";
 import { SESSION_HOURS as HRS, formatDayMonthYear as fmtDMY, formatDate as fmtDate, formatTime as fmtTime, isoDate as iso, padTwo as pad, parseSlot, formatRupiah as rp, slotLabel, slotRange, todayIso as todayS } from "../core/format.js";
 import { isStudioShown } from "../models/master.js";
 import { modalIcon } from "../components/modal.js";
 import { calendar } from "../components/calendar.js";
-import { $, capLabel, csContact, eff, free, go, ic, icf, me, modal, pkOf, prefetch, priceRange, ptag, refresh, refreshMaster, render, studioOf } from "./core.js";
+import { $, csContact, eff, go, ic, me, modal, pkOf, refresh, render, studioOf } from "./core.js";
+import { freeHours } from "../models/studio.js";
+import { priceTag } from "../components/packageCards.js";
+import { studioUnavailable } from "../views/customer/studio.js";
 import { openAuth } from "./landing.js";
-const bgi = u => u ? `background-image:url('${esc(u)}')` : "";
-const propVisual = p => p.img ? `<div class="pimg" style="${bgi(p.img)}"></div>` : `<div class="pimg" ${p.bg ? `style="background:${esc(p.bg.split(",")[0])}"` : ""}>${p.bg ? "" : esc(p.e || "🎁")}</div>`;
+const free = (sid, d) => freeHours(R.availability, sid, d, new Date()); // models/studio.js
+const ptag = p => priceTag(M, p).markup; // components/packageCards.js
 
-// ---------- kalender ----------
-// components/calendar.js; bulan yang ditampilkan per konteks di R.calendar[ctx] = { y, m }
+// ---------- kalender langkah Pilih Waktu (Filter Jadwal di Browse: StudioController) ----------
+// components/calendar.js; bulan yang ditampilkan di R.calendar.book = { y, m } (fase 5b: BookingController)
 function calHTML(ctx, sel) {
   const t = new Date(), c = R.calendar[ctx] || (R.calendar[ctx] = { y: t.getFullYear(), m: t.getMonth() });
   return calendar({ context: ctx, selected: sel, month: { year: c.y, month: c.m }, today: todayS() }).markup;
 }
 function calNav(ctx, dir) { const t = new Date(), c = R.calendar[ctx] || (R.calendar[ctx] = { y: t.getFullYear(), m: t.getMonth() }); let m = c.m + dir, y = c.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } if (y * 12 + m < t.getFullYear() * 12 + t.getMonth()) return; c.y = y; c.m = m; render(); }
-function calPick(ctx, ds) { if (ctx === "home") S.hDate = ds; else { BK.date = ds; BK.slot = null; } render(); }
+function calPick(ctx, ds) { BK.date = ds; BK.slot = null; render(); }
 
-// ---------- beranda (Browse) ----------
-const toggleBm = id => { const i = S.bm.indexOf(id); i < 0 ? S.bm.push(id) : S.bm.splice(i, 1); save(); render(); };
-function studioCard(s) {
-  const d = S.hDate, from = S.hFrom ?? 8, to = S.hTo ?? 20, slots = free(s.id, d).filter(h => h >= from && h <= to).slice(0, 3), on = S.bm.includes(s.id);
-  return `<article class="scard"><div class="box" onclick="go('studio',{id:${s.id}})"><div class="simg" style="${bgi(s.img)}"></div><div class="sbody"><div class="row sp" style="flex-wrap:nowrap"><h3>${esc(s.name)}</h3>
-<button class="star ${on ? "on" : ""}" aria-label="Favorit" onclick="event.stopPropagation();toggleBm(${s.id})">${icf("star", 20)}</button></div><p class="desc">${esc(s.description)}</p>
-<div class="meta"><span>${ic("users", 14)} ${esc(capLabel(s))}</span><span>${ic("tag", 14)} ${priceRange(s)}</span></div></div></div>
-<div class="chips">${slots.map(h => `<button class="chip" onclick="quickBook(${s.id},'${d}',${h})">${slotLabel(h)}</button>`).join("") || `<span class="chip none">Tidak ada sesi tersedia</span>`}</div></article>`;
-}
-function pkgCards() {
-  return M.packages.map(p => `<div class="pk"><div class="row sp"><h4>${esc(p.name)}</h4>${p.id == S.pkg ? '<span class="tag">Dipilih</span>' : ""}</div><div class="price">${ptag(p)}</div>
-<ul><li>${p.photo_count} foto · ${p.dur} menit</li><li>Strip ${esc(p.strip_size || "-")} · ${esc(p.strip_material || "-")}</li><li>Galeri online 30 hari</li></ul></div>`).join("");
-}
-V.home = () => {
-  const d = S.hDate || (S.hDate = todayS()), from = S.hFrom ?? 8, to = S.hTo ?? 20, opt = (v, sel) => HRS.map(h => `<option value="${h}" ${h == sel ? "selected" : ""}>${pad(h)}:00</option>`).join("");
-  return `<div class="home"><aside class="filter card soft"><h3 class="h3">Filter Jadwal</h3><p class="sub" style="margin-bottom:12px">Pilih waktu yang sesuai, kami tampilkan studio yang tersedia.</p>${calHTML("home", d)}
-<div class="trange"><div><label>Dari jam</label><select onchange="S.hFrom=+this.value;render()">${opt(0, from)}</select></div><div><label>Sampai jam</label><select onchange="S.hTo=+this.value;render()">${opt(0, to)}</select></div></div></aside>
-<section style="min-width:0"><h1 class="h1">Browse</h1><p class="sub">Temukan studio yang cocok sama selera kamu.</p><div class="grid3">${M.studios.map(studioCard).join("")}</div>
-<div class="row sp" style="margin-top:36px"><h2 class="h2">Paket</h2><button class="btn sm ghost" onclick="go('packages')">Lihat semua paket ${ic("right", 16)}</button></div><p class="sub">Pilih paket saat memesan — harga sudah termasuk diskon yang berlaku.</p><div class="pk-grid">${pkgCards()}</div></section></div>`;
-};
+// ---------- chip jam di kartu studio dan Book Now (data-action booking:quickBook / booking:start lewat legacy-actions.js; fase 5b: BookingController) ----------
 // paket pilihan (dari Pilihan Paket atau pilihan sebelumnya) dipakai bila masih aktif; bila sudah dinonaktifkan/dihapus admin: popup Paket Foto Tidak Ditemukan
 function ensurePkg(next) { if (S.pkg && !M.packages.find(p => p.id == S.pkg)) { pkgMissing(next); return false; } if (!S.pkg) S.pkg = M.packages[0].id; return true; }
 function quickBook(sid, date, h) { if (!ensurePkg(() => quickBook(sid, date, h))) return; BK.rescheduleId = null; S.draft = null; Object.assign(BK, { studio: sid, date, slot: `${date} ${h}:00` }); go("time"); }
 function startBook(sid) { if (!ensurePkg(() => startBook(sid))) return; BK.rescheduleId = null; S.draft = null; Object.assign(BK, { studio: sid, date: S.hDate || todayS(), slot: null }); go("time"); }
+
 
 // ---------- Pilihan Paket (Figma 660:5062) ----------
 const pkgDesc = p => `${p.photo_count} foto · ${p.dur} menit${p.strip_size ? " · cetak " + esc(p.strip_size) : ""}`;
@@ -68,24 +53,11 @@ async function pkgMissing(next, booking = false) {
   else if (v && M.packages.find(p => p.id == v)) { S.pkg = +v; save(); if (next) next(); else render(); }
 }
 // error API "Paket tidak valid": muat ulang data master; bila paket memang sudah tidak aktif, tampilkan popup (true), selain itu biarkan pemanggil menampilkan pesan error
-async function onPkgErr(e, next) { if (e.status != 400 || !/^Paket(\/studio)? tidak valid/.test(e.message)) return false; await refreshMaster(); if (M.packages.find(p => p.id == S.pkg)) return false; pkgMissing(next, true); return true; }
+async function onPkgErr(e, next) { if (e.status != 400 || !/^Paket(\/studio)? tidak valid/.test(e.message)) return false; await CONTROLLERS.studio.refreshMaster(); if (M.packages.find(p => p.id == S.pkg)) return false; pkgMissing(next, true); return true; }
 
-// ---------- detail studio + properti (hanya tampilan) ----------
+// ---------- studio tidak tersedia (Detail Studio sendiri: views/customer/studio.js) ----------
 // studio yang tidak tersedia/dihapus tidak bisa dibuka untuk dipesan (riwayat booking tetap memakai studioOf)
-const shown = id => isStudioShown(M, id), noStudio = (edit = false) => `<div class="panel"><div class="card center"><h1 class="h1">Studio tidak tersedia</h1><p class="sub">Studio ini sedang tidak dapat dipesan.</p><div style="margin-top:12px"><button class="btn" onclick="${edit && BK.rescheduleId ? `go('bdetail',{id:${BK.rescheduleId}})` : "go('home')"}">${edit && BK.rescheduleId ? "Kembali ke booking" : "Cari studio lain"}</button></div></div></div>`;
-V.studio = () => {
-  if (!shown(R.route.params.id)) return noStudio();
-  const s = studioOf(R.route.params.id), cat = S.pCat || "Semua", cats = ["Semua", ...new Set(M.properties.map(p => p.category || "Lainnya"))], list = M.properties.filter(p => cat === "Semua" || (p.category || "Lainnya") === cat);
-  const on = S.bm.includes(s.id);
-  return `<button class="back" onclick="go('home')">${ic("left", 16)} Kembali</button>
-<div class="sdet"><div class="left stack"><div class="bigcard"><div class="simg" style="${bgi(s.img)}"></div><div class="sbody"><div class="row sp" style="flex-wrap:nowrap"><h1 class="h2">${esc(s.name)}</h1><button class="star ${on ? "on" : ""}" aria-label="Favorit" onclick="toggleBm(${s.id})">${icf("star", 20)}</button></div>
-<p class="desc" style="-webkit-line-clamp:6">${esc(s.description)}</p><div class="row" style="margin-top:6px;color:var(--muted-2);font-size:12px">${ic("pin", 14)} ${esc(s.address || "-")}</div>
-<div class="row sp" style="margin-top:12px"><button class="btn" onclick="startBook(${s.id})">Book Now</button><div class="meta" style="margin:0"><span>${ic("users", 14)} ${esc(capLabel(s))}</span><span>${ic("tag", 14)} ${priceRange(s)}</span></div></div></div></div>
-</div>
-<div><h2 class="h2">Properti</h2><p class="sub">Background dan aksesori yang tersedia di studio ini.</p>
-<div class="tabsx">${cats.map(c => `<button class="tabx ${c === cat ? "on" : ""}" onclick="S.pCat='${esc(c)}';render()">${esc(c)}</button>`).join("")}</div>
-<div class="props">${list.map(p => { const off = p.qty <= 0; return `<div class="prop ${off ? "off" : ""}">${propVisual(p)}<div class="pinfo"><b>${esc(p.name)}</b><small>${off ? "Habis" : "Qty. " + p.qty}</small></div></div>`; }).join("") || '<p class="m">Belum ada properti.</p>'}</div></div></div>`;
-};
+const shown = id => isStudioShown(M, id), noStudio = (edit = false) => studioUnavailable({ rescheduleId: edit ? BK.rescheduleId : null }).markup;
 
 // ---------- booking: langkah 1 (tanggal & waktu) ----------
 V.time = () => {
@@ -127,13 +99,13 @@ async function bookingErr(e, next) {
 }
 const mIcon = (n, cls = "no") => modalIcon(n, cls).markup; // components/modal.js
 // kembali ke langkah Pilih Tanggal & Waktu dengan sesi dikosongkan dan ketersediaan dimuat ulang
-function backToTime() { BK.slot = null; BK.quote = null; R.availability = {}; if (R.route.name === "time") { render(); prefetch(); } else go("time"); }
+function backToTime() { BK.slot = null; BK.quote = null; R.availability = {}; if (R.route.name === "time") render(); else go("time"); } // render memicu prefetch jam kosong (kait route.after)
 async function inputInvalid() {
   await modal({ title: "Input Tidak Valid", cls: "center", kicker: mIcon("alert"), body: "<p>Input booking tidak lengkap atau tidak valid. Pilih tanggal dan sesi terlebih dahulu.</p>", buttons: [{ label: "Pilih Tanggal & Sesi", value: 1, icon: "calendar" }] });
   if (R.route.name !== "time") backToTime();
 }
 async function sesiGone() {
-  const lbl = BK.slot ? slotLabel(parseSlot(BK.slot).h) : ""; await refreshMaster(); const st = shown(BK.studio);
+  const lbl = BK.slot ? slotLabel(parseSlot(BK.slot).h) : ""; await CONTROLLERS.studio.refreshMaster(); const st = shown(BK.studio);
   await modal({ title: "Sesi Tidak Tersedia", cls: "center", kicker: mIcon("clock"), body: st ? `<p>Sesi ${lbl} tidak lagi tersedia. Silakan pilih sesi lain.</p>` : "<p>Studio ini sedang tidak tersedia. Silakan pilih studio lain.</p>",
     buttons: [st ? { label: "Pilih Sesi Lain", value: 1, icon: "calendar" } : { label: "Cari Studio Lain", value: 1, icon: "search" }] });
   if (st) backToTime(); else { BK.slot = null; BK.quote = null; go(BK.rescheduleId ? "bdetail" : "home", BK.rescheduleId ? { id: BK.rescheduleId } : {}); if (BK.rescheduleId) BK.rescheduleId = null; }
@@ -274,4 +246,4 @@ V.account = () => {
   return `<div class="panel"><h1 class="h1">Pengaturan Akun</h1><div class="seg">${tabs.map(t => `<button class="${t[0] == tab ? "on" : ""}" onclick="go('account',{tab:'${t[0]}'})">${t[1]}</button>`).join("")}</div>${body}<div style="margin-top:18px"><button class="btn ghost" onclick="logout()">${ic("logout", 16)} Keluar</button></div></div>`;
 };
 async function saveProfile() { R.toast.message = R.toast.error = ""; try { const r = await API.patch("/me", { name: $("#pn").value, phone: $("#pp").value }); S.user = { ...S.user, ...r }; save(); R.toast.message = "Profil disimpan."; } catch (e) { R.toast.error = e.message; } render(); }
-export { PAYLBL, bgi, calNav, calPick, choosePkg, confirmPay, doCancel, kvs, mailInv, nextTime, openCancel, payNow, pkgCards, qr, quickBook, resumeDraft, saveProfile, selectPkg, startBook, startReschedule, toggleBm };
+export { PAYLBL, calNav, calPick, choosePkg, confirmPay, doCancel, kvs, mailInv, nextTime, openCancel, payNow, qr, quickBook, resumeDraft, saveProfile, selectPkg, startBook, startReschedule };

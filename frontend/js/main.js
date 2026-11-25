@@ -3,14 +3,19 @@
 // untuk atribut onclick lama, lalu menjalankan isi boot.js lama: muat data master, tautan #reset= (router), pulihkan login, render pertama.
 import { API_BASE } from "./config.js";
 import { createStore } from "./core/store.js";
-import { createRouter } from "./core/router.js";
+import { ROUTES, createRouter } from "./core/router.js";
 import { createEvents } from "./core/events.js";
 import { createRenderer, installShellActions } from "./core/render.js";
 import { createApi } from "./models/api.js";
-import { loadMaster } from "./models/master.js";
+import * as masterModel from "./models/master.js";
+import * as studioModel from "./models/studio.js";
+import { openModal } from "./components/modal.js";
+import { createStudioController } from "./controllers/StudioController.js";
+import { browseView } from "./views/customer/browse.js";
+import { studioView } from "./views/customer/studio.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
 import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell, refresh, logout } from "./legacy/core.js";
-import "./legacy/customer.js";
+import { calNav, calPick } from "./legacy/customer.js";
 import "./legacy/landing.js";
 import { P } from "./legacy/session.js";
 import { AD, aDenied } from "./legacy/admin.js";
@@ -26,13 +31,65 @@ function browserStorage(name = "localStorage") {
   }
 }
 
+// UI untuk controller: dialog, toast (runtime.toast, tampil di outlet), buka tautan (WhatsApp di tab baru, mailto di tab ini)
+function createUi(store) {
+  return {
+    modal: openModal,
+    toast: message => store.update("runtime", { toast: { message, error: "" } }),
+    openUrl: (url, { newTab = false } = {}) => {
+      if (newTab) {
+        window.open(url, "_blank");
+      } else {
+        window.location.href = url;
+      }
+    },
+  };
+}
+
+// halaman yang sudah MVC: view (state, match) → Safe dan kait after(match) per path rute; rute lain masih memakai V.<view> lama
+function pagesFor({ studio }) {
+  const showAvailability = () => studio.prefetchAvailability();
+  return {
+    "/browse": {
+      view: browseView,
+      after: () => {
+        studio.refreshMaster();
+        showAvailability();
+      },
+    },
+    "/studios/:id": { view: studioView, after: () => studio.refreshMaster() },
+    // langkah Pilih Waktu masih kode lama sampai fase 5b, jam kosongnya sudah dari StudioController
+    "/book/time": { after: showAvailability },
+    "/bookings/:id/reschedule": { after: showAvailability },
+  };
+}
+
+// aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu, fase 5b)
+function controllerActions({ studio }) {
+  return {
+    "studio:toggleBookmark": studio.toggleBookmark,
+    "studio:setHourFrom": studio.setHourFrom,
+    "studio:setHourTo": studio.setHourTo,
+    "studio:setPropertyCategory": studio.setPropertyCategory,
+    "calendar:month": dataset => (dataset.context === "home" ? studio.moveMonth(dataset) : calNav(dataset.context, Number(dataset.step))),
+    "calendar:pick": dataset => (dataset.context === "home" ? studio.pickDate(dataset) : calPick(dataset.context, dataset.date)),
+  };
+}
+
 async function start() {
   const storage = browserStorage();
   const api = createApi({ base: API_BASE, storage });
   // booking berjalan (studio, tanggal, sesi, id reschedule; tanpa quote) bertahan saat dimuat ulang, hanya di tab ini (decisions.md 26)
   const session = { storage: browserStorage("sessionStorage"), key: "snapia_booking", slices: { booking: ["studio", "date", "slot", "rescheduleId"] } };
   const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: P, admin: AD }, { storage, persistKey: "snapia", session });
+  const ui = createUi(store);
+  const navigation = { navigate: path => goPath(path) };
+  const models = { master: masterModel, studio: studioModel };
+  const controllers = { studio: createStudioController({ api, store, ui, router: navigation, models }) };
+  const pages = pagesFor(controllers);
+  const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({
+    routes,
     history: window.history,
     location: window.location,
     events: window,
@@ -55,8 +112,9 @@ async function start() {
     },
   });
   // shell sekali per rute, outlet setiap render (core/render.js); kait-kaitnya masih kode lama (V.<view>, toast, header admin)
-  const renderer = createRenderer({ root: document.getElementById("app"), resolve: () => router.resolve(), before: renderBefore, shell: renderShell, outlet: renderContent, after: renderAfter });
-  connectLegacy({ api, store, router, renderer });
+  const outlet = match => renderContent(match, match.route.view ? match.route.view(store.get(), match) : null);
+  const renderer = createRenderer({ root: document.getElementById("app"), resolve: () => router.resolve(), before: renderBefore, shell: renderShell, outlet, after: renderAfter });
+  connectLegacy({ api, store, router, renderer, controllers });
   installLegacyBridge();
   renderer.start(store);
 
@@ -64,10 +122,11 @@ async function start() {
   const events = createEvents({ navigate: path => goPath(path) });
   installShellActions({ registerActions: events.registerActions, document });
   registerLegacyActions(events.registerActions);
+  events.registerActions(controllerActions(controllers));
   events.startEvents(document);
 
   try {
-    store.update("master", await loadMaster(api), { silent: true });
+    store.update("master", await masterModel.loadMaster(api), { silent: true });
   } catch (error) {
     $("#app").innerHTML = "<p style='padding:24px'>Server API tidak dapat dihubungi. Jalankan backend: <code>cd backend && npm start</code></p>";
     return;
