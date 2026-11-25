@@ -9,12 +9,21 @@ function adminShell(inner) {
   return `<div class="adm"><aside class="side"><h3>Admin</h3>${AMENU.map(m => `<button class="${S.view == m[0] ? "on" : ""}" onclick="go('${m[0]}')">${ic(m[2], 20)} ${m[1]}</button>`).join("")}<div class="foot"><div class="sm m" style="margin:0 6px 8px">${esc(BRAND)}</div><button onclick="logout()">${ic("logout", 20)} Keluar</button></div></aside>
 <main class="amain">${AD.me && AD.me.must_change ? `<div class="toast err">⚠ Anda masih memakai password bawaan. Ganti password sekarang — fitur admin lain terkunci sampai password diganti.</div>` : ""}<div class="ahead"><h1>${(typeof ATITLE[S.view] == "function" ? ATITLE[S.view]() : ATITLE[S.view]) || ""}</h1>${SEARCHABLE.includes(S.view) ? `<div class="search">${ic("search", 18)}<input placeholder="Search..." value="${esc(AD.q)}" onchange="AD.q=this.value;render()"></div>` : ""}</div>${toasts()}${inner}</main></div>`;
 }
+// galat otorisasi admin: 401 = sesi habis -> keluar seperti biasa; 403 "Hanya admin" (token bukan akun admin) -> dialog Akses Ditolak (Figma 593:4971, keputusan 38).
+// 403 lain (mis. "Password saat ini salah") bukan urusan akses: ditampilkan sebagai galat biasa. true bila sudah ditangani
+const aAuthErr = (e, what) => { if (e.status == 401) { logout(); return true; } if (e.status == 403 && /Hanya admin/.test(e.message)) { aDenied(what); return true; } return false; };
+let aDenyOpen = false;
+async function aDenied(what = "Hanya admin yang dapat membuka halaman admin.") { // what = kalimat pertama (Figma: "Hanya admin yang dapat menambahkan studio.")
+  if (aDenyOpen) return; aDenyOpen = true; logout(); // keluar dulu: data admin tidak tertinggal di balik dialog
+  const v = await modal({ title: "Akses ditolak", body: `<p>${esc(what)} Akun yang sedang masuk adalah akun pelanggan. Masuk dengan akun admin untuk melanjutkan.</p>`, buttons: [{ label: "Kembali ke Beranda", value: "home", style: "ghost" }, { label: "Masuk sebagai Admin", value: "login" }] });
+  aDenyOpen = false; if (v !== "home") openAuth("login"); // Escape / klik di luar: ke form masuk
+}
 async function aLoad(k, fn, def) {
   if (AD[k] || AD.loading[k]) return; AD.loading[k] = 1;
-  try { AD[k] = await fn(); } catch (e) { if (e.status == 403 && /Ganti password/.test(e.message)) { AD.loading[k] = 0; if (AD.me) AD.me.must_change = true; return go('aacct'); } if (e.status == 401 || e.status == 403) { AD.loading[k] = 0; return logout(); } err = e.message; AD[k] = def; }
+  try { AD[k] = await fn(); } catch (e) { if (e.status == 403 && /Ganti password/.test(e.message)) { AD.loading[k] = 0; if (AD.me) AD.me.must_change = true; return go('aacct'); } if (aAuthErr(e)) { AD.loading[k] = 0; return; } err = e.message; AD[k] = def; }
   AD.loading[k] = 0; render();
 }
-async function aDo(fn, ok, what) { msg = err = ""; AD.stdone = null; const sn = snap(); let failed = false; try { await fn(); if (ok) msg = ok; } catch (e) { if (e.status == 401 || e.status == 403) return logout(); err = e.message; failed = true; } render(); if (failed) restore(sn); }
+async function aDo(fn, ok, what) { msg = err = ""; AD.stdone = null; const sn = snap(); let failed = false; try { await fn(); if (ok) msg = ok; } catch (e) { if (e.status == 403 && /Ganti password/.test(e.message)) return logout(); if (aAuthErr(e, what)) return; err = e.message; failed = true; } render(); if (failed) restore(sn); }
 // simpan & pulihkan isian form agar tidak hilang saat tampilan dirender ulang (unggah gambar / error validasi)
 const snap = () => { const o = {}; document.querySelectorAll('.amain [id]').forEach(e => { if ('value' in e && e.type !== 'file') o[e.id] = e.value; }); return o; };
 const restore = o => Object.keys(o).forEach(id => { const e = document.getElementById(id); if (e && 'value' in e && e.type !== 'file') e.value = o[id]; });
@@ -104,7 +113,7 @@ V.astudio_after = () => { aLoad("studios", () => API.get("/admin/studios"), []);
 const masterReload = async () => { const m = await API.get("/master"); STUDIOS = m.STUDIOS; ALLSTUDIOS = m.ALLSTUDIOS || m.STUDIOS; };
 const stRead = n => { const p = val(`st${n}p`); return { name: val(`st${n}n`), status: val(`st${n}s`), description: val(`st${n}d`), address: val(`st${n}a`), price: p === "" ? 0 : +p, people_range_id: +val(`st${n}r`), budget_range_id: +val(`st${n}b`) }; };
 const studioSave = id => aDo(async () => { const k = "s" + id, b = stRead(id); b.price = b.price || 0; if (AD.imgs[k]) b.img = AD.imgs[k];
-  await API.patch("/admin/studios/" + id, b); delete AD.imgs[k]; AD.studios = null; await masterReload(); }, "Studio disimpan.", "mengubah studio"); // ubah studio: satu langkah
+  await API.patch("/admin/studios/" + id, b); delete AD.imgs[k]; AD.studios = null; await masterReload(); }, "Studio disimpan.", "Hanya admin yang dapat mengubah studio."); // ubah studio: satu langkah
 // Tambah Studio: form -> Ringkasan Studio (Figma 592:4329) -> Berhasil (592:4689). Validasi lokal = aturan server + gambar wajib (Figma); server tetap penentu akhir
 function stReview() {
   const b = stRead("N"), nm = String(b.name || "").trim(), e = {}; msg = err = ""; AD.stdone = null; AD.stnew = b;
@@ -130,7 +139,7 @@ const stSave = () => aDo(async () => { const b = { ...AD.stnew, name: AD.stnew.n
     else throw e; AD.stsum = null; return; }
   delete AD.imgs.sN; AD.open.N = false; AD.open[r.id] = true; AD.stnew = AD.stsum = AD.sterr = null;
   AD.stdone = { title: "Studio berhasil ditambahkan", text: b.status == "UNAVAILABLE" ? `${b.name} disimpan dengan status Tidak tersedia, belum tampil di daftar studio pelanggan.` : `${b.name} tersedia dan tampil di daftar studio pelanggan.` };
-  AD.studios = null; await masterReload(); }, "", "menambahkan studio");
+  AD.studios = null; await masterReload(); }, "", "Hanya admin yang dapat menambahkan studio.");
 const studioImpactText = i => `Studio ini memiliki ${i.sessions} sesi dan ${i.active_bookings} booking aktif${i.paid_bookings ? ` (${i.paid_bookings} sudah dibayar, total refund ${rp(i.refund_total)})` : ""}. ${i.active_bookings ? "Setelah dikonfirmasi, seluruh booking aktif dibatalkan dan dana yang sudah dibayar dikembalikan 100% kepada pelanggan. " : ""}Studio beserta sesinya tidak lagi tampil, tetapi riwayat booking tetap tersimpan.`;
 const studioDel = id => { const s = (AD.studios || []).find(x => x.id == id); if (!s) return;
   aDo(async () => { const r = await aConfirmDel("/admin/studios/" + id, `Hapus ${s.name}?`, studioImpactText, "Ya, Hapus Studio", s.impact); if (!r) return;
@@ -140,7 +149,7 @@ const studioDel = id => { const s = (AD.studios || []).find(x => x.id == id); if
 // ---------- Sesi studio (panel "Detail Sesi" di accordion studio, Figma): kalender bulan + chip jam per hari ----------
 const sMonth = sid => AD.scal[sid] || todayS().slice(0, 7), sDayOf = sid => AD.sday[sid] || todayS(), sKey = sid => sid + "|" + sMonth(sid);
 async function sessLoad(sid) { const k = sKey(sid); if (AD.sess[k] || AD.loading["s" + k]) return; AD.loading["s" + k] = 1;
-  try { AD.sess[k] = await API.get(`/admin/studios/${sid}/sessions?month=${sMonth(sid)}`); } catch (e) { if (e.status == 401 || e.status == 403) { AD.loading["s" + k] = 0; return logout(); } err = e.message; AD.sess[k] = []; }
+  try { AD.sess[k] = await API.get(`/admin/studios/${sid}/sessions?month=${sMonth(sid)}`); } catch (e) { if (aAuthErr(e)) { AD.loading["s" + k] = 0; return; } err = e.message; AD.sess[k] = []; }
   AD.loading["s" + k] = 0; render(); }
 const sNav = (sid, dir) => { let [y, m] = sMonth(sid).split("-").map(Number); m += dir; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } const mo = `${y}-${pad(m)}`; AD.scal[sid] = mo; AD.sday[sid] = todayS().startsWith(mo) ? todayS() : mo + "-01"; AD.sedit = AD.sadd = null; render(); }; // hari terpilih ikut pindah bulan
 const sDay = (sid, ds) => { AD.sday[sid] = ds; AD.sedit = AD.sadd = null; render(); };
