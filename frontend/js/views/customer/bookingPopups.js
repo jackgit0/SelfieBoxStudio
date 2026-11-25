@@ -1,5 +1,6 @@
 // Popup galat Create Booking (Figma 585:3886, 585:4061, 585:4358, 585:4400) dan "Booking Gagal": opsi openModal untuk BookingController.
 // View murni; teks sama dengan kode lama (inputInvalid, sesiGone, sesiBooked, needLogin, bookingErr di customer.js).
+// Juga dua modal konfirmasi Booking Saya (dulu dialog bawaan browser, decisions.md 4, 27, 57): resolve true bila tombol aksi ditekan.
 // Paket Tidak Ditemukan (585:4251) ada di views/customer/packages.js (PackageController).
 import { html } from "../../core/html.js";
 import { modalIcon } from "../../components/modal.js";
@@ -54,5 +55,23 @@ export function bookingFailedModal(message) {
     kicker: modalIcon("alert"),
     body: html`<p>${message}</p>`,
     buttons: [{ label: "Tutup", value: null }],
+  };
+}
+
+// Batalkan booking (BookingController.cancel); "Kembali" agar tidak bersanding "Batal" dengan "Batalkan"
+export function cancelConfirmModal() {
+  return {
+    title: "Konfirmasi Pembatalan",
+    body: html`<p>Yakin membatalkan booking ini?</p>`,
+    buttons: [{ label: "Kembali", value: false, style: "ghost" }, { label: "Ya, Batalkan", value: true }],
+  };
+}
+
+// Bayar booking yang tertunda dari Detail Booking (PaymentController.payNow)
+export function payConfirmModal() {
+  return {
+    title: "Konfirmasi Pembayaran",
+    body: html`<p>Bayar sekarang via QRIS (simulasi)?</p>`,
+    buttons: [{ label: "Batal", value: false, style: "ghost" }, { label: "Bayar", value: true }],
   };
 }

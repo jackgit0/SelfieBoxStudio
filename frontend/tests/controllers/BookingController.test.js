@@ -4,6 +4,7 @@ import { createStore } from "../../js/core/store.js";
 import { createBookingController } from "../../js/controllers/BookingController.js";
 import { createPackageController } from "../../js/controllers/PackageController.js";
 import * as bookingModel from "../../js/models/booking.js";
+import * as photoSessionModel from "../../js/models/photoSession.js";
 import { createFakeApi } from "../helpers/fakeApi.js";
 import { createFakeStorage } from "../helpers/fakeStorage.js";
 import { createFakeUi } from "../helpers/fakeUi.js";
@@ -13,7 +14,7 @@ const now = new Date(2026, 10, 25, 9, 30);
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
 // state: route = nama rute aktif (time / pay); log mencatat urutan render, modal, navigasi
-function setup({ persisted = {}, booking = {}, runtime = {}, route = "time", responses = {}, modalAnswers = [], afterRefreshMaster = null } = {}) {
+function setup({ persisted = {}, booking = {}, runtime = {}, route = "time", responses = {}, modalAnswers = [], afterRefreshMaster = null, ownRefresh = false } = {}) {
   const state = sampleState({ persisted: { pkg: 1, ...persisted }, booking: { studio: 1, date: "2026-11-27", ...booking }, runtime: { route: { name: route, path: "/book/" + route, params: {}, query: {} }, ...runtime } });
   state.data = { bookings: [{ id: 7, studio: 2, date: "2026-11-30 13:00", status: "Terbayar" }], sessions: [{ id: 1 }] };
   const storage = createFakeStorage();
@@ -43,7 +44,8 @@ function setup({ persisted = {}, booking = {}, runtime = {}, route = "time", res
     refreshes++;
   };
   const packages = createPackageController({ store, ui, router, config: { wa: "", email: "" }, refreshMaster });
-  const controller = createBookingController({ api, store, ui, router, models: { booking: bookingModel }, packages, refreshMaster, refresh, now: () => now });
+  // ownRefresh = refresh bawaan controller (refreshData lewat model), bukan tiruan penghitung
+  const controller = createBookingController({ api, store, ui, router, models: { booking: bookingModel, photoSession: photoSessionModel }, packages, refreshMaster, refresh: ownRefresh ? undefined : refresh, now: () => now });
   return { store, api, ui, log, controller, storage, sessionStorage, refreshes: () => refreshes, masterRefreshes: () => masterRefreshes };
 }
 
@@ -266,4 +268,80 @@ test("moveMonth berangkat dari bulan tanggal booking; memulai booking/reschedule
     await run(controller);
     assert.deepEqual(store.get().runtime.calendar, { home: { year: 2026, month: 11 } });
   }
+});
+
+// ---------- Booking Saya, pembatalan (refactor MVC fase 6) ----------
+
+test("refreshData: GET /bookings lalu GET /sessions ke slice data tanpa render (dulu refresh() di core.js)", async () => {
+  const { store, api, log, controller } = setup({ responses: { "GET /bookings": { body: [{ id: 3 }] }, "GET /sessions": { body: [{ id: 8, photos: [{ id: 1, img: "" }] }] } } });
+  api.imageUrl = id => `/img/${id}`;
+  await controller.refreshData();
+  assert.deepEqual(api.calls.map(call => call.path), ["/bookings", "/sessions"]);
+  assert.deepEqual(store.get().data.bookings, [{ id: 3 }]);
+  assert.equal(store.get().data.sessions[0].photos[0].img, "/img/1");
+  assert.deepEqual(log, []);
+});
+
+test("openCancel: isian pembatalan dikosongkan lalu ke /bookings/:id/cancel", () => {
+  const { store, log, controller } = setup({ runtime: { cancel: { reason: "Pemesanan ganda", detail: "lama" } } });
+  controller.openCancel({ id: "7" });
+  assert.deepEqual(store.get().runtime.cancel, { reason: "", detail: "" });
+  assert.deepEqual(log, ["navigate:/bookings/7/cancel"]);
+});
+
+test("setCancelReason merender ulang; setCancelDetail diam (textarea tidak dirender ulang saat mengetik)", () => {
+  const { store, log, controller } = setup({ runtime: { cancel: { reason: "", detail: "" } } });
+  controller.setCancelReason({ reason: "Pembatalan lainnya" });
+  assert.deepEqual(log, ["render"]);
+  controller.setCancelDetail({}, { target: { value: "Sakit" } });
+  assert.deepEqual(log, ["render"]);
+  assert.deepEqual(store.get().runtime.cancel, { reason: "Pembatalan lainnya", detail: "Sakit" });
+});
+
+test("cancel: modal Konfirmasi Pembatalan; Kembali / ditutup → tidak ada POST", async () => {
+  for (const answer of [false, null]) {
+    const { api, log, controller } = setup({ runtime: { cancel: { reason: "Tidak ada waktu", detail: "" } }, modalAnswers: [answer] });
+    await controller.cancel({ id: "7" });
+    assert.deepEqual(log, ["modal:Konfirmasi Pembatalan"]);
+    assert.deepEqual(api.calls, []);
+  }
+  const { ui: shown, controller } = setup({ runtime: { cancel: { reason: "Tidak ada waktu", detail: "" } } });
+  await controller.cancel({ id: "7" });
+  assert.equal(String(shown.modals[0].body), "<p>Yakin membatalkan booking ini?</p>");
+  assert.deepEqual(shown.modals[0].buttons.map(button => [button.label, button.value]), [["Kembali", false], ["Ya, Batalkan", true]]);
+});
+
+test("cancel: Ya → POST alasan, hasil disimpan, data dimuat ulang, halaman refund", async () => {
+  const result = { ok: true, refund: { state: "refunded", amount: 90000, at: 1, min_hours: 2 } };
+  const { store, api, log, controller, refreshes } = setup({ runtime: { cancel: { reason: "Pembatalan lainnya", detail: "Sakit" } }, modalAnswers: [true], responses: { "POST /bookings/7/cancel": { body: result } } });
+  await controller.cancel({ id: "7" });
+  assert.deepEqual(api.calls, [{ method: "POST", path: "/bookings/7/cancel", body: { reason: "Pembatalan lainnya", detail: "Sakit" } }]);
+  assert.deepEqual(store.get().persisted.cancelRes, result);
+  assert.equal(refreshes(), 1);
+  assert.deepEqual(log, ["modal:Konfirmasi Pembatalan", "navigate:/bookings/7/refund"]);
+});
+
+test("cancel: galat server → toast galat, tetap di halaman", async () => {
+  const { store, log, controller } = setup({ runtime: { cancel: { reason: "Tidak ada waktu", detail: "" } }, modalAnswers: [true], responses: { "POST /bookings/7/cancel": { status: 409, body: { error: "Booking tidak dapat dibatalkan" } } } });
+  await controller.cancel({ id: "7" });
+  assert.equal(store.get().runtime.toast.error, "Booking tidak dapat dibatalkan");
+  assert.deepEqual(log, ["modal:Konfirmasi Pembatalan", "render"]);
+});
+
+test("syncReschedule: /bookings/:id/reschedule dibuka langsung memulai ubah jadwal (bila bisa diubah); /book/time melepasnya (dulu legacy/core.js)", () => {
+  const { store, log, controller } = setup({ booking: { rescheduleId: null, studio: 1, date: "2026-11-27", slot: "2026-11-27 10:00" }, runtime: { calendar: { book: { year: 2026, month: 10 }, home: { year: 2026, month: 10 } } } });
+  controller.syncReschedule(7);
+  assert.deepEqual(store.get().booking, { rescheduleId: 7, studio: 2, date: "2026-11-30", slot: null, quote: null });
+  assert.deepEqual(store.get().runtime.calendar, { home: { year: 2026, month: 10 } });
+  store.update("booking", { slot: "2026-11-30 15:00" }, { silent: true });
+  controller.syncReschedule(7);
+  assert.equal(store.get().booking.slot, "2026-11-30 15:00");
+  controller.syncReschedule(null);
+  assert.equal(store.get().booking.rescheduleId, null);
+  controller.syncReschedule(99);
+  assert.equal(store.get().booking.rescheduleId, null);
+  store.get().data.bookings[0].status = "Selesai";
+  controller.syncReschedule(7);
+  assert.equal(store.get().booking.rescheduleId, null);
+  assert.deepEqual(log, []);
 });

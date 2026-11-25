@@ -148,3 +148,31 @@ test("loadMissingQuote dengan galat: kembali ke Pilih Waktu lalu popup", async (
   assert.equal(log[0], "navigate:/book/time");
   assert.ok(log.includes("modal:Sesi Tidak Tersedia"));
 });
+
+// ---------- Bayar booking tertunda dari Detail Booking (refactor MVC fase 6) ----------
+
+test("payNow: modal Konfirmasi Pembayaran; Batal / ditutup → tidak ada POST", async () => {
+  for (const answer of [false, null]) {
+    const { api, log, ui, controller } = setup({ modalAnswers: [answer] });
+    await controller.payNow({ id: "12" });
+    assert.deepEqual(log, ["modal:Konfirmasi Pembayaran"]);
+    assert.deepEqual(api.calls, []);
+    assert.equal(String(ui.modals[0].body), "<p>Bayar sekarang via QRIS (simulasi)?</p>");
+    assert.deepEqual(ui.modals[0].buttons.map(button => [button.label, button.value]), [["Batal", false], ["Bayar", true]]);
+  }
+});
+
+test("payNow: Bayar → POST QRIS, data dimuat ulang, Detail Pembayaran tertutup, halaman sukses", async () => {
+  const { api, log, store, controller } = setup({ persisted: { payOpen: true, method: "Transfer Bank" }, modalAnswers: [true], responses: { "POST /bookings/12/pay": { body: { status: "Terbayar" } } } });
+  await controller.payNow({ id: "12" });
+  assert.deepEqual(api.calls, [{ method: "POST", path: "/bookings/12/pay", body: { method: "QRIS" } }]);
+  assert.deepEqual(log, ["modal:Konfirmasi Pembayaran", "refresh", "navigate:/bookings/12/success"]);
+  assert.equal(store.get().persisted.payOpen, false);
+});
+
+test("payNow: galat server → toast galat", async () => {
+  const { store, log, controller } = setup({ modalAnswers: [true], responses: { "POST /bookings/12/pay": { status: 400, body: { error: "Pembayaran sudah kedaluwarsa" } } } });
+  await controller.payNow({ id: "12" });
+  assert.equal(store.get().runtime.toast.error, "Pembayaran sudah kedaluwarsa");
+  assert.deepEqual(log, ["modal:Konfirmasi Pembayaran", "render"]);
+});

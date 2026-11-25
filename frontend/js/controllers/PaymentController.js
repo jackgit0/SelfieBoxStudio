@@ -1,8 +1,9 @@
 // PaymentController (tabel MVC APS): langkah Paket & Pembayaran (pilih paket, metode, quote), Check Out, Detail Pembayaran di halaman
-// sukses, dan invoice lewat email (dulu selectPkg, V.pay_after, confirmPay, mailInv di customer.js). Bayar booking yang tertunda
-// (payNow) menyusul di fase 6. Metode data-* menerima (dataset, event) dari core/events.js.
+// sukses, invoice lewat email, dan Bayar booking yang tertunda dari Detail Booking dengan modal konfirmasi (dulu selectPkg, V.pay_after,
+// confirmPay, mailInv, payNow di customer.js). Metode data-* menerima (dataset, event) dari core/events.js.
 // booking = BookingController (popup galat, popup Belum Login, mengosongkan booking berjalan); refresh = muat ulang booking dan sesi foto.
 import { isStudioShown } from "../models/master.js";
+import { payConfirmModal } from "../views/customer/bookingPopups.js";
 
 const DEFAULT_METHOD = "QRIS";
 
@@ -70,6 +71,23 @@ export function createPaymentController({ api, store, ui, router, models, bookin
         toast.error = error.message;
       }
       store.update("runtime", { toast });
+    },
+
+    // Bayar di Detail Booking (data-id): modal Konfirmasi Pembayaran → bayar QRIS (simulasi) → muat ulang data → halaman sukses
+    async payNow(dataset) {
+      const id = Number(dataset.id);
+      if ((await ui.modal(payConfirmModal())) !== true) {
+        return;
+      }
+      try {
+        await paymentModel.pay(api, id, DEFAULT_METHOD);
+        await refresh();
+      } catch (error) {
+        store.update("runtime", { toast: { message: "", error: error.message } });
+        return;
+      }
+      store.update("persisted", { payOpen: false }, { silent: true });
+      router.navigate(`/bookings/${id}/success`);
     },
 
     // kait after /book/pay: booking berjalan bertahan saat dimuat ulang (sessionStorage, decisions.md 26) tanpa quote, jadi quote diambil lagi

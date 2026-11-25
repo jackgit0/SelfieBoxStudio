@@ -11,6 +11,7 @@ import * as masterModel from "./models/master.js";
 import * as studioModel from "./models/studio.js";
 import * as bookingModel from "./models/booking.js";
 import * as paymentModel from "./models/payment.js";
+import * as photoSessionModel from "./models/photoSession.js";
 import { openModal } from "./components/modal.js";
 import { createStudioController } from "./controllers/StudioController.js";
 import { createPackageController } from "./controllers/PackageController.js";
@@ -23,8 +24,12 @@ import { timeView } from "./views/customer/time.js";
 import { payView } from "./views/customer/pay.js";
 import { successView } from "./views/customer/success.js";
 import { rescheduledView } from "./views/customer/rescheduled.js";
+import { bookingsView } from "./views/customer/bookings.js";
+import { bookingDetailView } from "./views/customer/bookingDetail.js";
+import { cancelView } from "./views/customer/cancel.js";
+import { refundView } from "./views/customer/refund.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
-import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell, refresh, logout } from "./legacy/core.js";
+import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell, logout } from "./legacy/core.js";
 import "./legacy/landing.js";
 import { P } from "./legacy/session.js";
 import { AD, aDenied } from "./legacy/admin.js";
@@ -75,6 +80,11 @@ function pagesFor({ studio, payment }, links) {
     "/book/pay": { view: payView, after: () => payment.loadMissingQuote() },
     "/bookings/:id/success": { view: (state, match) => successView(state, match, links) },
     "/bookings/:id/rescheduled": { view: rescheduledView },
+    // Booking Saya, detail, pembatalan dan hasil refund (BookingController, PaymentController.payNow)
+    "/bookings": { view: bookingsView },
+    "/bookings/:id": { view: (state, match) => bookingDetailView(state, match, links) },
+    "/bookings/:id/cancel": { view: cancelView },
+    "/bookings/:id/refund": { view: refundView },
   };
 }
 
@@ -86,11 +96,16 @@ function controllerActions({ studio, package: packages, booking, payment }) {
     "payment:confirm": payment.confirm,
     "payment:togglePaymentDetail": payment.togglePaymentDetail,
     "payment:emailInvoice": payment.emailInvoice,
+    "payment:payNow": payment.payNow,
     "booking:quickBook": booking.quickBook,
     "booking:start": booking.start,
     "booking:startReschedule": booking.startReschedule,
     "booking:pickSlot": booking.pickSlot,
     "booking:next": booking.next,
+    "booking:openCancel": booking.openCancel,
+    "booking:setCancelReason": booking.setCancelReason,
+    "booking:setCancelDetail": booking.setCancelDetail,
+    "booking:cancel": booking.cancel,
     "package:choose": packages.choose,
     "package:contactCs": packages.contactCs,
     "studio:toggleBookmark": studio.toggleBookmark,
@@ -110,11 +125,11 @@ async function start() {
   const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: P, admin: AD }, { storage, persistKey: "snapia", session });
   const ui = createUi(store);
   const navigation = { navigate: path => goPath(path) };
-  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel };
+  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel };
   const studio = createStudioController({ api, store, ui, router: navigation, models });
   const packages = createPackageController({ store, ui, router: navigation, config: { wa: CS_WA, email: CS_EMAIL }, refreshMaster: studio.refreshMaster });
-  const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster, refresh });
-  const payment = createPaymentController({ api, store, ui, router: navigation, models, booking, refresh });
+  const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster });
+  const payment = createPaymentController({ api, store, ui, router: navigation, models, booking, refresh: booking.refreshData });
   const controllers = { studio, package: packages, booking, payment };
   const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
@@ -173,7 +188,7 @@ async function start() {
       if (S.admin) {
         AD.me = await api.get("/admin/me");
       } else {
-        await refresh();
+        await booking.refreshData();
       }
     } catch (error) {
       if (S.admin && error.status == 403 && /Hanya admin/.test(error.message)) {

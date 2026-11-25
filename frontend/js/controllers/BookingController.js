@@ -1,14 +1,15 @@
 // BookingController (tabel MVC APS): langkah Pilih Tanggal & Waktu, ubah jadwal (reschedule), draf booking tamu, dan satu pemetaan
 // galat API → popup Create Booking (dulu quickBook, startBook, calNav/calPick "book", nextTime, resumeDraft, backToTime, bookingErr,
-// inputInvalid, sesiGone, sesiBooked, needLogin di customer.js). Booking Saya, detail dan pembatalan menyusul di fase 6.
+// inputInvalid, sesiGone, sesiBooked, needLogin di customer.js), lalu Booking Saya: memuat booking dan sesi foto milik user (refresh),
+// pembatalan dengan modal konfirmasi (openCancel, doCancel) dan ubah jadwal yang dibuka langsung lewat URL (syncReschedule di core.js).
 // Metode data-* menerima (dataset, event) dari core/events.js.
 // packages = PackageController (paket pilihan, popup Paket Tidak Ditemukan); refreshMaster = StudioController.refreshMaster;
-// refresh = muat ulang booking dan sesi foto milik user (refresh() kode lama sampai fase 6).
+// refresh (opsional, untuk tes) = pengganti refreshData.
 import { isoDate, parseSlot, slotLabel } from "../core/format.js";
 import { isStudioShown } from "../models/master.js";
 import { filterDate } from "../models/studio.js";
 import { monthOf, shiftMonth } from "../components/calendar.js";
-import { bookingFailedModal, inputInvalidModal, loginRequiredModal, sessionBookedModal, sessionGoneModal } from "../views/customer/bookingPopups.js";
+import { bookingFailedModal, cancelConfirmModal, inputInvalidModal, loginRequiredModal, sessionBookedModal, sessionGoneModal } from "../views/customer/bookingPopups.js";
 
 const EMPTY_BOOKING = { studio: null, date: null, slot: null, quote: null, rescheduleId: null };
 
@@ -26,8 +27,9 @@ export const BOOKING_ERRORS = [
   { name: "sessionGone", matches: error => ["Jadwal sudah lewat", "Studio tidak tersedia", "Paket/studio tidak valid"].includes(error.message), open: controller => controller.showSessionGone() },
 ];
 
-export function createBookingController({ api, store, ui, router, models, packages, refreshMaster, refresh, now = () => new Date() }) {
+export function createBookingController({ api, store, ui, router, models, packages, refreshMaster, refresh: refreshOverride, now = () => new Date() }) {
   const bookingModel = models.booking;
+  const refresh = () => (refreshOverride ? refreshOverride() : controller.refreshData());
   const state = () => store.get();
   const booking = () => state().booking;
 
@@ -226,6 +228,66 @@ export function createBookingController({ api, store, ui, router, models, packag
         store.update("data", { bookings: [], sessions: [] }, { silent: true });
       }
       router.navigate(answer === "register" ? "/register" : "/login");
+    },
+
+    // ---------- Booking Saya ----------
+
+    // booking dan sesi foto milik user yang masuk → slice data (tanpa render; pemanggil yang pindah halaman / merender)
+    async refreshData() {
+      const bookings = await bookingModel.listMine(api);
+      const sessions = await models.photoSession.listMine(api);
+      store.update("data", { bookings, sessions }, { silent: true });
+    },
+
+    // rute Pilih Waktu (setiap render): /bookings/:id/reschedule dibuka langsung (tab baru, tautan) memulai ubah jadwal booking itu
+    // bila masih bisa diubah; id kosong (/book/time) = bukan reschedule
+    syncReschedule(id) {
+      if (!id) {
+        store.update("booking", { rescheduleId: null }, { silent: true });
+        return;
+      }
+      if (booking().rescheduleId == id) {
+        return;
+      }
+      const existing = bookingModel.bookingById(state().data.bookings, id);
+      if (existing && bookingModel.canChange(existing)) {
+        forgetMonth();
+        store.update("booking", { rescheduleId: id, studio: existing.studio, date: parseSlot(existing.date).date, slot: null, quote: null }, { silent: true });
+      }
+    },
+
+    // Batalkan di Detail Booking (data-id): isian alasan dikosongkan
+    openCancel(dataset) {
+      store.update("runtime", { cancel: { reason: "", detail: "" } }, { silent: true });
+      router.navigate(`/bookings/${dataset.id}/cancel`);
+    },
+
+    // alasan pembatalan (data-reason): outlet dirender ulang (tombol menyala, textarea untuk "Pembatalan lainnya")
+    setCancelReason(dataset) {
+      store.update("runtime", { cancel: { ...state().runtime.cancel, reason: dataset.reason } });
+    },
+
+    // teks alasan lain (data-input): disimpan diam-diam agar textarea tidak dirender ulang saat mengetik
+    setCancelDetail(dataset, event) {
+      store.update("runtime", { cancel: { ...state().runtime.cancel, detail: event.target.value } }, { silent: true });
+    },
+
+    // Refund / Batalkan Booking (data-id): modal Konfirmasi Pembatalan → POST → muat ulang data → halaman hasil refund
+    async cancel(dataset) {
+      const id = Number(dataset.id);
+      if ((await ui.modal(cancelConfirmModal())) !== true) {
+        return;
+      }
+      const { reason, detail } = state().runtime.cancel;
+      try {
+        const result = await bookingModel.cancel(api, id, { reason, detail });
+        store.update("persisted", { cancelRes: result }, { silent: true });
+        await refresh();
+      } catch (error) {
+        store.update("runtime", { toast: { message: "", error: error.message } });
+        return;
+      }
+      router.navigate(`/bookings/${id}/refund`);
     },
   };
   return controller;

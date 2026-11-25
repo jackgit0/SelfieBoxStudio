@@ -5,7 +5,6 @@ import { esc, raw } from "../core/html.js";
 import { icon, iconFilled } from "../components/icon.js";
 import { openModal } from "../components/modal.js";
 import { renderToasts } from "../components/toast.js";
-import { parseSlot } from "../core/format.js";
 import * as masterModel from "../models/master.js";
 import { legacyPath } from "../core/router.js";
 import { P, stopSessionTimers } from "./session.js";
@@ -44,16 +43,8 @@ function syncRoute(m) {
   const r = m.route;
   R.route = { name: r.name, path: m.path, params: numeric(m.params), query: m.query, title: r.title, tab: r.tab };
   if (r.name === "auth") R.auth.mode = r.params.mode;
-  if (r.name === "my") S.myTab = m.query.tab === "history" ? "hist" : "up";
   if (r.name === "account") S.acct = r.params.tab;
-  if (r.name === "time") syncReschedule(R.route.params.id);
-}
-// /bookings/:id/reschedule dibuka langsung (tab baru, tautan): mulai ubah jadwal booking itu bila masih bisa diubah; /book/time bukan reschedule
-function syncReschedule(id) {
-  if (!id) { BK.rescheduleId = null; return; }
-  if (BK.rescheduleId == id) return;
-  const b = D.bookings.find(x => x.id == id);
-  if (b && ["Menunggu Pembayaran", "Terbayar"].includes(b.status)) { Object.assign(BK, { rescheduleId: id, studio: b.studio, date: parseSlot(b.date).date, slot: null, quote: null }); delete R.calendar.book; } // kalender membuka bulan booking itu
+  if (r.name === "time") CONTROLLERS.booking.syncReschedule(R.route.params.id); // /bookings/:id/reschedule dibuka langsung (BookingController)
 }
 // dialog bersama: components/modal.js openModal(); body dan kicker kode lama berupa HTML yang sudah di-escape pemanggil, cls = kelas tambahan .mbox
 const modal = ({ body = "", kicker = "", cls = "", ...options }) => openModal({ ...options, body: raw(body), kicker: raw(kicker), className: cls });
@@ -94,10 +85,8 @@ V.auth = () => {
   if (R.auth.mode == "register") return wrap(tabs + `<label>Nama</label><input id="n" autocomplete="name"><label>Telepon</label><input id="p" inputmode="numeric" autocomplete="tel"><label>Email</label><input id="e" type="email" autocomplete="email"><label>Password (min. 6 karakter)</label><input id="pw" type="password" autocomplete="new-password" ${key}reg()"><div style="margin-top:18px"><button class="btn block" onclick="reg()">Daftar</button></div>`);
   return wrap(tabs + `<label>Email atau username</label><input id="e" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"><label>Password</label><input id="pw" type="password" autocomplete="current-password" ${key}login()"><div class="row sp" style="margin-top:18px"><button class="btn grow" onclick="login()">Masuk</button></div><p class="center sm" style="margin-top:14px"><a href="#" onclick="go('auth',{mode:'forgot'});return false">Lupa sandi?</a></p>`);
 };
-const fixS = s => { s.photos.forEach(p => p.img = p.img || API.imageUrl(p.id)); return s; };
-async function refresh() {
-  D.bookings = await API.get("/bookings"); D.sessions = (await API.get("/sessions")).map(fixS);
-}
+// muat ulang booking dan sesi foto milik user: BookingController.refreshData (dipakai session.js sampai fase 7)
+const refresh = () => CONTROLLERS.booking.refreshData();
 async function afterAuth(r) { API.token = r.token; S.admin = false; S.user = r.user; S.me = r.user.id; await refresh(); if (S.draft) return CONTROLLERS.booking.resumeDraft(); go("home"); } // draf booking tamu: kembali ke Paket & Pembayaran (BookingController)
 function logout() { API.token = ""; API.staffToken = ""; S.user = S.me = null; S.staff = false; S.admin = false; S.draft = null; D.bookings = []; D.sessions = []; if (typeof adminReset === "function") adminReset(); R.auth.mode = "login"; go("landing"); }
 // Mode Staf: PIN lewat modal "Masuk Mode Staf" (dulu dialog bawaan browser, decisions.md 4, 27, 41); fokus awal di isian PIN, Enter = Masuk,
