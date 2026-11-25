@@ -274,6 +274,10 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!/\bon(click|change|input|keydown|submit|load)=/.test(JS + index), 'frontend: tanpa atribut on…= (semua lewat data-*)');
     const html = files.filter(f => /\binnerHTML\s*=/.test(fs.readFileSync(path.join(FRONT, 'js', f), 'utf8')) && !['core/render.js', 'components/modal.js', 'components/sessionScreen.js'].includes(f));
     ok(!html.length, 'frontend: innerHTML = hanya di core/render.js, components/modal.js dan components/sessionScreen.js' + (html.length ? ` (masih di ${html.join(', ')})` : ''));
+    ok(!/gradient/i.test(CSS), 'frontend (CSS): tanpa gradient (.cta datar)');
+    const sheets = [...index.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map(m => m[1]);
+    ok(JSON.stringify(sheets) === JSON.stringify(['/css/tokens.css', '/css/base.css', '/css/components.css', '/css/pages/landing.css', '/css/pages/booking.css', '/css/pages/account.css', '/css/pages/session.css', '/css/pages/admin.css']), 'index.html memuat CSS terpisah berurutan: token, dasar, komponen, halaman');
+    ok(!fs.existsSync(path.join(FRONT, 'css', 'style.css')), 'css/style.css sudah dipecah (tidak ada lagi)');
   }
 
 

@@ -1,0 +1,8 @@
+/* SelfieBox Studio — token sistem desain (dari file Figma IMK): warna, radius, bayangan */
+:root{
+  --blue-50:#eef1fa;--blue-100:#e5e9f8;--blue-200:#c9d2f0;--blue:#506fce;--blue-h:#4864b9;--blue-a:#4059a5;--blue-d:#3c539b;--blue-dd:#1c2748;
+  --orange:#f28800;--red:#d64545;--green:#2e9e6a;
+  --bg:#f1f5f9;--surface:#fff;--soft:#eef1fa;--line:#cbd5e1;--line-2:#e2e8f0;
+  --ink:#020617;--ink-2:#334155;--muted:#94a3b8;--muted-2:#64748b;
+  --r-lg:24px;--r-md:16px;--shadow:0 6px 24px rgba(28,39,72,.08);
+}

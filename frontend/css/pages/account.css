@@ -1,0 +1,9 @@
+/* Form masuk, daftar, lupa sandi, buat sandi baru (pembungkus dan kartu) */
+.authwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.authcard{width:100%;max-width:420px;background:#fff;border-radius:28px;padding:32px;box-shadow:var(--shadow)}
+.authcard .brand{text-align:center;margin-bottom:4px;font-size:22px}
+.authcard .seg{display:flex}.authcard .seg button{flex:1}
+
+@media (max-width:760px){
+  .authcard{padding:24px}
+}
