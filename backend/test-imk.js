@@ -126,5 +126,36 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok((await call('POST', '/bookings', { package_id: 1, studio_id: 2, date: dayAhead(13) + ' 15:00' }, U)).s === 200, 'setelah migrasi: booking baru bisa dibuat'); }
   await down(srv);
 
+  // ===== Fase 3: halaman Pilihan Paket + popup Paket Foto Tidak Ditemukan =====
+  srv = start('c'); await up();
+  { const U = (await call('POST', '/auth/register', { name: 'Citra', email: 'citra@x.id', phone: '0813333333', password: 'secret1' })).j.token;
+    const AD = (await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token; ok(U && AD, 'fixture fase 3: customer dan admin masuk');
+    const fav = async () => (await call('GET', '/master')).j.FAV_PKG;
+    const book = async (pkg, d, h, pay = true) => { const b = (await call('POST', '/bookings', { package_id: pkg, studio_id: 1, date: dayAhead(d) + ` ${h}:00` }, U)).j; assert(b.id, 'booking gagal: ' + JSON.stringify(b)); if (pay) assert((await call('POST', `/bookings/${b.id}/pay`, { method: 'QRIS' }, U)).s === 200); return b; };
+    // 4. FAV_PKG = paket aktif dengan booking terbayar terbanyak; null bila seri atau belum ada (keputusan 32)
+    ok('FAV_PKG' in (await call('GET', '/master')).j && await fav() === null, 'FAV_PKG null saat belum ada booking terbayar');
+    await book(3, 5, 9, false); ok(await fav() === null, 'FAV_PKG tetap null: booking belum dibayar tidak dihitung');
+    await book(3, 5, 10); ok(await fav() === 3, 'FAV_PKG = paket dengan satu-satunya booking terbayar');
+    await book(2, 5, 11); ok(await fav() === null, 'FAV_PKG null saat dua paket seri');
+    const b2 = await book(2, 5, 12); ok(await fav() === 2, 'FAV_PKG = paket dengan booking terbayar terbanyak');
+    ok((await call('POST', `/bookings/${b2.id}/cancel`, { reason: 'Tidak ada waktu' }, U)).s === 200 && await fav() === null, 'booking yang dibatalkan tidak dihitung (kembali seri)');
+    await book(2, 6, 9); ok(await fav() === 2, 'fixture: paket 2 kembali terfavorit');
+    // 3. paket yang dinonaktifkan/dihapus admin hilang dari PKG (data yang dipakai popup)
+    ok((await call('PATCH', '/admin/packages/2', { active: 0 }, AD)).s === 200, 'admin menonaktifkan paket 2');
+    const m = (await call('GET', '/master')).j; ok(!m.PKG.some(p => p.id === 2) && m.ALLPKG.some(p => p.id === 2), 'paket nonaktif tidak ada di PKG, tetap ada di ALLPKG');
+    ok(m.FAV_PKG === 3, 'FAV_PKG hanya menghitung paket aktif');
+    const dl = await call('DELETE', '/admin/packages/4', null, AD); ok(dl.s === 200 && !(await call('GET', '/master')).j.PKG.some(p => p.id === 4), 'paket yang dihapus admin tidak ada di PKG');
+    ok((await call('POST', '/quote', { package_id: 2, studio_id: 1 }, U)).j.error === 'Paket tidak valid', 'quote dengan paket nonaktif: "Paket tidak valid" (pemicu popup)');
+    // 1–2. frontend
+    const core = await file('/js/core.js'), aj = await file('/js/admin.js'), cj = await file('/js/customer.js'), boot = await file('/js/boot.js');
+    ok(/function modal\(/.test(core) && core.includes('aria-modal="true"') && core.includes('Escape'), 'core.js: dialog bersama modal() dengan aria-modal dan Escape');
+    ok(core.includes('.mbtn button").focus()'), 'core.js: fokus awal dialog di tombol aksi, bukan di tombol dalam isi (mis. daftar paket)');
+    ok(!/function aModal\(/.test(aj) && /aModal\s*=.*modal\(/.test(aj), 'admin.js: aModal tidak lagi berdiri sendiri, memakai modal() bersama');
+    for (const s of ['V.packages', 'Pilihan Paket', 'Temukan Paket Sesuai Kebutuhanmu', 'Pilih Paket Ini', 'Lihat semua paket', 'Paling Favorit', '/ sesi', 'FAV_PKG', 'Paket Foto Tidak Ditemukan', 'Lihat & Pilih Paket Lain', 'Hubungi Customer Service', 'csContact()', 'Pilih studio untuk melanjutkan']) ok(cj.includes(s), `customer.js memuat "${s}"`);
+    ok(!/gradient/i.test(cj) && !/gradient/i.test(core), 'customer.js dan core.js tanpa gradient');
+    ok(boot.includes('FAV_PKG') && /FAV_PKG/.test(core.match(/function refreshMaster[^\n]*/)[0]), 'boot.js dan refreshMaster memuat FAV_PKG');
+    ok(!/S\.pkg\s*&&\s*!PKG\.find\(p => p\.id == S\.pkg\)\)\s*S\.pkg = null/.test(boot), 'boot.js tidak diam-diam menghapus paket pilihan yang hilang (popup yang memberi tahu)'); }
+  await down(srv);
+
   console.log(`\n${n} tes lulus`); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);
 })().catch(async e => { console.error('✘ GAGAL:', e.message); if (srv) await down(srv); process.exit(1); });
