@@ -47,3 +47,29 @@ export function sessionImpactBody(impact) {
   const paid = impact.paid_bookings ? `, ${impact.paid_bookings} sudah dibayar (total refund ${formatRupiah(impact.refund_total)})` : "";
   return html`<p>Sesi ini memiliki ${impact.active_bookings} booking aktif${customersOf(impact)}${paid}. Setelah dikonfirmasi, booking tersebut dibatalkan, dana yang sudah dibayar dikembalikan 100%, dan pelanggan diberi tahu lewat email.</p>`;
 }
+
+// ---------- Booking (AdminBookingController, dulu teks aModal di bookSave dan bookDelText di admin.js) ----------
+const bookingLine = (detail, slotHours) => `Booking ${detail.studio_name} · ${detail.slot.split(" ")[0]} · ${slotHours}`;
+
+export function cancelBookingBody(detail, slotHours) {
+  const money = detail.payment.status == "paid" ? `Dana ${formatRupiah(detail.payment.amount)} akan dikembalikan 100% kepada pelanggan dan sesinya dibuka kembali.` : "Booking belum dibayar, jadi tidak ada dana yang dikembalikan; sesinya dibuka kembali.";
+  return html`<p>${bookingLine(detail, slotHours)} atas nama ${detail.customer.name} diubah menjadi Dibatalkan. ${money} Pelanggan menerima email pemberitahuan.</p>`;
+}
+
+// status Sesi Berjalan / Selesai (tidak dapat dikembalikan)
+export function statusChangeBody(status) {
+  const effect = status == "Sesi Berjalan" ? "Timer sesi foto booking ini langsung dimulai." : "Booking ditandai selesai dan sesi fotonya diakhiri.";
+  return html`<p>${effect} Status tidak dapat dikembalikan. Pelanggan menerima email pemberitahuan.</p>`;
+}
+
+// impact = { status, paid, refund_amount } dari detail booking atau 409 needs_confirm
+export function deleteBookingBody(detail, slotHours, impact) {
+  let effect = "Booking akan langsung dihapus dan sesinya dibuka kembali.";
+  if (impact.paid) {
+    effect = `Dana ${formatRupiah(impact.refund_amount)} akan dikembalikan 100% lebih dulu, lalu booking dihapus dan sesinya dibuka kembali.`;
+  } else if (impact.status == "Dibatalkan") {
+    effect = "Booking akan dihapus dari riwayat.";
+  }
+  const mail = ["Menunggu Pembayaran", "Terbayar"].includes(impact.status) ? " Pelanggan menerima email pemberitahuan." : "";
+  return html`<p>${bookingLine(detail, slotHours)} atas nama ${detail.customer.name}. Status booking: ${impact.status} (${impact.paid ? "sudah dibayar" : "belum dibayar"}). ${effect}${mail} Tindakan ini tidak dapat dibatalkan.</p>`;
+}

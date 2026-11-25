@@ -32,11 +32,13 @@ import { landingView } from "./views/landing.js";
 import { createPhotoSessionController, createPhotoState } from "./controllers/PhotoSessionController.js";
 import { createGalleryController } from "./controllers/GalleryController.js";
 import { createAdminController } from "./controllers/AdminController.js";
+import { createAdminBookingController } from "./controllers/AdminBookingController.js";
 import * as adminModels from "./models/admin/index.js";
 import { photoSessionView } from "./views/session/photoSession.js";
 import { galleryView } from "./views/session/gallery.js";
 import { dashboardView } from "./views/admin/dashboard.js";
 import { studiosView } from "./views/admin/studios.js";
+import { bookingsView } from "./views/admin/bookings.js";
 import { usersView } from "./views/admin/users.js";
 import { transactionsView } from "./views/admin/transactions.js";
 import { packagesView as adminPackagesView } from "./views/admin/packages.js";
@@ -89,6 +91,17 @@ function createUi(store) {
     toast: message => store.update("runtime", { toast: { message, error: "" } }),
     // gulir ke bawah halaman (form Ubah item rekap, detail pelanggan di panel admin)
     scrollToEnd: () => window.scrollTo(0, document.body.scrollHeight),
+    // layar sempit: panel Detail Booking ada di bawah tabel, jadi digulir ke sana setelah dirender
+    revealBookingDetail: () => {
+      if (window.innerWidth <= 1000) {
+        window.setTimeout(() => {
+          const panel = document.querySelector(".bdet");
+          if (panel) {
+            panel.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      }
+    },
     // fokus ke elemen pertama yang cocok (field bertanda galat di Tambah Studio)
     focus: selector => {
       const element = document.querySelector(selector);
@@ -108,7 +121,7 @@ function createUi(store) {
 
 // halaman yang sudah MVC: view (state, match) → Safe dan kait after(match) per path rute; rute lain masih memakai V.<view> lama.
 // links = { invoiceUrl } untuk view yang menautkan invoice (token tetap di models/api.js, decisions.md 50)
-function pagesFor({ studio, payment, landing, photo, gallery, admin }, links) {
+function pagesFor({ studio, payment, landing, photo, gallery, admin, adminBooking }, links) {
   const showAvailability = () => studio.prefetchAvailability();
   return {
     // landing page (LandingController): scroll-spy dipasang setiap render dan dilepas saat halaman ditinggalkan
@@ -145,9 +158,10 @@ function pagesFor({ studio, payment, landing, photo, gallery, admin }, links) {
     "/sessions/:id": { view: photoSessionView, after: match => photo.enter(match), leave: () => photo.stopTimers() },
     // Galeri (GalleryController)
     "/gallery": { view: galleryView },
-    // panel admin (AdminController; Studio + Detail Sesi = StudioController); Booking, Properti, Pose masih V.<view> lama (fase 8b)
+    // panel admin (AdminController; Studio + Detail Sesi = StudioController; Booking = AdminBookingController); Properti, Pose masih V.<view> lama (fase 8b)
     "/admin": { view: dashboardView, after: () => admin.loadDashboard() },
     "/admin/studios": { view: studiosView, after: () => studio.loadStudios() },
+    "/admin/bookings": { view: bookingsView, after: () => adminBooking.load() },
     "/admin/users": { view: (state, match) => usersView(state, match, links), after: () => admin.loadUsers() },
     "/admin/transactions": { view: transactionsView, after: () => admin.loadTransactions() },
     "/admin/packages": { view: adminPackagesView, after: () => admin.loadPackagesPage() },
@@ -156,7 +170,7 @@ function pagesFor({ studio, payment, landing, photo, gallery, admin }, links) {
 }
 
 // aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
-function controllerActions({ studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin }) {
+function controllerActions({ studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin, adminBooking }) {
   return {
     "admin:search": (dataset, event) => admin.setSearch(event.target.value),
     "admin:setOperationsPeriod": (dataset, event) => admin.setOperationsPeriod(event.target.value),
@@ -190,6 +204,11 @@ function controllerActions({ studio, package: packages, booking, payment, accoun
     "studio:addSession": (dataset, event) => studio.addSession(dataset, formValues(event.target)),
     "studio:saveSession": (dataset, event) => studio.saveSession(dataset, formValues(event.target)),
     "studio:deleteSession": studio.deleteSession,
+    "adminBooking:setFilter": adminBooking.setFilter,
+    "adminBooking:open": adminBooking.open,
+    "adminBooking:close": adminBooking.close,
+    "adminBooking:save": (dataset, event) => adminBooking.save(dataset, formValues(event.target)),
+    "adminBooking:delete": adminBooking.delete,
     "gallery:showSession": gallery.showSession,
     "gallery:select": gallery.select,
     "gallery:toggleFavourite": gallery.toggleFavourite,
@@ -280,7 +299,8 @@ async function start() {
     brand: BRAND,
   });
   const gallery = createGalleryController({ api, store, ui, models, drive: { fetch: (...request) => window.fetch(...request) }, files: { download: downloadFile }, photoSession: photo, refreshData: booking.refreshData, brand: BRAND });
-  const controllers = { studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin };
+  const adminBooking = createAdminBookingController({ api, store, ui, models, admin });
+  const controllers = { studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin, adminBooking };
   const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl, adminPhotoUrl: api.adminPhotoUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({
