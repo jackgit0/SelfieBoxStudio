@@ -246,6 +246,12 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     for (const s of ['Masuk Mode Staf', 'Masukkan PIN staf', 'inputmode="numeric"', 'Hubungi Customer Service', 'Silakan hubungi staf di studio atau kontak Customer Service Anda.']) ok(JS.includes(s), `frontend memuat "${s}"`);
   }
 
+  // ===== Refactor MVC fase 6: sisi pelanggan tanpa confirm() bawaan browser (decisions.md 4, 27, 57) =====
+  { const JS = allJs(), rest = fs.readdirSync(path.join(FRONT, 'js'), { recursive: true }).filter(f => f.endsWith('.js') && !/legacy[\\/](session|admin)\.js$/.test(f)).map(f => fs.readFileSync(path.join(FRONT, 'js', f), 'utf8')).join('\n');
+    ok(!/\bconfirm\(["'`]/.test(rest), 'frontend (selain sesi foto dan admin): tanpa confirm() bawaan browser'); // kode: diganti di fase 9 (semua berkas)
+    for (const s of ['Konfirmasi Pembatalan', 'Yakin membatalkan booking ini?', 'Ya, Batalkan', 'Konfirmasi Pembayaran', 'Bayar sekarang via QRIS (simulasi)?']) ok(JS.includes(s), `frontend memuat "${s}"`);
+  }
+
   // ===== Fase refactor 3: fallback SPA (rute frontend dengan path history disajikan index.html) =====
   srv = start('spa'); await up();
   { const index = fs.readFileSync(path.join(FRONT, 'index.html'), 'utf8');

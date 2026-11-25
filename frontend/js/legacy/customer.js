@@ -3,7 +3,7 @@ import { API, D, M, R, S, V, save } from "./state.js";
 import { esc, raw } from "../core/html.js";
 import { formatDate as fmtDate, formatTime as fmtTime, parseSlot, formatRupiah as rp, slotRange } from "../core/format.js";
 import { isStudioShown } from "../models/master.js";
-import { $, go, ic, me, pkOf, refresh, render, studioOf } from "./core.js";
+import { $, go, ic, me, modal, pkOf, refresh, render, studioOf } from "./core.js";
 import { PAYMENT_LABELS, bookingById } from "../models/booking.js";
 import { bookingRows, keyValueRows, paymentDetail } from "../components/keyValueRows.js";
 // studio yang tidak tersedia/dihapus tidak bisa dipesan lagi (riwayat booking tetap memakai studioOf); tombol Reschedule disembunyikan
@@ -29,7 +29,10 @@ V.my = () => {
 ${Object.keys(groups).map(d => `<div class="dayh">${fmtDate(d)}</div>${groups[d].map(b => `<button class="brow" onclick="go('bdetail',{id:${b.id}})"><div><b>${esc(studioOf(b.studio).name)}</b><div class="sub">${esc(pkOf(b.package_id).name)} · ${stTag(b)}</div></div><b>${slotRange(b.date)}</b></button>`).join("")}`).join("") || `<div class="card center m" style="margin-top:12px">${tab == "up" ? "Belum ada booking mendatang." : "Belum ada riwayat booking."}<div style="margin-top:12px"><button class="btn" onclick="go('home')">Cari studio</button></div></div>`}</div>`;
 };
 const canChange = b => ["Menunggu Pembayaran", "Terbayar"].includes(b.status);
-async function payNow(id) { if (!confirm("Bayar sekarang via QRIS (simulasi)?")) return; try { await API.post(`/bookings/${id}/pay`, { method: "QRIS" }); await refresh(); S.payOpen = false; go("success", { id }); } catch (e) { R.toast.error = e.message; render(); } }
+// konfirmasi lewat modal (dulu dialog bawaan browser, decisions.md 4, 27, 57)
+const PAY_CONFIRM = { title: "Konfirmasi Pembayaran", body: "<p>Bayar sekarang via QRIS (simulasi)?</p>", buttons: [{ label: "Batal", value: false, style: "ghost" }, { label: "Bayar", value: true }] };
+const CANCEL_CONFIRM = { title: "Konfirmasi Pembatalan", body: "<p>Yakin membatalkan booking ini?</p>", buttons: [{ label: "Kembali", value: false, style: "ghost" }, { label: "Ya, Batalkan", value: true }] };
+async function payNow(id) { if ((await modal(PAY_CONFIRM)) !== true) return; try { await API.post(`/bookings/${id}/pay`, { method: "QRIS" }); await refresh(); S.payOpen = false; go("success", { id }); } catch (e) { R.toast.error = e.message; render(); } }
 V.bdetail = () => {
   const b = bookOf(); if (!b) return `<div class="panel"><button class="back" onclick="go('my')">${ic("left", 16)} Kembali</button><div class="card">Booking tidak ditemukan.</div></div>`;
   const s = studioOf(b.studio), pt = parseSlot(b.date), pending = b.status == "Menunggu Pembayaran";
@@ -53,7 +56,7 @@ ${paid ? `<p class="sm m" style="margin:10px 0">${ic("clock", 14)} Refund dipros
 <button class="btn block" style="margin-top:8px" ${R.cancel.reason ? "" : "disabled"} onclick="doCancel(${b.id})">${paid ? "Refund" : "Batalkan Booking"}</button></div></div>`;
 };
 async function doCancel(id) {
-  if (!confirm("Yakin membatalkan booking ini?")) return;
+  if ((await modal(CANCEL_CONFIRM)) !== true) return;
   try { const r = await API.post(`/bookings/${id}/cancel`, { reason: R.cancel.reason, detail: R.cancel.detail }); S.cancelRes = r; await refresh(); go("refund", { id }); } catch (e) { R.toast.error = e.message; render(); }
 }
 V.refund = () => {
