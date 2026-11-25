@@ -18,14 +18,8 @@ async function aDo(fn, ok) { msg = err = ""; const sn = snap(); let failed = fal
 const snap = () => { const o = {}; document.querySelectorAll('.amain [id]').forEach(e => { if ('value' in e && e.type !== 'file') o[e.id] = e.value; }); return o; };
 const restore = o => Object.keys(o).forEach(id => { const e = document.getElementById(id); if (e && 'value' in e && e.type !== 'file') e.value = o[id]; });
 const val = id => ($("#" + id) || {}).value;
-// dialog konfirmasi (Figma "Konfirmasi Hapus …"): resolve true bila admin menekan tombol aksi; body berupa HTML yang sudah di-escape pemanggil
-function aModal(title, body, okLabel) {
-  return new Promise(res => { const d = document.createElement("div"), back = document.activeElement; d.className = "mdl";
-    d.innerHTML = `<div class="mbox" role="dialog" aria-modal="true" aria-labelledby="mdl-t"><h3 id="mdl-t">${esc(title)}</h3><p>${body}</p><div class="row"><button class="btn sm ghost" data-v="0">Kembali</button><button class="btn sm" data-v="1">${esc(okLabel)}</button></div></div>`;
-    const key = e => { if (e.key === "Escape") done(false); else if (e.key === "Tab") { e.preventDefault(); const bs = [...d.querySelectorAll("button")], i = bs.indexOf(document.activeElement); bs[(i + (e.shiftKey ? bs.length - 1 : 1)) % bs.length].focus(); } }, done = v => { d.remove(); document.removeEventListener("keydown", key); if (back && back.focus) back.focus(); res(v); };
-    d.onclick = e => { const b = e.target.closest("[data-v]"); if (b) done(b.dataset.v == "1"); else if (e.target === d) done(false); };
-    document.addEventListener("keydown", key); document.body.appendChild(d); d.querySelector('[data-v="0"]').focus(); });
-}
+// dialog konfirmasi (Figma "Konfirmasi Hapus …"), memakai modal() bersama di core.js: true bila admin menekan tombol aksi; body berupa HTML yang sudah di-escape pemanggil
+const aModal = (title, body, okLabel) => modal({ title, body, buttons: [{ label: "Kembali", value: false, style: "ghost" }, { label: okLabel, value: true }] }).then(v => v === true);
 // aksi dengan alur konfirmasi server (DELETE/PATCH): dialog memakai dampak yang sudah diketahui (ask=false: langsung kirim tanpa dialog awal); bila server membalas 409 needs_confirm
 // dengan dampak yang sama dan dialog sudah disetujui, ulangi dengan ?confirm=1, selain itu tampilkan dialog dengan dampak terbaru. Mengembalikan hasil server, atau null bila dibatalkan.
 async function aConfirmReq(method, path, body, title, describe, okLabel, known, ask = true) {

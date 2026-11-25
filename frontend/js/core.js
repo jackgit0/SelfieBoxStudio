@@ -1,7 +1,7 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
 const $ = s => document.querySelector(s);
 const BRAND = window.BRAND || "SelfieBox Studio";
-let PKG = [], ALLPKG = [], DISC = { pct: 0, label: "" }, PEOPLE = [], BUDGET = [], STUDIOS = [], ALLSTUDIOS = [], PROP = [], POSES = {}, POLICY = { refund_hours: 2 };
+let PKG = [], ALLPKG = [], FAV_PKG = null, DISC = { pct: 0, label: "" }, PEOPLE = [], BUDGET = [], STUDIOS = [], ALLSTUDIOS = [], PROP = [], POSES = {}, POLICY = { refund_hours: 2 };
 const V = {};
 let S; try { S = JSON.parse(localStorage.getItem("snapia")); } catch (e) {}
 S = Object.assign({ user: null, me: null, admin: false, view: "landing", p: {}, pkg: null, bm: [], staff: false, log: [] }, S || {}); delete S.quiz; delete S.setup; // sisa state lama (kuis rekomendasi paket dan pilihan setup properti sudah dihapus)
@@ -54,8 +54,8 @@ const icf = (n, s = 20) => ic(n, s).replace('fill="none"', 'fill="currentColor"'
 
 // ---------- navigasi ----------
 const ADMIN_VIEWS = ["adash", "acust", "astudio", "abook", "aprop", "apose", "atrx", "apkg", "aacct"];
-const TITLES = { home: "Browse", studio: "Studio", time: "Pilih Waktu", pay: "Pembayaran", my: "Booking Saya", bdetail: "Detail Booking", cancel: "Pembatalan", refund: "Refund", success: "Booking", rescheduled: "Reschedule", gallery: "Galeri", session: "Sesi Foto", account: "Akun" };
-const TABGROUP = { home: ["home", "studio", "time", "pay", "success", "rescheduled"], my: ["my", "bdetail", "cancel", "refund"], gallery: ["gallery", "session"] };
+const TITLES = { home: "Browse", packages: "Pilihan Paket", studio: "Studio", time: "Pilih Waktu", pay: "Pembayaran", my: "Booking Saya", bdetail: "Detail Booking", cancel: "Pembatalan", refund: "Refund", success: "Booking", rescheduled: "Reschedule", gallery: "Galeri", session: "Sesi Foto", account: "Akun" };
+const TABGROUP = { home: ["home", "packages", "studio", "time", "pay", "success", "rescheduled"], my: ["my", "bdetail", "cancel", "refund"], gallery: ["gallery", "session"] };
 function go(v, p = {}, push = true) {
   S.view = v; S.p = p; msg = err = ""; AV = {}; save();
   if (push) { try { history.pushState({ v, p }, "", location.pathname + location.search); } catch (e) {} }
@@ -65,6 +65,17 @@ window.addEventListener("popstate", e => { const st = e.state; if (st && st.v) {
 document.addEventListener("click", () => { const m = $("#menu"); if (m) m.hidden = true; });
 const toggleMenu = e => { e.stopPropagation(); const m = $("#menu"); m.hidden = !m.hidden; };
 const openAcct = tab => { S.acct = tab; go("account"); };
+// dialog bersama (Figma "Konfirmasi …" dan popup error): resolve dengan value tombol yang ditekan, null bila ditutup (Escape / klik di luar).
+// body = HTML yang sudah di-escape pemanggil; buttons = [{ label, value, style ("ghost"/"soft"/"danger"), icon }]; kicker = HTML di atas judul; cls = kelas tambahan .mbox;
+// tombol di dalam body dengan atribut data-v="…" juga menutup dialog dan resolve dengan string itu
+function modal({ title, body = "", buttons = [{ label: "Tutup", value: null }], kicker = "", cls = "" }) {
+  return new Promise(res => { const d = document.createElement("div"), back = document.activeElement; d.className = "mdl";
+    d.innerHTML = `<div class="mbox ${cls}" role="dialog" aria-modal="true" aria-labelledby="mdl-t">${kicker}<h3 id="mdl-t">${esc(title)}</h3><div class="mtx">${body}</div><div class="row mbtn">${buttons.map((b, i) => `<button class="btn sm ${b.style || ""}" data-i="${i}">${b.icon ? ic(b.icon, 16) : ""}${esc(b.label)}</button>`).join("")}</div></div>`;
+    const key = e => { if (e.key === "Escape") done(null); else if (e.key === "Tab") { e.preventDefault(); const bs = [...d.querySelectorAll("button")], i = bs.indexOf(document.activeElement); bs[(i + (e.shiftKey ? bs.length - 1 : 1)) % bs.length].focus(); } },
+      done = v => { d.remove(); document.removeEventListener("keydown", key); if (back && back.focus && document.contains(back)) back.focus(); res(v); };
+    d.onclick = e => { const b = e.target.closest("button[data-i], button[data-v]"); if (b) done(b.dataset.i !== undefined ? buttons[b.dataset.i].value : b.dataset.v); else if (e.target === d) done(null); };
+    document.addEventListener("keydown", key); document.body.appendChild(d); d.querySelector(".mbtn button").focus(); });
+}
 const toasts = () => (msg ? `<div class="toast">${esc(msg)}</div>` : "") + (err ? `<div class="toast err">${esc(err)}</div>` : "");
 
 function shell(inner) {
@@ -79,7 +90,7 @@ function shell(inner) {
 }
 // muat ulang data master (studio/properti/paket) bila admin mengubahnya; render ulang hanya jika berbeda
 let _mj = "";
-async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, PROP, POSES } = m); ALLSTUDIOS = ALLSTUDIOS || STUDIOS; if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
+async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, FAV_PKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, PROP, POSES } = m); ALLSTUDIOS = ALLSTUDIOS || STUDIOS; if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
 V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
 function render() {
   if (!S.me && !["auth", "landing"].includes(S.view)) S.view = "landing";
