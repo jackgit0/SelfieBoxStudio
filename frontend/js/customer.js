@@ -35,8 +35,8 @@ V.home = () => {
 };
 // paket pilihan (dari Pilihan Paket atau pilihan sebelumnya) dipakai bila masih aktif; bila sudah dinonaktifkan/dihapus admin: popup Paket Foto Tidak Ditemukan
 function ensurePkg(next) { if (S.pkg && !PKG.find(p => p.id == S.pkg)) { pkgMissing(next); return false; } if (!S.pkg) S.pkg = PKG[0].id; return true; }
-function quickBook(sid, date, h) { if (!ensurePkg(() => quickBook(sid, date, h))) return; editId = null; B = { studio: sid, date, slot: `${date} ${h}:00` }; go("time"); }
-function startBook(sid) { if (!ensurePkg(() => startBook(sid))) return; editId = null; B = { studio: sid, date: S.hDate || todayS(), slot: null }; go("time"); }
+function quickBook(sid, date, h) { if (!ensurePkg(() => quickBook(sid, date, h))) return; editId = null; S.draft = null; B = { studio: sid, date, slot: `${date} ${h}:00` }; go("time"); }
+function startBook(sid) { if (!ensurePkg(() => startBook(sid))) return; editId = null; S.draft = null; B = { studio: sid, date: S.hDate || todayS(), slot: null }; go("time"); }
 
 // ---------- Pilihan Paket (Figma 660:5062) ----------
 const pkgDesc = p => `${p.photo_count} foto · ${p.dur} menit${p.strip_size ? " · cetak " + esc(p.strip_size) : ""}`;
@@ -50,17 +50,18 @@ function choosePkg(id) { const p = PKG.find(x => x.id == id); if (!p) return pkg
 
 // ---------- popup Paket Foto Tidak Ditemukan (Figma 660:5538) ----------
 // next: lanjutkan alur semula setelah customer memilih paket lain langsung dari daftar di popup
-async function pkgMissing(next) {
+// booking = muncul di langkah Create Booking: judul dan kalimat dari Figma "Create Booking - Paket Tidak Ditemukan" (585:4251)
+async function pkgMissing(next, booking = false) {
   S.pkg = null; save(); render();
-  const v = await modal({ title: "Paket Foto Tidak Ditemukan", cls: "wide center", kicker: `<span class="tag no mkick">STATUS PAKET: TIDAK TERSEDIA</span>`,
-    body: `<p>Maaf, paket foto yang Anda pilih saat ini sudah tidak tersedia atau telah habis kuotanya untuk sesi ini. Rincian paket tidak dapat ditampilkan.</p><div class="mnote">Jangan khawatir, masih ada berbagai paket foto menarik lainnya yang siap kamu pesan! Silakan cek opsi paket studio di bawah ini.</div>
+  const v = await modal({ title: booking ? "Paket Tidak Ditemukan" : "Paket Foto Tidak Ditemukan", cls: "wide center", kicker: `<span class="tag no mkick">STATUS PAKET: TIDAK TERSEDIA</span>`,
+    body: `<p>${booking ? "Paket tidak ditemukan. Silakan pilih paket lain." : "Maaf, paket foto yang Anda pilih saat ini sudah tidak tersedia atau telah habis kuotanya untuk sesi ini. Rincian paket tidak dapat ditampilkan."}</p><div class="mnote">Jangan khawatir, masih ada berbagai paket foto menarik lainnya yang siap kamu pesan! Silakan cek opsi paket studio di bawah ini.</div>
 <div class="mpk">${PKG.map(p => `<button class="mpkr" data-v="${p.id}"><span><b>Paket ${esc(p.name)}</b><small>${pkgDesc(p)}</small></span><b>${rp(eff(p))}</b></button>`).join("")}</div>`,
     buttons: [{ label: "Lihat & Pilih Paket Lain", value: "list", icon: "box" }, { label: "Hubungi Customer Service", value: "cs", style: "soft", icon: "mail" }] });
   if (v === "list") go("packages"); else if (v === "cs") csContact();
   else if (v && PKG.find(p => p.id == v)) { S.pkg = +v; save(); if (next) next(); else render(); }
 }
 // error API "Paket tidak valid": muat ulang data master; bila paket memang sudah tidak aktif, tampilkan popup (true), selain itu biarkan pemanggil menampilkan pesan error
-async function onPkgErr(e, next) { if (e.status != 400 || !/^Paket(\/studio)? tidak valid/.test(e.message)) return false; await refreshMaster(); if (PKG.find(p => p.id == S.pkg)) return false; pkgMissing(next); return true; }
+async function onPkgErr(e, next) { if (e.status != 400 || !/^Paket(\/studio)? tidak valid/.test(e.message)) return false; await refreshMaster(); if (PKG.find(p => p.id == S.pkg)) return false; pkgMissing(next, true); return true; }
 
 // ---------- detail studio + properti (hanya tampilan) ----------
 // studio yang tidak tersedia/dihapus tidak bisa dibuka untuk dipesan (riwayat booking tetap memakai studioOf)
@@ -87,15 +88,61 @@ V.time = () => {
 <div class="row sp"><div><h1 class="h1">${editId ? "Ubah Jadwal" : "Pilih Tanggal & Waktu"}</h1><p class="sub">${esc(s.name)} · ${esc(s.address || "")}</p></div>${editId ? "" : '<span class="steps">1/2</span>'}</div>
 <div class="card" style="margin-top:16px"><div class="bk"><div><h3 class="h3" style="margin-bottom:10px">Pilih Tanggal</h3>${calHTML("book", d)}</div>
 <div><h3 class="h3">Pilih Sesi</h3><p class="sub">${fmtDate(d)} · tiap sesi 50 menit</p><div class="slots">${HRS.map(h => { const dt = `${d} ${h}:00`; return `<button class="pill ${B.slot == dt ? "on" : ""}" ${fr.includes(h) ? "" : "disabled"} onclick="B.slot='${dt}';render()">${slotLabel(h)}</button>`; }).join("")}</div></div></div>
-<button class="btn block" style="margin-top:22px" ${B.slot ? "" : "disabled"} onclick="nextTime()">${editId ? "Simpan Jadwal Baru" : "Lanjut ke Pembayaran"}</button></div></div>`;
+<button class="btn block" style="margin-top:22px" onclick="nextTime()">${editId ? "Simpan Jadwal Baru" : "Lanjut ke Pembayaran"}</button></div></div>`;
 };
 async function loadQuote() { Q = await API.post("/quote", { package_id: S.pkg, studio_id: B.studio }); }
+// sesi yang sudah lewat / terisi menurut data ketersediaan terakhir (sama dengan aturan server: sesi dimulai setelah sekarang)
+const slotGone = sl => { const { date, h } = parseSlot(sl); return !free(B.studio, date).includes(h); };
 async function nextTime() {
+  if (!B.date || !B.slot) return inputInvalid(); if (slotGone(B.slot)) return sesiGone();
   if (editId) {
     try { await API.patch("/bookings/" + editId, { studio_id: B.studio, date: B.slot }); const id = editId; editId = null; await refresh(); return go("rescheduled", { id }); }
-    catch (e) { err = e.message; B.slot = null; AV = {}; return render(); }
+    catch (e) { return bookingErr(e, nextTime); }
   }
-  Q = null; try { await loadQuote(); } catch (e) { if (await onPkgErr(e, nextTime)) return; err = e.message; return render(); } go("pay");
+  Q = null; try { await loadQuote(); } catch (e) { return bookingErr(e, nextTime); } go("pay");
+}
+// draf booking tamu setelah login (popup Belum Login → Masuk/Daftar): kembali ke Paket & Pembayaran dengan studio, sesi dan paket yang sama
+async function resumeDraft() {
+  const d = S.draft; S.draft = null; editId = null; B = { studio: d.studio, date: d.date, slot: d.slot }; Q = null; save();
+  try { await loadQuote(); } catch (e) { go("time"); return bookingErr(e, nextTime); } go("pay");
+}
+
+// ---------- popup galat Create Booking (Figma 585:3886, 585:4061, 585:4251, 585:4358, 585:4400) ----------
+// satu pemetaan: status/pesan API → popup; next = lanjutkan langkah semula setelah paket lain dipilih
+async function bookingErr(e, next) {
+  const m = e.message || "";
+  if (e.status == 401) return needLogin();
+  if (e.status == 409 && /^Jadwal (sudah|baru) tidak tersedia/.test(m)) return sesiBooked(); // "Jadwal sudah tidak tersedia" (booking) / "Jadwal baru tidak tersedia" (reschedule)
+  if (await onPkgErr(e, next)) return;                                                       // "Paket tidak valid" / "Paket/studio tidak valid" dengan paket nonaktif
+  if (m === "Format/jam slot tidak valid") return inputInvalid();
+  if (["Jadwal sudah lewat", "Studio tidak tersedia", "Paket/studio tidak valid"].includes(m)) return sesiGone(); // paket masih aktif: studionya yang hilang
+  await modal({ title: "Booking Gagal", cls: "center", kicker: mIcon("alert"), body: `<p>${esc(m)}</p>`, buttons: [{ label: "Tutup", value: null }] });
+}
+const mIcon = (n, cls = "no") => `<div class="mico ${cls}">${ic(n, 28)}</div>`;
+// kembali ke langkah Pilih Tanggal & Waktu dengan sesi dikosongkan dan ketersediaan dimuat ulang
+function backToTime() { B.slot = null; Q = null; AV = {}; if (S.view === "time") { render(); prefetch(); } else go("time"); }
+async function inputInvalid() {
+  await modal({ title: "Input Tidak Valid", cls: "center", kicker: mIcon("alert"), body: "<p>Input booking tidak lengkap atau tidak valid. Pilih tanggal dan sesi terlebih dahulu.</p>", buttons: [{ label: "Pilih Tanggal & Sesi", value: 1, icon: "calendar" }] });
+  if (S.view !== "time") backToTime();
+}
+async function sesiGone() {
+  const lbl = B.slot ? slotLabel(parseSlot(B.slot).h) : ""; await refreshMaster(); const st = shown(B.studio);
+  await modal({ title: "Sesi Tidak Tersedia", cls: "center", kicker: mIcon("clock"), body: st ? `<p>Sesi ${lbl} tidak lagi tersedia. Silakan pilih sesi lain.</p>` : "<p>Studio ini sedang tidak tersedia. Silakan pilih studio lain.</p>",
+    buttons: [st ? { label: "Pilih Sesi Lain", value: 1, icon: "calendar" } : { label: "Cari Studio Lain", value: 1, icon: "search" }] });
+  if (st) backToTime(); else { B.slot = null; Q = null; go(editId ? "bdetail" : "home", editId ? { id: editId } : {}); if (editId) editId = null; }
+}
+async function sesiBooked() {
+  await modal({ title: "Maaf, Sesi Sudah Dibooking", cls: "center", kicker: mIcon("calendar"), body: "<p>Sesi ini sudah memiliki booking aktif. Silakan pilih sesi lain.</p>", buttons: [{ label: "Pilih Sesi Lain", value: 1, icon: "calendar" }] });
+  backToTime();
+}
+// Belum Login: draf (studio, tanggal, sesi) disimpan agar setelah Masuk/Daftar alur kembali ke Paket & Pembayaran
+async function needLogin() {
+  S.draft = { studio: B.studio, date: B.date, slot: B.slot }; save();
+  const v = await modal({ title: "Masuk untuk melanjutkan booking", cls: "center", kicker: mIcon("info", "info"), body: "<p>Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.</p>",
+    buttons: [{ label: "Masuk", value: "login", icon: "user" }, { label: "Daftar", value: "register", style: "ghost" }] });
+  if (!v) return;
+  if (S.me) { API.token = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; S.bookings = []; S.sessions = []; } // token kedaluwarsa (401 saat booking)
+  openAuth(v);
 }
 
 // ---------- booking: langkah 2 (paket & pembayaran) ----------
@@ -104,7 +151,7 @@ function qr() {
     if (fx ? (x % 6 == 0 || y % 6 == 0 || x == 14 || x == 20 || y == 14 || y == 20 || (x % 6 > 1 && x % 6 < 5 && y % 6 > 1 && y % 6 < 5)) : h % 2) r += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }
   return `<svg viewBox="0 0 21 21" width="160" fill="#1c2748" style="background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line-2)">${r}</svg>`;
 }
-async function selectPkg(id) { S.pkg = id; save(); msg = err = ""; try { await loadQuote(); } catch (e) { if (await onPkgErr(e, () => selectPkg(S.pkg))) return; err = e.message; } render(); }
+async function selectPkg(id) { S.pkg = id; save(); msg = err = ""; try { await loadQuote(); } catch (e) { return bookingErr(e, () => selectPkg(S.pkg)); } render(); }
 V.pay = () => {
   if (!B.slot || !Q) return `<div class="card">Pilih jadwal terlebih dahulu.</div>`; if (!shown(B.studio)) return noStudio();
   if (!PKG.find(x => x.id == S.pkg)) return `<div class="panel"><button class="back" onclick="go('time')">${ic("left", 16)} Kembali</button><div class="card"><h2 class="h2">Pilih Paket</h2><p class="sub">Paket sebelumnya tidak tersedia. Pilih paket lain untuk melanjutkan.</p><div class="pkpick" style="margin-top:12px">${PKG.map(x => `<button class="pill" onclick="selectPkg(${x.id})">${esc(x.name)}</button>`).join("")}</div></div></div>`;
@@ -121,9 +168,10 @@ ${Q.mainDisc ? `<div class="kv disc"><span>Diskon utama (${Q.pct}%)</span><b>-${
 <button class="btn block" onclick="confirmPay()">Check Out</button></div></div></div></div>`;
 };
 async function confirmPay() {
+  if (!S.me) return needLogin(); // tamu: login dulu sebelum booking dibuat (keputusan 35)
   try { const b = await API.post("/bookings", { package_id: S.pkg, studio_id: B.studio, date: B.slot }); await API.post(`/bookings/${b.id}/pay`, { method: S.method || "QRIS" });
     B.slot = null; Q = null; await refresh(); S.payOpen = false; go("success", { id: b.id }); }
-  catch (e) { if (await onPkgErr(e, () => selectPkg(S.pkg))) return; err = e.message; AV = {}; render(); }
+  catch (e) { AV = {}; bookingErr(e, () => selectPkg(S.pkg)); }
 }
 
 // ---------- halaman hasil: sukses, reschedule ----------
