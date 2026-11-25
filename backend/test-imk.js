@@ -243,6 +243,9 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!asg('msg|err|AV|CAL|CR|CD|authMode|resetTok|LP|aDenyOpen').test(JS), 'frontend: state runtime hanya di objek R (tanpa msg/err/AV/CAL/CR/CD/authMode/resetTok/LP yang di-assign ulang)'); // kode: diganti di fase 9
     ok(!/S\.(bookings|sessions)\b/.test(JS), 'frontend: booking dan sesi foto user di objek D, tidak lagi di S (state tersimpan)'); // kode: diganti di fase 9
     ok(!asg('drive|curSes|poseI|tick|poseT|stream|gSes|dMode|dSel').test(JS), 'frontend: state sesi foto dan galeri hanya di objek P (tanpa drive/curSes/tick/gSes/dSel/… yang di-assign ulang)'); // kode: diganti di fase 9
+    // nama global lama juga tidak lagi dibaca, termasuk setelah spread (...PKG, [...dSel]); err/drive/stream tidak ikut karena juga dipakai sebagai kelas CSS, URL Drive dan kunci objek
+    const old = /(?<![.\w$])(PKG|ALLPKG|FAV_PKG|DISC|PEOPLE|BUDGET|STUDIOS|ALLSTUDIOS|PROP|POSES|POLICY|_mj|B|Q|editId|msg|AV|CAL|CR|CD|authMode|resetTok|LP|aDenyOpen|curSes|poseI|tick|poseT|gSes|dMode|dSel)(?![\w$])/.exec(JS.replace(/\.\.\./g, '… '));
+    ok(!old, 'frontend: tidak ada lagi rujukan ke nama global lama' + (old ? ` (masih ada "${old[0]}")` : '')); // kode: diganti di fase 9
   }
 
   console.log(`\n${n} tes lulus`); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);

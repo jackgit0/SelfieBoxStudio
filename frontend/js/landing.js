@@ -30,7 +30,7 @@ function lpStudio(s) {
 <div class="row sp" style="margin-top:10px"><span class="m sm">${ic("users", 14)} ${esc(capLabel(s))} orang</span><b class="sm">${priceRange(s)}</b></div></div></article>`;
 }
 V.landing = () => {
-  const min = M.packages.length ? Math.min(...PKG.map(eff)) : 0, addr = (M.studios[0] || {}).address || "Jl. Veteran No. 3", wa = window.CS_WA, mail = window.CS_EMAIL, first = HRS[0], last = HRS[HRS.length - 1];
+  const min = M.packages.length ? Math.min(...M.packages.map(eff)) : 0, addr = (M.studios[0] || {}).address || "Jl. Veteran No. 3", wa = window.CS_WA, mail = window.CS_EMAIL, first = HRS[0], last = HRS[HRS.length - 1];
   const links = LSECS.map(l => `<button data-s="${l[0]}" onclick="toSec('${l[0]}')">${l[1]}</button>`).join("");
   const propImgs = M.properties.filter(p => p.img).slice(0, 4);
   return `<div class="lp"><header class="lnav"><div class="lnav-in"><a class="brand" href="#" onclick="toSec('home');return false">${esc(BRAND)}</a><nav class="llinks">${links}</nav>
