@@ -4145,7 +4145,13 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/StudioStatus"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StudioStatus"
+              }
+            ],
+            "readOnly": true,
+            "description": "Tidak disimpan: AVAILABLE bila ada minimal satu slot per jam yang kosong dan belum lewat dalam 14 hari ke depan (studio terhapus = UNAVAILABLE). Dikirim admin = diabaikan."
           },
           "deleted_at": {
             "type": [
@@ -4154,6 +4160,12 @@
             ],
             "format": "int64",
             "description": "Waktu soft delete"
+          },
+          "free_slots": {
+            "type": "integer",
+            "minimum": 0,
+            "readOnly": true,
+            "description": "Jumlah slot kosong dari sekarang sampai akhir hari ini + 13 hari."
           }
         },
         "required": [
@@ -4165,6 +4177,7 @@
           "people_range_id",
           "budget_range_id",
           "status",
+          "free_slots",
           "deleted_at"
         ],
         "example": {
@@ -4176,7 +4189,8 @@
           "people_range_id": 1,
           "budget_range_id": 1,
           "status": "AVAILABLE",
-          "deleted_at": null
+          "deleted_at": null,
+          "free_slots": 150
         }
       },
       "AdminStudio": {
@@ -4242,9 +4256,6 @@
             ],
             "pattern": "^(\\/(img|media)\\/[\\w.\\-]+|https?:\\/\\/[^\\s'\"()<>\\\\]+)$",
             "description": "Tanpa nilai: `/img/studio-2.jpg`"
-          },
-          "status": {
-            "$ref": "#/components/schemas/StudioStatus"
           }
         },
         "required": [
@@ -4282,9 +4293,6 @@
               "null"
             ],
             "description": "Kosong/null = gambar lama dipertahankan"
-          },
-          "status": {
-            "$ref": "#/components/schemas/StudioStatus"
           }
         },
         "description": "Field yang tidak dikirim memakai nilai lama. `UNAVAILABLE` menyembunyikan studio dari customer; booking lama tidak diubah."

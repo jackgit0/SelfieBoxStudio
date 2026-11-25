@@ -70,7 +70,7 @@ function seedData() {
   run(`DELETE FROM photo WHERE session_id IN (${ss})`, ...ids); run(`DELETE FROM staff_log WHERE session_id IN (${ss})`, ...ids);
   ['session', 'payment'].forEach(t => run(`DELETE FROM ${t} WHERE booking_id IN (${bk})`, ...ids)); run(`DELETE FROM booking WHERE user_id IN ${inn}`, ...ids);
 
-  const studios = all("SELECT * FROM studio WHERE COALESCE(status,'AVAILABLE')='AVAILABLE' AND deleted_at IS NULL ORDER BY id"), pkgs = all('SELECT * FROM package WHERE COALESCE(active,1)=1 ORDER BY id');
+  const studios = all('SELECT * FROM studio WHERE deleted_at IS NULL ORDER BY id'), pkgs = all('SELECT * FROM package WHERE COALESCE(active,1)=1 ORDER BY id');
   if (!studios.length || !pkgs.length) throw new Error('Belum ada studio tersedia atau paket aktif');
   const pct = +(get("SELECT value FROM setting WHERE key='main_discount_pct'") || {}).value || 0, REFUND_H = +(process.env.REFUND_MIN_HOURS || 2);
   const taken = (sid, slot) => get("SELECT 1 FROM session WHERE studio_id=? AND slot=? AND status!='Dibatalkan'", sid, slot);

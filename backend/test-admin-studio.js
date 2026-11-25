@@ -1,4 +1,4 @@
-// Tes fitur admin studio: status, nama unik, disembunyikan dari customer, soft delete + pembatalan/refund + email (US-03 s.d. US-06). Jalankan: node --disable-warning=ExperimentalWarning test-admin-studio.js
+// Tes fitur admin studio: status turunan dari slot kosong, nama unik, disembunyikan dari customer, soft delete + pembatalan/refund + email (US-03 s.d. US-06). Jalankan: node --disable-warning=ExperimentalWarning test-admin-studio.js
 const { spawn, execFileSync } = require('child_process'), assert = require('assert'), os = require('os'), path = require('path'), net = require('net'), fs = require('fs');
 const PORT = 3930, PORT2 = 3931, TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'snapia-studio-')), mails = [];
 // SMTP palsu (tanpa TLS) untuk memeriksa email notifikasi ke customer
@@ -26,30 +26,33 @@ const stop = () => { srv.kill(); srv2.kill(); smtp.close(); };
   ok(A && Bt && AD, 'fixture: dua customer dan admin login');
   const far = dayOf(5);
 
-  // --- status studio & nama unik (SR-04-02, SR-04-03, SR-05-03) ---
+  // --- status studio diturunkan dari slot kosong 14 hari (imk/dev/studio-fix-plan.md bagian 3) & nama unik (SR-04-03) ---
   const nst = { description: 'Studio uji', price: 10000, people_range_id: 1, budget_range_id: 1 };
-  const s1 = await call('POST', '/admin/studios', { ...nst, name: 'Studio Uji', status: 'UNAVAILABLE' }, AD); ok(s1.s === 200 && s1.j.id, 'admin menambah studio berstatus UNAVAILABLE'); const U1 = s1.j.id;
-  ok((await call('POST', '/admin/studios', { ...nst, name: 'Studio Rusak', status: 'RUSAK' }, AD)).s === 400, 'status studio tidak valid ditolak');
+  const s1 = await call('POST', '/admin/studios', { ...nst, name: 'Studio Uji', status: 'UNAVAILABLE' }, AD); ok(s1.s === 200 && s1.j.id, 'admin menambah studio (status dari klien lama diabaikan)'); const U1 = s1.j.id;
+  const rowOf = async id => (await call('GET', '/admin/studios', null, AD)).j.find(s => s.id === id);
+  { const r = await rowOf(U1); ok(r.status === 'AVAILABLE' && r.free_slots > 0 && r.free_slots <= 14 * 13, 'studio baru tanpa booking: AVAILABLE, free_slots = slot kosong 14 hari'); }
   const dup = await call('POST', '/admin/studios', { ...nst, name: '  studio MAWAR ' }, AD); ok(dup.s === 409 && /sudah dipakai/.test(dup.j.error), 'nama studio ganda (beda huruf besar/spasi) ditolak saat tambah');
   ok((await call('PATCH', '/admin/studios/2', { name: ' studio mawar' }, AD)).s === 409, 'nama studio ganda (beda huruf besar/spasi) ditolak saat ubah');
   ok((await call('PATCH', '/admin/studios/1', { name: 'Studio Mawar' }, AD)).s === 200, 'mengubah studio dengan namanya sendiri diterima');
-  ok((await call('PATCH', `/admin/studios/${U1}`, { status: '' }, AD)).s === 400, 'status kosong saat ubah ditolak');
-  ok((await call('PATCH', `/admin/studios/${U1}`, { status: null, description: 'ubah deskripsi' }, AD)).s === 200 && (await call('GET', '/admin/studios', null, AD)).j.find(s => s.id === U1).status === 'UNAVAILABLE', 'ubah tanpa status mempertahankan status lama');
-  { const { DatabaseSync } = require('node:sqlite'), D = new DatabaseSync(DB('a')), ins = D.prepare("INSERT INTO studio(name,description,people_range_id,budget_range_id,status) VALUES('Studio Kembar','x',1,1,'AVAILABLE')"); ins.run(); const k2 = +ins.run().lastInsertRowid; D.close();
-    ok((await call('PATCH', `/admin/studios/${k2}`, { status: 'UNAVAILABLE' }, AD)).s === 200, 'data lama dengan nama kembar: ubah status saja tetap bisa'); }
-  ok((await call('POST', '/admin/studios', { ...nst, name: 'Studio Default' }, AD)).s === 200 && (await call('GET', '/master')).j.STUDIOS.some(s => s.name === 'Studio Default' && s.status === 'AVAILABLE'), 'status bawaan studio baru AVAILABLE');
-  // --- studio tidak tersedia disembunyikan dari customer (SR-05-05, SR-04-04) ---
+  ok((await call('PATCH', `/admin/studios/${U1}`, { status: 'UNAVAILABLE', description: 'ubah deskripsi' }, AD)).s === 200 && (await rowOf(U1)).status === 'AVAILABLE', 'admin tidak bisa mengubah status (diabaikan, tetap dari slot)');
+  { const { DatabaseSync } = require('node:sqlite'), D = new DatabaseSync(DB('a')), ins = D.prepare("INSERT INTO studio(name,description,people_range_id,budget_range_id) VALUES('Studio Kembar','x',1,1)"); ins.run(); const k2 = +ins.run().lastInsertRowid; D.close();
+    ok((await call('PATCH', `/admin/studios/${k2}`, { description: 'y' }, AD)).s === 200, 'data lama dengan nama kembar: ubah selain nama tetap bisa'); }
+  ok((await call('POST', '/admin/studios', { ...nst, name: 'Studio Default' }, AD)).s === 200 && (await call('GET', '/master')).j.STUDIOS.some(s => s.name === 'Studio Default' && s.status === 'AVAILABLE'), 'studio baru langsung tampil untuk customer (AVAILABLE)');
+  { const D = new (require('node:sqlite').DatabaseSync)(DB('a')); ok(!D.prepare('PRAGMA table_info(studio)').all().some(c => c.name === 'status'), 'tabel studio tanpa kolom status'); D.close(); }
+  // --- studio tanpa slot kosong = tidak tersedia, disembunyikan dari customer (SR-05-05) ---
+  const wib = k => new Date(Date.now() + 420 * 60000 + k * 864e5).toISOString().slice(0, 10), HRS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+  { const D = new (require('node:sqlite').DatabaseSync)(DB('a')); D.exec('PRAGMA foreign_keys=OFF'); const ins = D.prepare("INSERT INTO session(booking_id,studio_id,slot,status) VALUES(0,?,?,'Terjadwal')");
+    for (let k = 0; k < 14; k++) for (const h of HRS) ins.run(U1, `${wib(k)} ${h}:00`); D.close(); }
+  { const r = await rowOf(U1); ok(r.status === 'UNAVAILABLE' && r.free_slots === 0, 'semua slot 14 hari terisi: UNAVAILABLE, free_slots 0'); }
   let ms = (await call('GET', '/master')).j; ok(!ms.STUDIOS.some(s => s.id === U1) && ms.ALLSTUDIOS.some(s => s.id === U1 && s.status === 'UNAVAILABLE'), 'studio tidak tersedia: tidak ada di STUDIOS, ada di ALLSTUDIOS');
-  const av = await call('GET', `/availability?studio_id=${U1}&date=${far}`); ok(av.s === 400 && /tidak tersedia/.test(av.j.error), 'availability studio tidak tersedia ditolak');
-  const nb = await call('POST', '/bookings', { package_id: 1, studio_id: U1, date: far + ' 10:00' }, A); ok(nb.s === 400 && /tidak tersedia/.test(nb.j.error), 'booking ke studio tidak tersedia ditolak');
-  ok((await call('POST', '/quote', { package_id: 1, studio_id: U1 }, A)).s === 400, 'quote dengan studio tidak tersedia ditolak');
-  const eb = await book(call, A, 2, far + ' 10:00'); ok((await call('PATCH', '/admin/studios/2', { status: 'UNAVAILABLE' }, AD)).s === 200, 'admin menonaktifkan studio yang sudah punya booking');
-  const mine = (await call('GET', '/bookings', null, A)).j.find(b => b.id === eb.id); ok(mine && mine.status === 'Menunggu Pembayaran' && mine.studio === 2 && mine.date === far + ' 10:00', 'booking lama di studio tidak tersedia tetap utuh');
-  ok((await call('PATCH', `/bookings/${eb.id}`, { studio_id: 2, date: far + ' 11:00' }, A)).s === 400, 'reschedule ke studio tidak tersedia ditolak');
-  ok((await call('PATCH', '/admin/studios/2', { status: 'AVAILABLE' }, AD)).s === 200 && (await call('GET', '/master')).j.STUDIOS.some(s => s.id === 2) && (await call('GET', `/availability?studio_id=2&date=${far}`)).s === 200 && (await call('POST', '/bookings', { package_id: 1, studio_id: 2, date: far + ' 11:00' }, Bt)).s === 200, 'studio kembali tersedia dan bisa dipesan');
+  { const av = await call('GET', `/availability?studio_id=${U1}&date=${far}`); ok(av.s === 200 && av.j.free.length === 0, 'availability studio penuh: 200 tanpa slot kosong (hanya studio terhapus yang ditolak)'); }
+  { const D = new (require('node:sqlite').DatabaseSync)(DB('a')); D.prepare("UPDATE session SET status='Dibatalkan' WHERE studio_id=? AND slot=?").run(U1, `${far} 10:00`); D.close(); }
+  { const r = await rowOf(U1); ok(r.status === 'AVAILABLE' && r.free_slots === 1, 'satu slot dibebaskan: kembali AVAILABLE, free_slots 1'); }
+  ok((await call('GET', '/master')).j.STUDIOS.some(s => s.id === U1 && s.status === 'AVAILABLE') && (await call('GET', `/availability?studio_id=${U1}&date=${far}`)).j.free.includes(10), 'studio kembali tampil untuk customer dan slot 10:00 bisa dipilih');
+  const eb = await book(call, A, 2, far + ' 10:00'); ok(eb.id, 'booking di studio 2'); ok((await call('POST', '/bookings', { package_id: 1, studio_id: 2, date: far + ' 11:00' }, Bt)).s === 200, 'booking kedua di studio 2');
   // --- daftar studio admin (SR-03-02) ---
   const L = (await call('GET', '/admin/studios', null, AD)).j, r2 = L.find(s => s.id === 2); ok(r2 && r2.status === 'AVAILABLE' && typeof r2.price === 'number' && r2.active_bookings === 2 && r2.bookings === 2 && r2.sessions === 0, 'daftar studio admin: status, biaya, booking aktif, jumlah sesi');
-  ok(L.some(s => s.id === U1 && s.status === 'UNAVAILABLE'), 'daftar studio admin memuat studio tidak tersedia');
+  ok(L.every(s => ['AVAILABLE', 'UNAVAILABLE'].includes(s.status) && Number.isInteger(s.free_slots)), 'daftar studio admin: setiap studio punya status turunan dan free_slots');
 
   // --- hapus studio: soft delete + batalkan & refund booking aktif + email (US-06) ---
   const d1 = await book(call, A, 3, far + ' 13:00'), d2 = await book(call, Bt, 3, far + ' 14:00', 2); await pay(call, Bt, d2.id);

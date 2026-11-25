@@ -253,7 +253,9 @@ export function createStudioController({
           const name = String(draft.name).trim();
           let created;
           try {
-            created = await adminModels().studios.createStudio(api, { ...draft, name, img: adminState().images.new });
+            // draf lama (tersimpan sebelum status diturunkan server) bisa masih membawa status: tidak dikirim
+            const { status, ...fields } = draft;
+            created = await adminModels().studios.createStudio(api, { ...fields, name, img: adminState().images.new });
           } catch (error) {
             const errors = adminModels().studios.serverStudioErrors(error);
             if (!errors) {
@@ -266,10 +268,8 @@ export function createStudioController({
             });
             return;
           }
-          const text =
-            draft.status == "UNAVAILABLE"
-              ? `${name} disimpan dengan status Tidak tersedia, belum tampil di daftar studio pelanggan.`
-              : `${name} tersedia dan tampil di daftar studio pelanggan.`;
+          // studio baru belum punya booking, jadi slotnya kosong: status turunannya Tersedia
+          const text = `${name} tersedia dan tampil di daftar studio pelanggan.`;
           updateAdmin({
             images: without(adminState().images, "new"),
             openStudios: { ...adminState().openStudios, new: false, [created.id]: true },
