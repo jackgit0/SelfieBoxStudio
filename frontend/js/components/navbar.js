@@ -1,5 +1,5 @@
 // Navbar customer (dulu shell(), acctMenu() dan navGo() di core.js): header dengan tab, menu akun, dan bilah bawah di layar kecil.
-// route = { title, tab } (dari tabel rute), session = { user, staff }; user null = tamu.
+// route = { title, tab } (dari tabel rute), session = { user }; user null = tamu.
 import { html } from "../core/html.js";
 import { BRAND } from "../config.js";
 import { icon } from "./icon.js";
@@ -17,7 +17,7 @@ function tabPath(tab, session) {
 
 function accountMenu(session) {
   return html`<div class="usr">
-    ${session.staff ? html`<span class="tag warn">Staf</span>` : ""}<span class="uname">${session.user.name}</span
+    <span class="uname">${session.user.name}</span
     ><button
       class="avatar"
       aria-label="Menu akun"
@@ -29,9 +29,7 @@ function accountMenu(session) {
     </button>
     <div id="menu" class="menu" hidden>
       <button data-route="/account">${icon("user", 18)} Pengaturan Akun</button
-      ><button data-route="/account/payments">${icon("receipt", 18)} Riwayat Pembayaran</button>
-      <button data-action="auth:staffToggle">
-        ${icon("settings", 18)} ${session.staff ? "Nonaktifkan Mode Staf" : "Mode Staf"}</button
+      ><button data-route="/account/payments">${icon("receipt", 18)} Riwayat Pembayaran</button
       ><button data-action="auth:logout">${icon("logout", 18)} Keluar</button>
     </div>
   </div>`;

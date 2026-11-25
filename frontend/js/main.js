@@ -1,7 +1,7 @@
 // Titik masuk aplikasi (satu-satunya <script type="module"> di index.html).
 // Menyiapkan API, store, controller, router, renderer dan event data-*, lalu: muat data master, tautan #reset= (router),
 // pulihkan login (AuthController), render pertama. start() hanya berjalan di browser (ada document), jadi tes Node dapat mengimpor modul ini.
-import { API_BASE, BRAND, CS_EMAIL, CS_WA, GOOGLE_CLIENT_ID } from "./config.js";
+import { API_BASE, BRAND, CS_EMAIL, CS_WA } from "./config.js";
 import { createStore } from "./core/store.js";
 import { ROUTES, createRouter } from "./core/router.js";
 import { createEvents, formValues } from "./core/events.js";
@@ -36,7 +36,7 @@ import { createGalleryController } from "./controllers/GalleryController.js";
 import { createAdminController, createAdminState } from "./controllers/AdminController.js";
 import { createAdminBookingController } from "./controllers/AdminBookingController.js";
 import * as adminModels from "./models/admin/index.js";
-import { photoSessionView } from "./views/session/photoSession.js";
+import { liveSessionView } from "./views/admin/liveSession.js";
 import { galleryView } from "./views/session/gallery.js";
 import { dashboardView } from "./views/admin/dashboard.js";
 import { studiosView } from "./views/admin/studios.js";
@@ -153,13 +153,13 @@ function pagesFor({ studio, payment, landing, photo, gallery, admin, adminBookin
     "/register": { view: registerView },
     "/forgot-password": { view: forgotView },
     "/reset-password": { view: resetView },
-    // Sesi Foto (PhotoSessionController): kamera dan timer berjalan selama halaman terbuka, berhenti saat ditinggalkan
-    "/sessions/:id": { view: photoSessionView, after: match => photo.enter(match), leave: () => photo.stopTimers() },
     // Galeri (GalleryController)
     "/gallery": { view: galleryView },
     // panel admin (AdminController; Studio + Detail Sesi = StudioController; Booking = AdminBookingController)
     "/admin": { view: dashboardView, after: () => admin.loadDashboard() },
     "/admin/studios": { view: studiosView, after: () => studio.loadStudios() },
+    // Session Assistant di tablet studio (PhotoSessionController): kamera dan timer berjalan selama halaman terbuka, berhenti saat ditinggalkan
+    "/admin/studios/:id/live": { view: liveSessionView, after: match => photo.enter(match), leave: () => photo.stopTimers() },
     "/admin/bookings": { view: adminBookingsView, after: () => adminBooking.load() },
     "/admin/props": { view: propertiesView, after: () => admin.loadProperties() },
     "/admin/poses": { view: posesView, after: () => admin.loadPoses() },
@@ -233,6 +233,7 @@ export function controllerActions({
     "adminBooking:close": adminBooking.close,
     "adminBooking:save": (dataset, event) => adminBooking.save(dataset, formValues(event.target)),
     "adminBooking:delete": adminBooking.delete,
+    "adminBooking:checkIn": adminBooking.checkIn,
     "gallery:showSession": gallery.showSession,
     "gallery:select": gallery.select,
     "gallery:toggleFavourite": gallery.toggleFavourite,
@@ -242,11 +243,16 @@ export function controllerActions({
     "gallery:deleteSelected": gallery.deleteSelected,
     "gallery:confirmSelection": gallery.confirmSelection,
     "gallery:download": gallery.download,
+    "photo:refresh": photo.refresh,
     "photo:start": photo.start,
-    "photo:open": photo.open,
+    "photo:setTimer": photo.setTimer,
+    "photo:setCamera": photo.setCamera,
     "photo:shoot": photo.shoot,
+    "photo:deletePhoto": photo.deletePhoto,
+    "photo:pickBackground": photo.pickBackground,
     "photo:nextPose": photo.nextPose,
-    "photo:staffAction": photo.staffAction,
+    "photo:end": photo.end,
+    "photo:exit": photo.exit,
     "landing:scrollTo": landing.scrollTo,
     "landing:toggleMenu": landing.toggleMenu,
     "landing:openAuth": landing.openAuth,
@@ -257,7 +263,6 @@ export function controllerActions({
     "auth:forgot": (dataset, event) => auth.forgot(formValues(event.target)),
     "auth:reset": (dataset, event) => auth.reset(formValues(event.target)),
     "auth:logout": auth.logout,
-    "auth:staffToggle": auth.toggleStaff,
     "account:saveProfile": (dataset, event) => account.saveProfile(formValues(event.target)),
     "account:requestPasswordChange": account.requestPasswordChange,
     "payment:selectPackage": payment.selectPackage,
@@ -375,6 +380,7 @@ async function start() {
     page: createLandingPage({ document, window }),
     timers: { setTimeout: (callback, delay) => window.setTimeout(callback, delay) },
   });
+  // Session Assistant di tablet studio (admin); dibuat setelah AdminController (galat akses admin)
   const photo = createPhotoSessionController({
     api,
     store,
@@ -383,17 +389,20 @@ async function start() {
     models,
     screen: createSessionScreen({ document }),
     media: navigator.mediaDevices
-      ? { getUserMedia: constraints => navigator.mediaDevices.getUserMedia(constraints) }
+      ? {
+          getUserMedia: constraints => navigator.mediaDevices.getUserMedia(constraints),
+          enumerateDevices: () => navigator.mediaDevices.enumerateDevices(),
+        }
       : null,
     timers: {
       setInterval: (callback, delay) => window.setInterval(callback, delay),
       clearInterval: id => window.clearInterval(id),
       setTimeout: (callback, delay) => window.setTimeout(callback, delay),
+      clearTimeout: id => window.clearTimeout(id),
     },
     sound: createBeeper(window.AudioContext),
-    drive: { clientId: GOOGLE_CLIENT_ID, google: () => window.google, fetch: (...request) => window.fetch(...request) },
-    refreshData: booking.refreshData,
-    brand: BRAND,
+    photoUrl: id => api.adminPhotoUrl(id),
+    admin: adminCore,
   });
   const gallery = createGalleryController({
     api,
@@ -402,7 +411,6 @@ async function start() {
     models,
     drive: { fetch: (...request) => window.fetch(...request) },
     files: { download: downloadFile },
-    photoSession: photo,
     refreshData: booking.refreshData,
     brand: BRAND,
   });
@@ -480,7 +488,7 @@ async function start() {
   // back/forward dan tautan #reset= (diubah menjadi /reset-password)
   router.start();
 
-  // pulihkan login tersimpan (Mode Staf tidak ikut dipulihkan); token pelanggan di sesi admin → dialog Akses Ditolak (AuthController)
+  // pulihkan login tersimpan; token pelanggan di sesi admin → dialog Akses Ditolak (AuthController)
   if (await auth.restoreSession()) {
     renderer.render();
   }

@@ -6,8 +6,11 @@ import { packageOf, studioOf } from "../../models/master.js";
 import { groupByDay, myBookings, statusTone } from "../../models/booking.js";
 
 // label status booking (juga dipakai Detail Booking)
+// booking terbayar yang sudah check-in di studio diberi tanda "Sudah check-in"
 export function statusTag(booking) {
-  return html`<span class="tag ${statusTone(booking.status)}">${booking.status}</span>`;
+  const checkedIn =
+    booking.status === "Terbayar" && booking.checked_in_at ? html` <span class="tag ok">Sudah check-in</span>` : "";
+  return html`<span class="tag ${statusTone(booking.status)}">${booking.status}</span>${checkedIn}`;
 }
 
 // match.query.tab = "history" → Riwayat

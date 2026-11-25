@@ -19,6 +19,28 @@ import { icon } from "../../components/icon.js";
 import { loadingCard } from "../../components/adminWidgets.js";
 
 const statusTag = status => html`<span class="tag ${statusTone(status)}">${status}</span>`;
+// booking terbayar yang sudah check-in di meja depan (sesi dimulai dari tablet studio)
+const checkedInTag = booking =>
+  booking.status == "Terbayar" && booking.checked_in_at ? html`<br /><span class="tag ok">Sudah check-in</span>` : "";
+
+// Check-in (hari sesi, sampai slot berakhir): tombol aktif bila server tidak memberi alasan penolakan (checkin_block)
+function checkInBox(detail) {
+  if (detail.status != "Terbayar") {
+    return "";
+  }
+  if (detail.checked_in_at) {
+    return html`<div class="cibox ok">
+      ${icon("check", 18)}
+      <span>Sudah check-in ${formatTime(detail.checked_in_at)}. Sesi dimulai dari tablet ${detail.studio_name}.</span>
+    </div>`;
+  }
+  return html`<div class="cibox">
+    <button class="btn sm" data-action="adminBooking:checkIn" data-id="${detail.id}" ${detail.checkin_block ? "disabled" : ""}>
+      ${icon("check", 16)} Check-in
+    </button>
+    <span class="sm m">${detail.checkin_block ? detail.checkin_block + "." : "Pelanggan sudah datang di studio."}</span>
+  </div>`;
+}
 
 function bookingRows(rows, openId) {
   if (!rows.length) {
@@ -36,7 +58,9 @@ function bookingRows(rows, openId) {
       <td>${booking.slot}</td>
       <td class="bx">${formatRupiah(booking.amount)}</td>
       <td>
-        ${statusTag(booking.status)}${booking.cancel_reason ? html`<br /><small class="m">${booking.cancel_reason}</small>` : ""}
+        ${statusTag(booking.status)}${checkedInTag(booking)}${booking.cancel_reason
+          ? html`<br /><small class="m">${booking.cancel_reason}</small>`
+          : ""}
       </td>
       <td class="bx">
         ${PAYMENT_LABELS[booking.pay_status] || "-"}${booking.method ? html`<br /><small class="m">${booking.method}</small>` : ""}
@@ -159,7 +183,7 @@ function detailPanel(detail, draft) {
         </button>
       </div>
     </div>
-    ${bookingInfo} ${editForm(detail, draft)}
+    ${checkInBox(detail)} ${bookingInfo} ${editForm(detail, draft)}
     <h4 class="bh">Detail Pembayaran</h4>
     ${paymentInfo}
     ${detail.delete_block ? html`<p class="sm m" style="margin-top:10px">${detail.delete_block}.</p>` : ""}

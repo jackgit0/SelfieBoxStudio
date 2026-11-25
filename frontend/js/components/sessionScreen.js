@@ -1,4 +1,4 @@
-// Adaptor DOM layar Sesi Foto untuk PhotoSessionController (decisions.md 60; dulu bagian DOM dari V.session_after, upd, nextPose, shoot, beep di legacy/session.js).
+// Adaptor DOM layar Session Assistant di tablet studio untuk PhotoSessionController (decisions.md 60).
 // Tidak menyentuh document saat diimpor; main.js memberikan document dan AudioContext.
 import { mediaSrc } from "./propertyVisual.js";
 
@@ -14,7 +14,7 @@ export function createSessionScreen({ document }) {
     cameraUnavailable() {
       const video = $("#v");
       if (video) {
-        video.outerHTML = '<div class="m">Kamera tidak tersedia — foto simulasi digunakan.</div>';
+        video.outerHTML = '<div class="kio-nocam m">Kamera tidak tersedia — foto simulasi digunakan.</div>';
       }
     },
     // url = foto pose dari data master (/img/... atau /media/... unggahan admin, dimuat dari origin API lewat mediaSrc)
@@ -25,7 +25,7 @@ export function createSessionScreen({ document }) {
         pose.alt = alt;
       }
     },
-    // status = sessionStatus(), strip = photoStrip() dari views/session/photoSession.js; strip hanya diganti bila daftar fotonya berubah
+    // status = sessionStatus(), strip = photoStrip() dari views/admin/liveSession.js; strip hanya diganti bila daftar fotonya berubah
     update(status, strip) {
       const timer = $("#tm");
       if (!timer) {
@@ -42,8 +42,24 @@ export function createSessionScreen({ document }) {
       }
       $("#ds").textContent = status.note;
     },
-    // satu bingkai dari kamera (rasio foto = rasio kamera, tidak gepeng), atau foto simulasi bila kamera tidak tersedia; emojis = aksesori setup
-    capture({ emojis }) {
+    // angka hitung mundur timer foto (3·2·1) besar di atas kamera
+    showCountdown(seconds) {
+      const box = $("#cd");
+      if (box) {
+        box.hidden = false;
+        box.textContent = String(seconds);
+      }
+    },
+    hideCountdown() {
+      const box = $("#cd");
+      if (box) {
+        box.hidden = true;
+        box.textContent = "";
+      }
+    },
+    // satu bingkai dari kamera (rasio foto = rasio kamera, tidak gepeng), atau foto simulasi bila kamera tidak tersedia:
+    // warna datar background pilihan (fill), selain itu warna acak
+    capture({ fill = null } = {}) {
       const canvas = $("#cv");
       const video = $("#v");
       const width = 640;
@@ -54,32 +70,32 @@ export function createSessionScreen({ document }) {
       if (video && video.videoWidth) {
         context.drawImage(video, 0, 0, width, height);
       } else {
-        context.fillStyle = "hsl(" + Math.random() * 360 + ",70%,60%)"; // satu warna datar (decisions.md 64)
+        context.fillStyle = fill || "hsl(" + Math.random() * 360 + ",70%,60%)"; // satu warna datar (decisions.md 64)
         context.fillRect(0, 0, width, height);
         context.font = "90px serif";
         context.fillText("😄", width / 2 - 45, height / 2 + 30);
       }
-      context.font = "40px serif";
-      emojis.forEach((emoji, index) => context.fillText(emoji, 20 + index * 50, 50));
       return canvas.toDataURL("image/jpeg", 0.8);
     },
   };
 }
 
-// bunyi peringatan waktu hampir habis (880 Hz, 0,4 detik); diam bila Web Audio tidak tersedia
+// bunyi: peringatan waktu hampir habis (880 Hz, 0,4 detik) dan detak hitung mundur timer foto (660 Hz, 0,12 detik); diam bila Web Audio tidak tersedia
 export function createBeeper(AudioContextClass) {
+  function tone(frequency, length) {
+    try {
+      const audio = new AudioContextClass();
+      const oscillator = audio.createOscillator();
+      oscillator.connect(audio.destination);
+      oscillator.frequency.value = frequency;
+      oscillator.start();
+      oscillator.stop(audio.currentTime + length);
+    } catch (error) {
+      // tanpa suara
+    }
+  }
   return {
-    beep() {
-      try {
-        const audio = new AudioContextClass();
-        const oscillator = audio.createOscillator();
-        oscillator.connect(audio.destination);
-        oscillator.frequency.value = 880;
-        oscillator.start();
-        oscillator.stop(audio.currentTime + 0.4);
-      } catch (error) {
-        // tanpa suara
-      }
-    },
+    beep: () => tone(880, 0.4),
+    tick: () => tone(660, 0.12),
   };
 }

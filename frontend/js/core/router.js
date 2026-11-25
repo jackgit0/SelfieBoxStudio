@@ -29,7 +29,6 @@ export const ROUTES = [
   { path: "/account", name: "account", access: "customer", title: "Akun", tab: null, params: { tab: "profile" } },
   { path: "/account/payments", name: "account", access: "customer", title: "Akun", tab: null, params: { tab: "pay" } },
   { path: "/gallery", name: "gallery", access: "customer", title: "Galeri", tab: "gallery" },
-  { path: "/sessions/:id", name: "session", access: "customer", title: "Sesi Foto", tab: "gallery" },
   {
     path: "/admin",
     name: "adash",
@@ -57,6 +56,8 @@ export const ROUTES = [
     searchable: true,
     count: "studios",
   },
+  // Session Assistant di tablet studio (ikon mata di Admin → Studio): layar penuh tanpa sidebar (layout "kiosk", core/render.js)
+  { path: "/admin/studios/:id/live", name: "alive", access: "admin", title: "Session Assistant", tab: null },
   {
     path: "/admin/bookings",
     name: "abook",

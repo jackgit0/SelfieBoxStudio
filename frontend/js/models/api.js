@@ -17,7 +17,6 @@ export function createApi({
   storage = null,
 } = {}) {
   let token = readToken(storage);
-  let staffToken = "";
 
   const api = {
     // JWT pengguna atau admin; mengisinya juga menyimpan ke storage, mengosongkannya menghapus dari storage
@@ -36,21 +35,11 @@ export function createApi({
         // storage diblokir: token tetap berlaku di memori sampai halaman dimuat ulang
       }
     },
-    // token Mode Staf (header X-Staff-Token), hanya di memori
-    get staffToken() {
-      return staffToken;
-    },
-    set staffToken(value) {
-      staffToken = value || "";
-    },
 
     async request(method, path, body) {
       const headers = { "Content-Type": "application/json" };
       if (token) {
         headers.Authorization = "Bearer " + token;
-      }
-      if (staffToken) {
-        headers["X-Staff-Token"] = staffToken;
       }
       const response = await fetchFunction(base + "/api" + path, {
         method,
@@ -80,7 +69,7 @@ export function createApi({
     // tautan invoice (download = unduh berkas, bukan tampil di tab baru) dan gambar foto, dengan token di query
     invoiceUrl: (id, download) => `${base}/api/bookings/${id}/invoice?t=${token}${download ? "&dl=1" : ""}`,
     imageUrl: id => `${base}/api/photos/${id}/image?t=${token}`,
-    // foto pelanggan di panel admin (detail Pengguna)
+    // foto pelanggan di panel admin (detail Pengguna, strip Session Assistant di tablet studio)
     adminPhotoUrl: id => `${base}/api/admin/photos/${id}/image?t=${token}`,
   };
   return api;

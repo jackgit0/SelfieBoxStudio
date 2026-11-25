@@ -1,14 +1,18 @@
 // Render (decisions.md 9 dan 39): shell (navbar + bilah bawah customer, sidebar admin, pembungkus form masuk, atau tanpa shell untuk landing)
 // dipasang sekali per rute; perubahan store hanya merender ulang isi <main id="outlet">. Shell dipasang ulang bila path atau isinya berubah
-// (judul, tab, nama user, Mode Staf, login), jadi fokus di elemen shell tidak hilang saat outlet dirender ulang.
+// (judul, tab, nama user, login), jadi fokus di elemen shell tidak hilang saat outlet dirender ulang.
 // Modul ini tidak menyentuh window/document saat diimpor; elemen akar dan document diberikan main.js.
 import { html } from "./html.js";
 import { navbar, bottomBar } from "../components/navbar.js";
 import { adminHeader, adminSidebar, adminTitle } from "../components/adminSidebar.js";
 import { renderToasts } from "../components/toast.js";
 
-// nama rute + session = { admin } → "landing" | "auth" | "admin" | "customer" (aturan render() lama)
+// nama rute + session = { admin } → "landing" | "auth" | "kiosk" | "admin" | "customer" (aturan render() lama);
+// kiosk = Session Assistant di tablet studio, layar penuh tanpa sidebar admin
 export function layoutOf(routeName, session) {
+  if (routeName === "alive" && session.admin) {
+    return "kiosk";
+  }
   if (routeName === "landing") {
     return "landing";
   }
@@ -18,13 +22,16 @@ export function layoutOf(routeName, session) {
   return session.admin ? "admin" : "customer";
 }
 
-// options = { layout, route (entri tabel rute), session = { user, staff } }; setiap shell memuat tepat satu #outlet
+// options = { layout, route (entri tabel rute), session = { user } }; setiap shell memuat tepat satu #outlet
 export function shellMarkup({ layout, route, session }) {
   if (layout === "landing") {
     return html`<div id="outlet"></div>`;
   }
   if (layout === "auth") {
     return html`<main id="outlet" class="authwrap"></main>`;
+  }
+  if (layout === "kiosk") {
+    return html`<main id="outlet" class="kiosk"></main>`;
   }
   if (layout === "admin") {
     return html`<div class="adm">
@@ -37,7 +44,7 @@ export function shellMarkup({ layout, route, session }) {
     ${bottomBar(route, session)}`;
 }
 
-// isi outlet: landing dan form masuk apa adanya (form masuk menampilkan toast-nya sendiri); customer = toast + isi; admin = header + toast + isi
+// isi outlet: landing dan form masuk apa adanya (form masuk menampilkan toast-nya sendiri); customer dan kiosk = toast + isi; admin = header + toast + isi
 export function composeOutlet({ layout, content, toast = {}, header = "" }) {
   if (layout === "landing" || layout === "auth") {
     return content;
@@ -135,7 +142,7 @@ export function createPageHooks({ store, syncReschedule }) {
       return shellMarkup({
         layout: layoutNow(),
         route: match.route,
-        session: { user: persisted.me ? persisted.user : null, staff: persisted.staff },
+        session: { user: persisted.me ? persisted.user : null },
       });
     },
     outlet(match) {

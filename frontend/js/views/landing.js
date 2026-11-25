@@ -89,7 +89,7 @@ const FACILITIES = [
 const STEPS = [
   ["calendar", "Pilih studio & jadwal", "Lihat studio yang tersedia, pilih tanggal dan sesi 50 menit yang cocok."],
   ["tag", "Pilih paket & bayar", "Bandingkan paket, cek totalnya, lalu bayar lewat QRIS atau transfer."],
-  ["camera", "Datang & mulai foto", "Check-in, timer berjalan otomatis, dan panduan pose siap membantu."],
+  ["camera", "Datang & mulai foto", "Check-in di meja depan, lalu sesi berjalan di tablet studio dengan timer dan panduan pose."],
   ["images", "Pilih & unduh foto", "Pilih foto favorit sesuai kuota paket, lalu unduh atau kirim ke Google Drive."],
 ];
 
