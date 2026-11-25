@@ -1,44 +1,24 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
+import { API, BK, D, M, R, S, V, save } from "./state.js";
+import { BRAND, CS_EMAIL, CS_WA } from "../config.js";
+import { esc } from "../core/html.js";
+import { SESSION_HOURS as HRS, formatRupiah as rp, todayIso as todayS } from "../core/format.js";
+import * as masterModel from "../models/master.js";
+import { resumeDraft } from "./customer.js";
+import { stopSessionTimers } from "./session.js";
+import { AD, adminReset, adminShell } from "./admin.js";
 const $ = s => document.querySelector(s);
-const BRAND = window.BRAND || "SelfieBox Studio";
-// data master dari /api/master dalam satu objek (refactor MVC fase 1: field objek, bukan global yang di-assign ulang); json = isi terakhir untuk refreshMaster
-const M = { packages: [], allPackages: [], favouritePackageId: null, discount: { pct: 0, label: "" }, peopleRanges: [], budgetRanges: [], studios: [], allStudios: [], properties: [], poses: {}, policy: { refund_hours: 2 }, json: "" };
-const V = {};
-let S; try { S = JSON.parse(localStorage.getItem("snapia")); } catch (e) {}
-S = Object.assign({ user: null, me: null, admin: false, view: "landing", p: {}, pkg: null, bm: [], staff: false, log: [] }, S || {}); delete S.quiz; delete S.setup; // sisa state lama (kuis rekomendasi paket dan pilihan setup properti sudah dihapus)
-if (S.acct === "pref") S.acct = "profile";
-["bookings", "sessions"].forEach(k => delete S[k]); // state lama menyimpan keduanya (sebagai array kosong); kini di objek D
-// booking dan sesi foto milik user yang masuk (dari /api/bookings dan /api/sessions; tidak disimpan)
-const D = { bookings: [], sessions: [] };
-const save = () => { try { localStorage.setItem("snapia", JSON.stringify(S)); } catch (e) {} };
-// state sementara (tidak disimpan): toast, cache ketersediaan slot, bulan kalender, isian pembatalan, mode form masuk + token reset, form Contact Us di landing, dialog Akses Ditolak yang sedang terbuka
-const R = { toast: { message: "", error: "" }, availability: {}, calendar: {}, cancel: { reason: "", detail: "" }, auth: { mode: "login", resetToken: "" }, contact: { n: "", e: "", m: "", ok: "", err: "", busy: false }, accessDeniedOpen: false };
-// booking yang sedang diisi: studio, tanggal, sesi; quote = rincian harga dari /api/quote; rescheduleId = id booking yang sedang diubah jadwalnya
-const BK = { studio: null, date: null, slot: null, quote: null, rescheduleId: null };
 const me = () => S.user;
 
 // ---------- utilitas ----------
-const esc = x => String(x ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const rp = n => "Rp" + Number(n || 0).toLocaleString("id-ID");
-const rpk = n => n >= 1000 ? "Rp " + Math.round(n / 1000) + "k" : "Rp " + n;
-const pad = n => String(n).padStart(2, "0");
-const HRS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];      // sesi 50 menit tiap jam (sama dengan server)
-const iso = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
-const todayS = () => iso(new Date());
-const slotLabel = h => `${pad(h)}:00 - ${pad(h)}:50`;
-const parseSlot = s => { const [d, t] = String(s).split(" "); return { date: d, h: +t.split(":")[0] }; };
-const slotRange = s => slotLabel(parseSlot(s).h);
-const dObj = d => new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
-const fmtDate = d => dObj(d).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
-const fmtDMY = d => d.split("-").reverse().join("/");
-const fmtTime = ms => ms ? new Date(ms).toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }).replace(/\./g, ":").replace(",", " -") : "-";
-const pkOf = id => M.allPackages.find(p => p.id == id) || { name: "(paket dihapus)", price: 0, photo_count: 1, dur: 1, strip_size: "", strip_material: "" };
-const eff = p => Math.round(p.price * (1 - (M.discount.pct || 0) / 100));
+// esc dan format (rp, pad, slotLabel, …) dari core/html.js dan core/format.js; pencarian data master dari models/master.js
+const pkOf = id => masterModel.packageOf(M, id);
+const eff = p => masterModel.effectivePrice(M, p);
 const ptag = p => M.discount.pct ? `<s class="m">${rp(p.price)}</s> ${rp(eff(p))}` : rp(p.price);
-const studioOf = id => M.allStudios.find(s => s.id == id) || { id, name: "(studio dihapus)", img: "", address: "-", price: 0, description: "" };
+const studioOf = id => masterModel.studioOf(M, id);
 const free = (sid, d) => R.availability[sid + "|" + d] || HRS.filter(h => d > todayS() || h > new Date().getHours());
-const priceRange = s => { if (!M.packages.length) return "-"; const v = M.packages.map(p => eff(p) + (s.price || 0)); const a = Math.min(...v), b = Math.max(...v); return a === b ? rpk(a) : rpk(a) + " - " + rpk(b); };
-const capLabel = s => ((M.peopleRanges.find(p => p.id == s.people_range_id) || {}).range || "").replace("-", " - ");
+const priceRange = s => masterModel.priceRange(M, s);
+const capLabel = s => masterModel.capacityLabel(M, s);
 
 // ---------- ikon (garis, 24px) ----------
 const IC = {
@@ -101,7 +81,7 @@ ${S.me ? acctMenu() : `<div class="usr"><button class="btn ghost sm" onclick="op
 <nav class="bottom">${nav.map(n => `<button class="${on(n[0]) ? "on" : ""}" onclick="${navGo(n[0])}">${ic(n[2], 22)}<span>${n[1]}</span></button>`).join("")}</nav>`;
 }
 // muat ulang data master (studio/properti/paket) bila admin mengubahnya; render ulang hanya jika berbeda
-async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === M.json) return; M.json = j; Object.assign(M, { packages: m.PKG, allPackages: m.ALLPKG, favouritePackageId: m.FAV_PKG, discount: m.DISC, peopleRanges: m.PEOPLE, budgetRanges: m.BUDGET, studios: m.STUDIOS, allStudios: m.ALLSTUDIOS || m.STUDIOS, properties: m.PROP, poses: m.POSES }); if (m.POLICY) M.policy = m.POLICY; render(); } catch (e) {} }
+async function refreshMaster() { try { const m = await masterModel.loadMaster(API); if (m.json === M.json) return; Object.assign(M, m); render(); } catch (e) {} }
 V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
 function render() {
   if (!S.me && !GUEST_VIEWS.includes(S.view)) S.view = "landing";
@@ -132,13 +112,13 @@ V.auth = () => {
   if (R.auth.mode == "register") return wrap(tabs + `<label>Nama</label><input id="n" autocomplete="name"><label>Telepon</label><input id="p" inputmode="numeric" autocomplete="tel"><label>Email</label><input id="e" type="email" autocomplete="email"><label>Password (min. 6 karakter)</label><input id="pw" type="password" autocomplete="new-password" ${key}reg()"><div style="margin-top:18px"><button class="btn block" onclick="reg()">Daftar</button></div>`);
   return wrap(tabs + `<label>Email atau username</label><input id="e" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"><label>Password</label><input id="pw" type="password" autocomplete="current-password" ${key}login()"><div class="row sp" style="margin-top:18px"><button class="btn grow" onclick="login()">Masuk</button></div><p class="center sm" style="margin-top:14px"><a href="#" onclick="R.auth.mode='forgot';R.toast.message=R.toast.error='';render();return false">Lupa sandi?</a></p>`);
 };
-const fixS = s => { s.photos.forEach(p => p.img = p.img || API.imgUrl(p.id)); return s; };
+const fixS = s => { s.photos.forEach(p => p.img = p.img || API.imageUrl(p.id)); return s; };
 async function refresh() {
   D.bookings = await API.get("/bookings"); D.sessions = (await API.get("/sessions")).map(fixS);
 }
-async function afterAuth(r) { API.token = r.token; localStorage.setItem("snapia_t", r.token); S.admin = false; S.user = r.user; S.me = r.user.id; await refresh(); if (S.draft) return resumeDraft(); go("home"); } // draf booking tamu: kembali ke Paket & Pembayaran
-function logout() { API.token = ""; API.staff = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; S.staff = false; S.admin = false; S.draft = null; D.bookings = []; D.sessions = []; if (typeof adminReset === "function") adminReset(); R.auth.mode = "login"; go("landing"); }
-async function staffToggle() { if (S.staff) { S.staff = false; API.staff = ""; } else { const pin = prompt("PIN staf:"); if (!pin) return; try { API.staff = (await API.post("/staff/login", { pin })).token; S.staff = true; } catch (e) { R.toast.error = e.message; } } save(); render(); }
+async function afterAuth(r) { API.token = r.token; S.admin = false; S.user = r.user; S.me = r.user.id; await refresh(); if (S.draft) return resumeDraft(); go("home"); } // draf booking tamu: kembali ke Paket & Pembayaran
+function logout() { API.token = ""; API.staffToken = ""; S.user = S.me = null; S.staff = false; S.admin = false; S.draft = null; D.bookings = []; D.sessions = []; if (typeof adminReset === "function") adminReset(); R.auth.mode = "login"; go("landing"); }
+async function staffToggle() { if (S.staff) { S.staff = false; API.staffToken = ""; } else { const pin = prompt("PIN staf:"); if (!pin) return; try { API.staffToken = (await API.post("/staff/login", { pin })).token; S.staff = true; } catch (e) { R.toast.error = e.message; } } save(); render(); }
 async function reg() {
   const n = $("#n").value.trim(), e = $("#e").value.trim(), p = $("#p").value.trim(), pw = $("#pw").value;
   if (!n || !/\S+@\S+\.\S+/.test(e) || !/^\d{8,15}$/.test(p) || pw.length < 6) { R.toast.error = "Lengkapi data: email valid, telepon 8-15 digit, password min. 6 karakter."; return render(); }
@@ -159,7 +139,8 @@ async function doReset() {
   try { await API.post("/auth/reset", { token: R.auth.resetToken, password: a }); R.auth.resetToken = ""; R.auth.mode = "login"; R.toast.message = "Sandi berhasil diubah. Silakan masuk dengan sandi baru."; } catch (x) { R.toast.error = x.message; } render();
 }
 async function adminLogin(username, password) {
-  const r = await API.post("/admin/login", { username, password }); API.token = r.token; localStorage.setItem("snapia_t", r.token); S.admin = true; S.draft = null; S.user = { name: "Admin", id: 0 }; S.me = "admin"; AD.me = r.admin; go(r.admin.must_change ? "aacct" : "adash");
+  const r = await API.post("/admin/login", { username, password }); API.token = r.token; S.admin = true; S.draft = null; S.user = { name: "Admin", id: 0 }; S.me = "admin"; AD.me = r.admin; go(r.admin.must_change ? "aacct" : "adash");
 }
 async function changePw() { try { await API.post("/auth/forgot", { email: me().email }); R.toast.message = "Tautan untuk mengubah sandi telah dikirim ke " + me().email; } catch (x) { R.toast.error = x.message; } render(); }
-function csContact() { const wa = window.CS_WA, mail = window.CS_EMAIL; if (wa) window.open("https://wa.me/" + wa, "_blank"); else if (mail) location.href = "mailto:" + mail; else alert("Silakan hubungi staf di studio atau kontak Customer Service Anda. (Atur nomor di frontend/js/config.js)"); }
+function csContact() { const wa = CS_WA, mail = CS_EMAIL; if (wa) window.open("https://wa.me/" + wa, "_blank"); else if (mail) location.href = "mailto:" + mail; else alert("Silakan hubungi staf di studio atau kontak Customer Service Anda. (Atur nomor di frontend/js/config.js)"); }
+export { $, capLabel, changePw, csContact, doReset, eff, forgot, free, go, ic, icf, login, logout, me, modal, openAcct, pkOf, prefetch, priceRange, ptag, refresh, refreshMaster, reg, render, staffToggle, studioOf, toasts, toggleMenu };

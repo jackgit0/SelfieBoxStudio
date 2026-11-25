@@ -1,5 +1,8 @@
 // ===== SESI FOTO (kamera, timer, Google Drive) & GALERI =====
-const GOOGLE_CLIENT_ID = window.GOOGLE_CLIENT_ID || "";
+import { API, D, M, R, S, V } from "./state.js";
+import { GOOGLE_CLIENT_ID } from "../config.js";
+import { esc } from "../core/html.js";
+import { $, go, ic, pkOf, refresh, render } from "./core.js";
 // state sesi foto & galeri (tidak disimpan): token/folder Google Drive, sesi yang sedang dibuka, indeks pose, timer, stream kamera, sesi yang dipilih di Galeri, mode hapus + foto yang dipilih untuk dihapus
 const P = { drive: { token: null, folder: null }, session: null, poseIndex: 0, tickTimer: null, poseTimer: null, stream: null, gallerySession: null, deleteMode: false, deleteSelection: new Set() };
 function stopSessionTimers() { clearInterval(P.tickTimer); clearInterval(P.poseTimer); stopCam(); }
@@ -80,4 +83,5 @@ function selAllNonFav(sid){D.sessions.find(s=>s.id==sid).photos.forEach(p=>{if(!
 async function bulkDel(){if(!P.deleteSelection.size||!confirm(`Hapus ${P.deleteSelection.size} foto terpilih secara permanen? Foto favorit tidak ikut terhapus.`))return;R.toast.message=R.toast.error="";
  try{const r=await API.post("/photos/bulk-delete",{ids:[...P.deleteSelection]});P.deleteSelection=new Set();P.deleteMode=false;await refresh();R.toast.message=`${r.deleted} foto dihapus${r.skipped_favorites?`, ${r.skipped_favorites} foto favorit dilewati`:""}.`}catch(e){R.toast.error=e.message}render()}
 async function confirmSel(sid){try{await API.post(`/sessions/${sid}/confirm`);D.sessions.find(s=>s.id==sid).confirmed=true;R.toast.message="Pilihan dikonfirmasi."}catch(e){R.toast.error=e.message}render()}
-function dl(sid){const s=D.sessions.find(s=>s.id==sid);s.photos.filter(p=>p.sel).forEach(p=>{const a=document.createElement("a");a.href=API.imgUrl(p.id)+"&dl=1";a.download="snapia-"+p.id+".jpg";document.body.appendChild(a);a.click();a.remove()})}
+function dl(sid){const s=D.sessions.find(s=>s.id==sid);s.photos.filter(p=>p.sel).forEach(p=>{const a=document.createElement("a");a.href=API.imageUrl(p.id)+"&dl=1";a.download="snapia-"+p.id+".jpg";document.body.appendChild(a);a.click();a.remove()})}
+export { P, bulkDel, confirmSel, delPhoto, dl, fav, nextPose, ph, selAllNonFav, selPh, shoot, staffAct, startSession, stopSessionTimers, toggleDel, warn };

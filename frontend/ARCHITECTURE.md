@@ -1,6 +1,6 @@
 # Arsitektur frontend SelfieBox Studio
 
-> **Target arsitektur, migrasi sedang berjalan di branch `refactor/frontend-mvc`.** Kode di branch ini dipindahkan bertahap dari skrip global lama (`js/core.js`, `customer.js`, `session.js`, `landing.js`, `admin.js`, `boot.js`) ke struktur di bawah. Setiap tahap tetap membuat aplikasi berjalan. Branch ini tidak digabung ke `main`.
+> **Target arsitektur, migrasi sedang berjalan di branch `refactor/frontend-mvc`.** Kode di branch ini dipindahkan bertahap dari skrip global lama ke struktur di bawah. Sejak fase 2 aplikasi dimuat sebagai modul ES dari `js/main.js`; kode lama yang belum dipindahkan ada di `js/legacy/` (`core.js`, `customer.js`, `session.js`, `landing.js`, `admin.js`, dengan state bersamanya di `legacy/state.js`), dan `js/legacy-bridge.js` memasang ke `window` nama-nama yang masih dipanggil atribut `onclick="…"`. Setiap tahap tetap membuat aplikasi berjalan. Branch ini tidak digabung ke `main`.
 
 Frontend ini HTML, CSS, dan JavaScript murni: tanpa framework, tanpa build step, tanpa dependensi npm. Browser memuat modul ES langsung dari `js/main.js`.
 

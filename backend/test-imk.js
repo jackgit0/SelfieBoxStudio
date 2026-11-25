@@ -28,9 +28,7 @@ let srv = null;
   { const t = tables('a'); ok(!t.includes('schedule_preference') && !t.includes('setup_preference'), 'database baru tanpa tabel schedule_preference / setup_preference'); }
   { const JS = allJs(), CSS = allCss();
     for (const s of ['Preferensi', 'rec-banner', 'recPkg', 'recommend(', 'Rekomendasi untuk kamu', 'Dapatkan rekomendasi paket', 'savePref', 'PURPOSES']) ok(!JS.includes(s), `frontend tanpa "${s}"`);
-    ok(!src('js/customer.js').includes('quiz'), 'customer.js tanpa "quiz"'); // kode: diganti di fase 2 (test-map.md); core.js sah memuat "delete S.quiz" (pembersihan state lama)
-    ok(!JS.includes('/preferences'), 'frontend tidak memanggil /preferences'); ok(!/quiz:\s*null/.test(JS), 'state awal frontend tanpa quiz');
-    ok(!src('js/session.js').includes('S.quiz'), 'session.js tidak membaca S.quiz'); // kode: diganti di fase 2 (test-map.md)
+    ok(!JS.includes('/preferences'), 'frontend tidak memanggil /preferences'); // state awal tanpa quiz/setup dan pembersihan state lama: frontend/tests/core/store.test.js (refactor MVC fase 2)
     ok(!CSS.includes('.rec-banner') && !CSS.includes('.pk.rec'), 'CSS tanpa .rec-banner / .pk.rec'); }
   await down(srv);
 
@@ -95,7 +93,7 @@ CREATE TABLE IF NOT EXISTS setup_preference(user_id INTEGER PRIMARY KEY REFERENC
     for (const s of ['promoAdd', 'promoToggle', 'promoDel', '/admin/promos', 'add_ons', 'Kode promo', 'Harga add-on', 'add-on', 'promo_disc']) ok(!JS.includes(s), `frontend tanpa "${s}" (sisi admin)`);
     for (const s of ['previewHTML', 'setupItems']) ok(!JS.includes(s), `frontend tanpa "${s}" (sesi foto)`);
     ok(JS.includes('Background dan properti tersedia di studio'), 'frontend: kartu Background & Properti sesi foto berisi satu kalimat statis');
-    for (const s of ['promoCode', 'VIBES']) ok(!JS.includes(s), `frontend tanpa "${s}" (inti)`); ok(!/S\.setup\s*=/.test(JS), 'frontend tidak lagi menyimpan S.setup'); ok(!JS.includes('VIBES'), 'frontend tanpa VIBES (boot)');
+    for (const s of ['promoCode', 'VIBES']) ok(!JS.includes(s), `frontend tanpa "${s}" (inti)`); ok(!JS.includes('VIBES'), 'frontend tanpa VIBES (boot)');
     ok(!/kode promo/i.test(JS), 'frontend tanpa sebutan kode promo (landing)');
     for (const s of ['.pchk', '.pv{', '.prop.on']) ok(!CSS.includes(s), `CSS tanpa "${s}"`); }
   await down(srv);
@@ -155,15 +153,15 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     const dl = await call('DELETE', '/admin/packages/4', null, AD); ok(dl.s === 200 && !(await call('GET', '/master')).j.PKG.some(p => p.id === 4), 'paket yang dihapus admin tidak ada di PKG');
     ok((await call('POST', '/quote', { package_id: 2, studio_id: 1 }, U)).j.error === 'Paket tidak valid', 'quote dengan paket nonaktif: "Paket tidak valid" (pemicu popup)');
     // 1–2. frontend
-    const JS = allJs(), core = src('js/core.js'), aj = src('js/admin.js'), cj = src('js/customer.js'), boot = src('js/boot.js');
+    const JS = allJs(), core = src('js/legacy/core.js'), aj = src('js/legacy/admin.js'), cj = src('js/legacy/customer.js'), boot = src('js/main.js'); // fase 2: berkas lama di js/legacy, isi boot.js di main.js
     ok(/function modal\(/.test(core) && core.includes('aria-modal="true"') && core.includes('Escape'), 'core.js: dialog bersama modal() dengan aria-modal dan Escape'); // kode: diganti di fase 4 (test-map.md)
     ok(core.includes('.mbtn button").focus()'), 'core.js: fokus awal dialog di tombol aksi, bukan di tombol dalam isi (mis. daftar paket)'); // kode: diganti di fase 4 (test-map.md)
     ok(!/function aModal\(/.test(aj) && /aModal\s*=.*modal\(/.test(aj), 'admin.js: aModal tidak lagi berdiri sendiri, memakai modal() bersama'); // kode: diganti di fase 8a (test-map.md)
     for (const s of ['Pilihan Paket', 'Temukan Paket Sesuai Kebutuhanmu', 'Pilih Paket Ini', 'Lihat semua paket', 'Paling Favorit', '/ sesi', 'Paket Foto Tidak Ditemukan', 'Lihat & Pilih Paket Lain', 'Hubungi Customer Service', 'Pilih studio untuk melanjutkan']) ok(JS.includes(s), `frontend memuat "${s}"`);
     for (const s of ['V.packages', 'M.favouritePackageId', 'csContact()']) ok(cj.includes(s), `customer.js memuat "${s}"`); // kode: diganti di fase 5a (test-map.md)
     ok(!uiGradient(JS), 'frontend (JS) tanpa gradient');
-    ok(/favouritePackageId: m\.FAV_PKG/.test(boot) && /favouritePackageId: m\.FAV_PKG/.test(core.match(/function refreshMaster[^\n]*/)[0]), 'boot.js dan refreshMaster memuat FAV_PKG ke M.favouritePackageId'); // kode: diganti di fase 2 (test-map.md)
-    ok(!/S\.pkg\s*&&\s*!M\.packages\.find\(p => p\.id == S\.pkg\)\)\s*S\.pkg = null/.test(boot), 'boot.js tidak diam-diam menghapus paket pilihan yang hilang (popup yang memberi tahu)'); } // kode: diganti di fase 5a (test-map.md)
+    // FAV_PKG → M.favouritePackageId saat boot dan refreshMaster: frontend/tests/models/master.test.js (refactor MVC fase 2, keduanya memakai loadMaster)
+    ok(!/S\.pkg\s*&&\s*!M\.packages\.find\(p => p\.id == S\.pkg\)\)\s*S\.pkg = null/.test(boot), 'main.js (dulu boot.js) tidak diam-diam menghapus paket pilihan yang hilang (popup yang memberi tahu)'); } // kode: diganti di fase 5a (test-map.md)
   await down(srv);
 
   // ===== Fase 4: popup galat Create Booking + akses tamu =====
@@ -186,7 +184,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     { const r = await B({ studio_id: 2 }, U2); ok(r.s === 400 && r.j.error === 'Studio tidak tersedia', 'booking studio tidak tersedia: "Studio tidak tersedia" (Sesi Tidak Tersedia)'); }
     ok((await call('POST', '/quote', { package_id: 1, studio_id: 2 })).j.error === 'Studio tidak tersedia', 'quote studio tidak tersedia: "Studio tidak tersedia"');
     // 3. guard tamu di core.js
-    const JS = allJs(), core = src('js/core.js'), cj = src('js/customer.js'), lj = src('js/landing.js');
+    const JS = allJs(), core = src('js/legacy/core.js'), cj = src('js/legacy/customer.js'), lj = src('js/legacy/landing.js');
     const gv = (core.match(/const GUEST_VIEWS = \[([^\]]*)\]/) || [])[1] || ''; // kode: diganti di fase 3 (test-map.md), dua baris di bawah
     for (const v of ['home', 'studio', 'packages', 'time', 'pay', 'auth', 'landing']) ok(gv.includes(`"${v}"`), `core.js: tamu boleh membuka "${v}"`);
     for (const v of ['account', 'my', 'bdetail', 'gallery', 'session', 'success', 'cancel', 'refund']) ok(!gv.includes(`"${v}"`), `core.js: "${v}" tetap hanya untuk yang sudah login`);
@@ -218,7 +216,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     { const r = await call('PATCH', '/admin/account', { current_password: 'salah' }, AD); ok(r.s === 403 && r.j.error === 'Password saat ini salah', '403 lain di admin ("Password saat ini salah") bukan Akses Ditolak'); }
     { const r = await call('POST', '/admin/studios', SB({ name: 'Studio Senja', description: 'Cahaya alami' }), AD); ok(r.s === 200 && r.j.id, 'fixture: admin menambah Studio Senja'); }
     // 2. frontend admin.js: teks Figma
-    const JS = allJs(), aj = src('js/admin.js'), core = src('js/core.js'), boot = src('js/boot.js');
+    const JS = allJs(), aj = src('js/legacy/admin.js'), core = src('js/legacy/core.js'), boot = src('js/main.js');
     for (const s of ['Ringkasan Studio', 'Detail Studio Baru', 'Isi data studio. Nama dan gambar wajib diisi, dan nama tidak boleh sama dengan studio lain.', 'Simpan Studio', 'Ubah',
       'Input studio tidak valid. Periksa field yang ditandai.', 'Nama studio wajib diisi.', 'Gambar studio wajib diunggah.', 'Nama studio sudah digunakan oleh studio lain.', 'Nama studio sudah digunakan. Gunakan nama lain.',
       'Studio berhasil ditambahkan', 'tersedia dan tampil di daftar studio pelanggan.',
@@ -229,7 +227,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(/e\.status == 403 && \/Ganti password\/\.test\(e\.message\)\) \{ AD\.loading\[k\] = 0; if \(AD\.me\) AD\.me\.must_change = true; return go\('aacct'\); \}/.test(aj), 'admin.js: alur 403 ganti password bawaan tetap ke Akun Admin'); // kode: diganti di fase 8a (test-map.md)
     ok(/studioSave = id =>/.test(aj) && /stSummary|AD\.stsum/.test(aj), 'admin.js: tambah studio lewat langkah ringkasan'); // kode: diganti di fase 8b (test-map.md)
     ok(/if \(!S\.admin && ADMIN_VIEWS\.includes\(S\.view\)\) S\.view = S\.me \? "home" : "auth";/.test(core), 'core.js: customer tetap dialihkan diam-diam dari halaman admin'); // kode: diganti di fase 3 (test-map.md)
-    ok(/aDenied/.test(boot), 'boot.js: sesi admin dengan token bukan admin juga memunculkan Akses Ditolak'); // kode: diganti di fase 6 (test-map.md)
+    ok(/aDenied/.test(boot), 'main.js (dulu boot.js): sesi admin dengan token bukan admin juga memunculkan Akses Ditolak'); // kode: diganti di fase 6 (test-map.md)
     ok(/if \(key === "sN"\) AD\.sterr = null;/.test(aj), 'admin.js: unggah gambar studio baru menghapus tanda galat lama (dicek ulang di Lihat Ringkasan)'); // kode: diganti di fase 8b (test-map.md)
     ok(/sudah dipakai\/\.test\(e\.message\)\) \{ AD\.sterr = \{ top: ST_DUP, name: ST_DUPF \}; AD\.studios = null;/.test(aj), 'admin.js: nama ganda dari server memuat ulang daftar studio'); // kode: diganti di fase 8b (test-map.md)
     ok(!uiGradient(JS), 'frontend (JS) tanpa gradient (admin)'); }

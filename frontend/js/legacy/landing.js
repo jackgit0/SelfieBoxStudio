@@ -1,4 +1,10 @@
 // ===== LANDING PAGE (sebelum login): Home, About, Fasilitas, Keterangan, Join Sekarang, Contact Us =====
+import { API, M, R, S, V } from "./state.js";
+import { BRAND, CS_EMAIL, CS_WA } from "../config.js";
+import { esc } from "../core/html.js";
+import { SESSION_HOURS as HRS, padTwo as pad, formatRupiahShort as rpk } from "../core/format.js";
+import { $, capLabel, eff, go, ic, priceRange, render } from "./core.js";
+import { bgi, pkgCards } from "./customer.js";
 const LSECS = [["home", "Home"], ["about", "About"], ["fasilitas", "Fasilitas"], ["keterangan", "Keterangan"], ["kontak", "Contact Us"]];
 const openAuth = mode => { if (S.view === "landing") S.draft = null; R.auth.mode = mode; go("auth"); }; // dari landing: draf booking lama tidak dilanjutkan
 function toSec(id) { const m = $("#lmenu"); if (m) m.hidden = true; const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }
@@ -30,7 +36,7 @@ function lpStudio(s) {
 <div class="row sp" style="margin-top:10px"><span class="m sm">${ic("users", 14)} ${esc(capLabel(s))} orang</span><b class="sm">${priceRange(s)}</b></div></div></article>`;
 }
 V.landing = () => {
-  const min = M.packages.length ? Math.min(...M.packages.map(eff)) : 0, addr = (M.studios[0] || {}).address || "Jl. Veteran No. 3", wa = window.CS_WA, mail = window.CS_EMAIL, first = HRS[0], last = HRS[HRS.length - 1];
+  const min = M.packages.length ? Math.min(...M.packages.map(eff)) : 0, addr = (M.studios[0] || {}).address || "Jl. Veteran No. 3", wa = CS_WA, mail = CS_EMAIL, first = HRS[0], last = HRS[HRS.length - 1];
   const links = LSECS.map(l => `<button data-s="${l[0]}" onclick="toSec('${l[0]}')">${l[1]}</button>`).join("");
   const propImgs = M.properties.filter(p => p.img).slice(0, 4);
   return `<div class="lp"><header class="lnav"><div class="lnav-in"><a class="brand" href="#" onclick="toSec('home');return false">${esc(BRAND)}</a><nav class="llinks">${links}</nav>
@@ -76,3 +82,4 @@ ${propImgs.length ? `<h3 class="h2" style="margin:44px 0 6px">Properti & backgro
 <footer class="lfoot"><div class="lw lfoot-in"><b>${esc(BRAND)}</b><div class="llinks2">${LSECS.map(l => `<a href="#" onclick="toSec('${l[0]}');return false">${l[1]}</a>`).join("")}<a href="#" onclick="openAuth('login');return false">Masuk</a></div><span class="m sm">© ${new Date().getFullYear()} ${esc(BRAND)}. Semua hak dilindungi.</span></div></footer></div>`;
 };
 V.landing_after = () => { window.onscroll = lpSpy; lpSpy(); };
+export { lpMenu, openAuth, sendContact, toSec };

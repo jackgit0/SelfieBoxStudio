@@ -1,4 +1,11 @@
 // ===== SISI CUSTOMER: Beranda (Browse), Studio, Booking, Booking Saya, Pembatalan/Refund, Akun =====
+import { API, BK, D, M, R, S, V, save } from "./state.js";
+import { BRAND } from "../config.js";
+import { esc } from "../core/html.js";
+import { SESSION_HOURS as HRS, formatDayMonthYear as fmtDMY, formatDate as fmtDate, formatTime as fmtTime, isoDate as iso, padTwo as pad, parseSlot, formatRupiah as rp, slotLabel, slotRange, todayIso as todayS } from "../core/format.js";
+import { isStudioShown } from "../models/master.js";
+import { $, capLabel, csContact, eff, free, go, ic, icf, me, modal, pkOf, prefetch, priceRange, ptag, refresh, refreshMaster, render, studioOf } from "./core.js";
+import { openAuth } from "./landing.js";
 const bgi = u => u ? `background-image:url('${esc(u)}')` : "";
 const propVisual = p => p.img ? `<div class="pimg" style="${bgi(p.img)}"></div>` : `<div class="pimg" ${p.bg ? `style="background:${esc(p.bg.split(",")[0])}"` : ""}>${p.bg ? "" : esc(p.e || "🎁")}</div>`;
 
@@ -65,7 +72,7 @@ async function onPkgErr(e, next) { if (e.status != 400 || !/^Paket(\/studio)? ti
 
 // ---------- detail studio + properti (hanya tampilan) ----------
 // studio yang tidak tersedia/dihapus tidak bisa dibuka untuk dipesan (riwayat booking tetap memakai studioOf)
-const shown = id => M.studios.some(s => s.id == id), noStudio = (edit = false) => `<div class="panel"><div class="card center"><h1 class="h1">Studio tidak tersedia</h1><p class="sub">Studio ini sedang tidak dapat dipesan.</p><div style="margin-top:12px"><button class="btn" onclick="${edit && BK.rescheduleId ? `go('bdetail',{id:${BK.rescheduleId}})` : "go('home')"}">${edit && BK.rescheduleId ? "Kembali ke booking" : "Cari studio lain"}</button></div></div></div>`;
+const shown = id => isStudioShown(M, id), noStudio = (edit = false) => `<div class="panel"><div class="card center"><h1 class="h1">Studio tidak tersedia</h1><p class="sub">Studio ini sedang tidak dapat dipesan.</p><div style="margin-top:12px"><button class="btn" onclick="${edit && BK.rescheduleId ? `go('bdetail',{id:${BK.rescheduleId}})` : "go('home')"}">${edit && BK.rescheduleId ? "Kembali ke booking" : "Cari studio lain"}</button></div></div></div>`;
 V.studio = () => {
   if (!shown(S.p.id)) return noStudio();
   const s = studioOf(S.p.id), cat = S.pCat || "Semua", cats = ["Semua", ...new Set(M.properties.map(p => p.category || "Lainnya"))], list = M.properties.filter(p => cat === "Semua" || (p.category || "Lainnya") === cat);
@@ -141,7 +148,7 @@ async function needLogin() {
   const v = await modal({ title: "Masuk untuk melanjutkan booking", cls: "center", kicker: mIcon("info", "blue"), body: "<p>Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.</p>",
     buttons: [{ label: "Masuk", value: "login", icon: "user" }, { label: "Daftar", value: "register", style: "ghost" }] });
   if (!v) return;
-  if (S.me) { API.token = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; D.bookings = []; D.sessions = []; } // token kedaluwarsa (401 saat booking)
+  if (S.me) { API.token = ""; S.user = S.me = null; D.bookings = []; D.sessions = []; } // token kedaluwarsa (401 saat booking)
   openAuth(v);
 }
 
@@ -188,7 +195,7 @@ V.success = () => {
   const b = bookOf(); if (!b) return `<div class="card">Memuat…</div>`;
   return `<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Studio Berhasil Direservasi</h1><img class="ill" src="img/ill-booking.png" alt="">
 <div style="text-align:left;margin-top:8px"><h3 class="h3" style="margin-bottom:6px">Detail Transaksi</h3>${bookRows(b)}<button class="coll" onclick="S.payOpen=!S.payOpen;render()">Detail Pembayaran ${ic(S.payOpen ? "up" : "down", 16)}</button>${S.payOpen ? `<div style="padding-bottom:10px">${payDetail(b)}</div>` : ""}</div>
-<div class="row" style="margin-top:12px;flex-wrap:nowrap"><a class="btn ghost grow" href="${API.invUrl(b.id, 1)}" download>${ic("download", 16)} Unduh invoice</a><button class="btn ghost" onclick="mailInv(${b.id})">${ic("mail", 16)}</button></div>
+<div class="row" style="margin-top:12px;flex-wrap:nowrap"><a class="btn ghost grow" href="${API.invoiceUrl(b.id, 1)}" download>${ic("download", 16)} Unduh invoice</a><button class="btn ghost" onclick="mailInv(${b.id})">${ic("mail", 16)}</button></div>
 <button class="btn block" style="margin-top:10px" onclick="go('home')">Kembali ke Beranda</button></div></div>`;
 };
 V.rescheduled = () => {
@@ -218,7 +225,7 @@ V.bdetail = () => {
 <div class="row" style="margin:16px 0">${canChange(b) ? `${shown(b.studio) ? `<button class="btn sm" onclick="startReschedule(${b.id})">Reschedule</button>` : ""}<button class="btn sm ghost" onclick="openCancel(${b.id})">Batalkan</button>` : ""}${pending ? `<button class="btn sm" onclick="payNow(${b.id})">Bayar</button>` : ""}${b.status == "Terbayar" ? `<button class="btn sm soft" onclick="startSession(${b.id})">${ic("camera", 16)} Check-in & Mulai Sesi</button>` : ""}${b.status == "Sesi Berjalan" ? `<button class="btn sm soft" onclick="go('session')">Buka Sesi</button>` : ""}</div>
 <div class="card"><h3 class="h3" style="margin-bottom:6px">Detail Booking</h3>${bookRows(b)}<hr><h3 class="h3" style="margin-bottom:6px">Detail Pembayaran</h3>${payDetail(b)}
 ${b.cancel_reason ? `<hr><div class="kv"><span>Alasan pembatalan</span><b>${esc(b.cancel_reason)}</b></div>` : ""}
-${b.paid && b.status != "Dibatalkan" ? `<div class="row" style="margin-top:12px"><a class="btn sm ghost" href="${API.invUrl(b.id, 1)}" download>${ic("download", 16)} Unduh invoice</a><button class="btn sm ghost" onclick="mailInv(${b.id})">${ic("mail", 16)} Kirim ke email</button></div>` : ""}</div></div>`;
+${b.paid && b.status != "Dibatalkan" ? `<div class="row" style="margin-top:12px"><a class="btn sm ghost" href="${API.invoiceUrl(b.id, 1)}" download>${ic("download", 16)} Unduh invoice</a><button class="btn sm ghost" onclick="mailInv(${b.id})">${ic("mail", 16)} Kirim ke email</button></div>` : ""}</div></div>`;
 };
 
 // ---------- pembatalan & refund ----------
@@ -252,7 +259,8 @@ V.account = () => {
 <div class="row" style="margin-top:18px"><button class="btn" onclick="saveProfile()">Simpan</button><button class="btn ghost" onclick="changePw()">${ic("mail", 16)} Ubah sandi via email</button></div></div>`;
   if (tab == "pay") { const L = D.bookings.filter(b => b.pay_status && !["pending", "batal"].includes(b.pay_status)).sort((a, b) => (b.paid_at || 0) - (a.paid_at || 0));
     body = `<div class="card"><h3 class="h3">Riwayat Pembayaran</h3>${L.length ? `<div class="tbl"><table><tr><th>Waktu</th><th>Studio</th><th>Paket</th><th>Total</th><th>Status</th><th></th></tr>${L.map(b => `<tr><td>${fmtTime(b.paid_at)}</td><td>${esc(studioOf(b.studio).name)}</td><td>${esc(pkOf(b.package_id).name)}</td><td>${rp(b.amount)}</td><td><span class="tag ${b.pay_status == "paid" ? "ok" : b.pay_status == "refunded" ? "" : "no"}">${PAYLBL[b.pay_status]}</span></td>
-<td>${b.paid && b.status != "Dibatalkan" ? `<a class="btn sm ghost" href="${API.invUrl(b.id, 0)}" target="_blank" rel="noopener">${ic("receipt", 14)} Kwitansi Digital</a>` : ""}</td></tr>`).join("")}</table></div>` : `<p class="m" style="margin-top:8px">Belum ada transaksi.</p>`}</div>`; }
+<td>${b.paid && b.status != "Dibatalkan" ? `<a class="btn sm ghost" href="${API.invoiceUrl(b.id, 0)}" target="_blank" rel="noopener">${ic("receipt", 14)} Kwitansi Digital</a>` : ""}</td></tr>`).join("")}</table></div>` : `<p class="m" style="margin-top:8px">Belum ada transaksi.</p>`}</div>`; }
   return `<div class="panel"><h1 class="h1">Pengaturan Akun</h1><div class="seg">${tabs.map(t => `<button class="${t[0] == tab ? "on" : ""}" onclick="S.acct='${t[0]}';R.toast.message=R.toast.error='';render()">${t[1]}</button>`).join("")}</div>${body}<div style="margin-top:18px"><button class="btn ghost" onclick="logout()">${ic("logout", 16)} Keluar</button></div></div>`;
 };
 async function saveProfile() { R.toast.message = R.toast.error = ""; try { const r = await API.patch("/me", { name: $("#pn").value, phone: $("#pp").value }); S.user = { ...S.user, ...r }; save(); R.toast.message = "Profil disimpan."; } catch (e) { R.toast.error = e.message; } render(); }
+export { PAYLBL, bgi, calNav, calPick, choosePkg, confirmPay, doCancel, kvs, mailInv, nextTime, openCancel, payNow, pkgCards, qr, quickBook, resumeDraft, saveProfile, selectPkg, startBook, startReschedule, toggleBm };
