@@ -48,6 +48,7 @@ addCol('studio', 'deleted_at', 'INTEGER');
 db.exec(`CREATE TABLE IF NOT EXISTS studio_session(id INTEGER PRIMARY KEY AUTOINCREMENT,studio_id INTEGER NOT NULL REFERENCES studio(id),start_time INTEGER NOT NULL,end_time INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'AVAILABLE',deleted_at INTEGER);
 CREATE INDEX IF NOT EXISTS ix_ssess ON studio_session(studio_id,start_time);`);
 addCol('booking', 'studio_session_id', 'INTEGER REFERENCES studio_session(id)');
+addCol('booking', 'checked_in_at', 'INTEGER'); // check-in oleh admin di meja depan; sesi foto dimulai dari tablet studio
 const flag = k => db.prepare('SELECT 1 FROM setting WHERE key=?').get(k), setFlag = k => db.prepare('INSERT OR IGNORE INTO setting(key,value) VALUES(?,?)').run(k, '1');
 db.prepare(`UPDATE studio SET img='/img/studio-'||(CASE WHEN id%2=1 THEN 1 ELSE 2 END)||'.jpg' WHERE img IS NULL OR img=''`).run();
 db.prepare(`UPDATE property SET qty=1 WHERE qty IS NULL`).run();
