@@ -242,6 +242,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!asg('B|Q|editId').test(JS), 'frontend: booking berjalan hanya di objek BK (tanpa B/Q/editId yang di-assign ulang)'); // kode: diganti di fase 9
     ok(!asg('msg|err|AV|CAL|CR|CD|authMode|resetTok|LP|aDenyOpen').test(JS), 'frontend: state runtime hanya di objek R (tanpa msg/err/AV/CAL/CR/CD/authMode/resetTok/LP yang di-assign ulang)'); // kode: diganti di fase 9
     ok(!/S\.(bookings|sessions)\b/.test(JS), 'frontend: booking dan sesi foto user di objek D, tidak lagi di S (state tersimpan)'); // kode: diganti di fase 9
+    ok(!asg('drive|curSes|poseI|tick|poseT|stream|gSes|dMode|dSel').test(JS), 'frontend: state sesi foto dan galeri hanya di objek P (tanpa drive/curSes/tick/gSes/dSel/… yang di-assign ulang)'); // kode: diganti di fase 9
   }
 
   console.log(`\n${n} tes lulus`); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);
