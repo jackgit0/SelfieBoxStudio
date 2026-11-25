@@ -13,7 +13,7 @@ backend/   server.js (REST API + file statis) · db.js (skema + migrasi) · mail
            test-imk.js (lingkup IMK: tanpa onboarding/promo/add-on, Pilihan Paket, popup booking, Ringkasan Studio, Akses Ditolak)
 ```
 
-Branch `refactor/frontend-mvc` memakai frontend MVC dengan modul ES (HTML/CSS/JS murni, tanpa build step); strukturnya dijelaskan di [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md). Branch ini **tidak digabung ke `main`** dan tidak disinkronkan dengannya; Render tetap menyajikan `main`, jadi branch ini dijalankan secara lokal.
+Frontend memakai struktur MVC dengan modul ES (HTML/CSS/JS murni, tanpa build step); strukturnya dijelaskan di [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md). Kode `frontend/js/` dirapikan dengan Prettier (`cd frontend && npm run format`, lewat `npx` tanpa dependensi terpasang).
 
 ## Menjalankan
 Node.js >= 22.5 (tanpa `npm install`).

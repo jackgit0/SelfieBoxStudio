@@ -1,7 +1,5 @@
 # Arsitektur frontend SelfieBox Studio
 
-> Struktur ini ada di branch `refactor/frontend-mvc`. Branch ini **tidak digabung ke `main`**: Render tetap menyajikan `main`, jadi branch ini dijalankan secara lokal (`cd backend && npm start`).
-
 Frontend ini HTML, CSS, dan JavaScript murni: tanpa framework, tanpa build step, tanpa dependensi npm. Browser memuat modul ES langsung dari `js/main.js`.
 
 ## Susunan folder
