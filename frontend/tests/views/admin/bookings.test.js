@@ -51,20 +51,31 @@ test("booking: panel Detail Booking (baris terpilih, data pelanggan di-escape, s
   assert.ok(!out.includes("<span>Refund</span>"));
 });
 
-test("booking: form Ubah Booking (data-submit), status sekarang + tujuan server, paket bisa diubah sebelum dibayar", () => {
+test("booking: detail terbuka → tombol Ubah Booking saja (tanpa form, tanpa Simpan Perubahan); booking yang tak bisa diubah → tanpa tombol", () => {
   const out = render({ bookings: [row()], bookingDetail: detail() });
+  assert.ok(!out.includes("adminBooking:save"));
+  assert.ok(!out.includes("Simpan Perubahan"));
+  assert.match(out, /<button class="btn sm soft" type="button" style="margin-top:12px;width:100%" data-action="admin:startEdit" data-key="booking-5"><svg[^]*<\/svg> Ubah Booking<\/button>/);
+  const done = render({ bookings: [row()], bookingDetail: detail({ status: "Selesai", allowed: [] }) });
+  assert.ok(!done.includes("Ubah Booking"));
+});
+
+test("booking: Ubah Booking → form (data-submit), status sekarang + tujuan server, paket bisa diubah sebelum dibayar, Simpan Perubahan + Batal", () => {
+  const out = render({ bookings: [row()], bookingDetail: detail(), editing: "booking-5" });
   assert.match(out, /<form novalidate data-submit="adminBooking:save" data-id="5"><h4 class="bh">Ubah Booking<\/h4>/);
-  assert.match(out, /<input type="radio" name="status" value="Menunggu Pembayaran" checked> ?Menunggu Pembayaran \(sekarang\)/);
+  assert.match(out, /<input type="radio" name="status" value="Menunggu Pembayaran" checked data-edit-focus> ?Menunggu Pembayaran \(sekarang\)/);
   assert.match(out, /<input type="radio" name="status" value="Terbayar" ?> ?Terbayar<\/label>/);
   assert.match(out, /<select id="be-pkg" name="package_id" ><option value="1" selected>Basic · Rp50\.000<\/option><option value="2" >Standard · Rp90\.000<\/option>/);
   assert.ok(out.includes("Paket hanya dapat diubah sebelum booking dibayar; total dihitung ulang (paket + biaya studio − diskon)."));
-  assert.match(out, /type="submit" style="margin-top:10px;width:100%">Simpan Perubahan<\/button>/);
+  assert.match(out, /<button class="btn sm" type="submit">Simpan Perubahan<\/button><button class="btn sm ghost" type="button" data-action="admin:cancelEdit">Batal<\/button>/);
+  assert.ok(!out.includes("Ubah Booking</button>"));
+  assert.ok(!render({ bookings: [row()], bookingDetail: detail(), editing: "booking-9" }).includes("adminBooking:save"));
   assert.ok(!out.includes("akan mengembalikan dana 100%"));
 });
 
 test("booking: sudah dibayar → paket terkunci, catatan refund bila boleh Dibatalkan; draf gagal memilih status draf", () => {
   const paid = detail({ status: "Terbayar", allowed: ["Sesi Berjalan", "Dibatalkan"], payment: { status: "paid", paid_at: Date.UTC(2026, 10, 25, 2, 5), method: "QRIS", amount: 45000 } });
-  const out = render({ bookings: [row()], bookingDetail: paid, drafts: { "booking-5": { status: "Dibatalkan" } } });
+  const out = render({ bookings: [row()], bookingDetail: paid, editing: "booking-5", drafts: { "booking-5": { status: "Dibatalkan" } } });
   assert.match(out, /<select id="be-pkg" name="package_id" disabled><option value="1" selected>Basic<\/option><\/select>/);
   assert.ok(out.includes("Mengubah status booking yang sudah dibayar menjadi Dibatalkan akan mengembalikan dana 100% kepada pelanggan."));
   assert.ok(out.includes("Paket hanya dapat diubah sebelum booking dibayar."));

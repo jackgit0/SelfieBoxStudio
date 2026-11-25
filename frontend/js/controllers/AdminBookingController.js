@@ -70,7 +70,9 @@ export function createAdminBookingController({ api, store, ui, models, admin: ad
       updateAdmin({ bookingFilter: event.target.value, bookings: null, bookingDetail: null }, { silent: false });
     },
 
+    // membuka booking (juga booking lain) menutup form Ubah Booking yang masih terbuka
     async open({ id }) {
+      adminCore.stopEditing();
       const opened = await adminCore.run(async () => {
         updateAdmin({ drafts: withoutDraft("booking-" + id), bookingDetail: await bookingModel.loadBooking(api, id) });
       });
@@ -80,6 +82,7 @@ export function createAdminBookingController({ api, store, ui, models, admin: ad
     },
 
     close() {
+      adminCore.stopEditing();
       updateAdmin({ bookingDetail: null }, { silent: false });
     },
 
@@ -129,6 +132,7 @@ export function createAdminBookingController({ api, store, ui, models, admin: ad
           const answer = await bookingModel.updateBooking(api, id, body).catch(error => failWith(id, error));
           invalidateAfterChange();
           updateAdmin({ bookingDetail: answer, drafts: withoutDraft(draftKey) });
+          adminCore.stopEditing();
           if (answer.refund && answer.refund.state == "failed") {
             setToast({ error: "Booking dibatalkan, tetapi refund gagal. Tindak lanjuti secara manual." });
           } else {

@@ -1,5 +1,5 @@
 // Daftar Booking admin (/admin/bookings, Figma "Admin - Booking"): saringan status, tabel, panel Detail Booking dengan form Ubah Booking
-// (US-15, Figma "Admin - Edit Booking"). View murni (dulu V.abook, bookPanel, bookEdit di admin.js). Form dikirim lewat data-submit
+// (US-15, Figma "Admin - Edit Booking"); form itu hanya tampil setelah tombol Ubah Booking (admin.editing = "booking-<id>", dev/admin-edit-mode-plan.md). View murni (dulu V.abook, bookPanel, bookEdit di admin.js). Form dikirim lewat data-submit
 // (AdminBookingController.save); pilihan yang batal/gagal disimpan dibaca dari admin.drafts["booking-<id>"].
 import { html } from "../../core/html.js";
 import { formatRupiah, formatTime } from "../../core/format.js";
@@ -84,10 +84,26 @@ function bookingRows(rows, openId) {
   });
 }
 
-function editForm(detail, draft) {
+// booking yang masih bisa diubah: tombol Ubah Booking, atau form-nya bila sedang diubah
+function editSection(detail, draft, editing) {
   if (!isEditable(detail)) {
     return "";
   }
+  if (!editing) {
+    return html`<button
+      class="btn sm soft"
+      type="button"
+      style="margin-top:12px;width:100%"
+      data-action="admin:startEdit"
+      data-key="booking-${detail.id}"
+    >
+      ${icon("edit", 16)} Ubah Booking
+    </button>`;
+  }
+  return editForm(detail, draft);
+}
+
+function editForm(detail, draft) {
   const options = statusOptions(detail);
   const chosen = draft && options.includes(draft.status) ? draft.status : detail.status;
   const chosenPackage = (draft && draft.package_id) || detail.package_id;
@@ -95,7 +111,7 @@ function editForm(detail, draft) {
   const radios = options.map(
     status =>
       html`<label
-        ><input type="radio" name="status" value="${status}" ${status == chosen ? "checked" : ""} />
+        ><input type="radio" name="status" value="${status}" ${status == chosen ? "checked data-edit-focus" : ""} />
         ${status}${status == detail.status ? " (sekarang)" : ""}</label
       >`,
   );
@@ -126,11 +142,14 @@ function editForm(detail, draft) {
       Paket hanya dapat diubah sebelum booking
       dibayar${changeable ? "; total dihitung ulang (paket + biaya studio − diskon)" : ""}.
     </p>
-    <button class="btn sm" type="submit" style="margin-top:10px;width:100%">Simpan Perubahan</button>
+    <div class="row" style="margin-top:10px">
+      <button class="btn sm" type="submit">Simpan Perubahan</button
+      ><button class="btn sm ghost" type="button" data-action="admin:cancelEdit">Batal</button>
+    </div>
   </form>`;
 }
 
-function detailPanel(detail, draft) {
+function detailPanel(detail, draft, editing) {
   const payment = detail.payment;
   const studioSession = detail.studio_session;
   const sessionNote = studioSession
@@ -188,7 +207,7 @@ function detailPanel(detail, draft) {
         </button>
       </div>
     </div>
-    ${checkInBox(detail)} ${bookingInfo} ${editForm(detail, draft)}
+    ${checkInBox(detail)} ${bookingInfo} ${editSection(detail, draft, editing)}
     <h4 class="bh">Detail Pembayaran</h4>
     ${paymentInfo}
     ${detail.delete_block ? html`<p class="sm m" style="margin-top:10px">${detail.delete_block}.</p>` : ""}
@@ -196,7 +215,7 @@ function detailPanel(detail, draft) {
 }
 
 export function bookingsView(state) {
-  const { bookings, bookingDetail: detail, bookingFilter, query, drafts } = state.admin;
+  const { bookings, bookingDetail: detail, bookingFilter, query, drafts, editing } = state.admin;
   if (!bookings) {
     return loadingCard();
   }
@@ -227,6 +246,6 @@ export function bookingsView(state) {
         </table>
       </div>
     </div>
-    ${detail ? detailPanel(detail, drafts["booking-" + detail.id]) : ""}
+    ${detail ? detailPanel(detail, drafts["booking-" + detail.id], editing == "booking-" + detail.id) : ""}
   </div>`;
 }
