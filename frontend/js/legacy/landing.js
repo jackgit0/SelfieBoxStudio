@@ -47,9 +47,9 @@ V.landing = () => {
 <p class="hero-p">Pilih studio, atur jadwal, lalu bergaya sepuasnya dengan panduan pose dan timer otomatis. Hasil foto bisa langsung kamu pilih, unduh, dan simpan.</p>
 <div class="row" style="margin-top:22px"><button class="btn" onclick="openAuth('register')">Join Sekarang</button><button class="btn ghost" onclick="go('home')">Lihat Studio</button></div>
 <div class="hero-stats"><div><b>${M.studios.length}</b><span>Studio</span></div><div><b>${M.properties.length}+</b><span>Properti</span></div><div><b>50 mnt</b><span>Per sesi</span></div><div><b>${rpk(min)}</b><span>Mulai dari</span></div></div></div>
-<div class="hero-img"><div class="simg" style="${bgi((M.studios[0] || {}).img || "img/studio-1.jpg")}"></div><div class="hero-float">${ic("clock", 18)}<div><b>Buka setiap hari</b><small>${pad(first)}.00 – ${pad(last)}.50 WIB</small></div></div></div></div></section>
+<div class="hero-img"><div class="simg" style="${bgi((M.studios[0] || {}).img || "/img/studio-1.jpg")}"></div><div class="hero-float">${ic("clock", 18)}<div><b>Buka setiap hari</b><small>${pad(first)}.00 – ${pad(last)}.50 WIB</small></div></div></div></div></section>
 
-<section id="about" class="sec"><div class="lw about"><div class="about-img"><div class="simg" style="${bgi(((M.studios[1] || M.studios[0]) || {}).img || "img/studio-2.jpg")}"></div></div>
+<section id="about" class="sec"><div class="lw about"><div class="about-img"><div class="simg" style="${bgi(((M.studios[1] || M.studios[0]) || {}).img || "/img/studio-2.jpg")}"></div></div>
 <div><span class="eyebrow">About</span><h2 class="sec-h">Studio foto yang bisa kamu atur sendiri</h2>
 <p class="lead">${esc(BRAND)} adalah studio foto self-service: kamu memesan jadwal secara online, datang, dan mengambil fotomu sendiri dengan bantuan timer, panduan pose, dan properti yang sudah kami siapkan.</p>
 <p class="lead">Cocok untuk foto solo, couple, keluarga, sampai teman satu geng — tanpa fotografer, tanpa antre, dan harga yang jelas sejak awal.</p>

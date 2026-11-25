@@ -259,6 +259,8 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     { const r = await get('/api/nope'); ok(r.s === 404 && r.t.startsWith('application/json') && JSON.parse(r.b).error === 'Endpoint tidak ada', 'GET /api/nope → 404 JSON'); }
     { const r = await get('/media/nope'); ok(r.s === 404 && r.b !== index, 'GET /media/nope → 404 (bukan index.html)'); }
     for (const p of ['/../backend/.env', '/../backend/server.js', '/..%2Fbackend%2F.env', '/%2e%2e/backend/.env']) { const r = await raw(p); ok(r.s === 404 && !/JWT_SECRET|createServer/.test(r.b), `GET ${p} tidak membocorkan berkas backend (404)`); }
+    { const rel = /(src=|href=|url\()\\?["']?(img|css|js)\/|["'](img|css|js)\/[\w.-]+\.(png|jpe?g|webp|svg|css|js)["']/, idx = rel.exec(index), js = rel.exec(allJs()), css = rel.exec(allCss());
+      ok(!idx && !js && !css, 'aset frontend memakai URL absolut (/img/…, /css/…, /js/…) agar halaman di path bertingkat tetap memuatnya' + (idx || js || css ? ` (masih "${(idx || js || css)[0]}")` : '')); }
     { const r = await get('/js/main.js'); ok(r.s === 200 && r.t.startsWith('text/javascript'), 'berkas yang ada tetap disajikan apa adanya (/js/main.js)'); }
   }
   await down(srv);
