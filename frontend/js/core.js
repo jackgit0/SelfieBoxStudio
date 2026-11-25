@@ -4,7 +4,8 @@ const BRAND = window.BRAND || "SelfieBox Studio";
 let PKG = [], ALLPKG = [], DISC = { pct: 0, label: "" }, PEOPLE = [], BUDGET = [], STUDIOS = [], ALLSTUDIOS = [], VIBES = [], PROP = [], POSES = {}, POLICY = { refund_hours: 2 };
 const V = {};
 let S; try { S = JSON.parse(localStorage.getItem("snapia")); } catch (e) {}
-S = Object.assign({ user: null, me: null, admin: false, view: "landing", p: {}, quiz: null, pkg: null, bm: [], staff: false, log: [] }, S || {});
+S = Object.assign({ user: null, me: null, admin: false, view: "landing", p: {}, pkg: null, bm: [], staff: false, log: [] }, S || {}); delete S.quiz; // sisa state lama (kuis rekomendasi paket sudah dihapus)
+if (S.acct === "pref") S.acct = "profile";
 S.setup = { bg: (S.setup && S.setup.bg) || null, acc: (S.setup && S.setup.acc) || [] }; S.bookings = []; S.sessions = [];
 const save = () => { try { localStorage.setItem("snapia", JSON.stringify({ ...S, bookings: [], sessions: [] })); } catch (e) {} };
 let msg = "", err = "", AV = {}, CAL = {}, B = { studio: null, date: null, slot: null }, editId = null, Q = null, promoCode = "";
@@ -112,7 +113,6 @@ V.auth = () => {
 const fixS = s => { s.photos.forEach(p => p.img = p.img || API.imgUrl(p.id)); return s; };
 async function refresh() {
   S.bookings = await API.get("/bookings"); S.sessions = (await API.get("/sessions")).map(fixS);
-  try { const pr = await API.get("/preferences"); if (pr.schedule && !S.quiz) S.quiz = { purpose: "Couple", people: pr.schedule.people, vibe: (pr.setup && pr.setup.vibe) || 1, budget: pr.schedule.budget, ok: true }; } catch (e) {}
 }
 async function afterAuth(r) { API.token = r.token; localStorage.setItem("snapia_t", r.token); S.admin = false; S.user = r.user; S.me = r.user.id; await refresh(); go("home"); }
 function logout() { API.token = ""; API.staff = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; S.staff = false; S.admin = false; S.bookings = []; S.sessions = []; if (typeof adminReset === "function") adminReset(); authMode = "login"; go("landing"); }

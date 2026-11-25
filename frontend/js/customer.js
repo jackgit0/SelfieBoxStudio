@@ -1,12 +1,6 @@
 // ===== SISI CUSTOMER: Beranda (Browse), Studio, Booking, Booking Saya, Pembatalan/Refund, Akun =====
-const PURPOSES = ["Pas foto/Portrait", "Couple", "Keluarga", "Teman/Grup"];
 const bgi = u => u ? `background-image:url('${esc(u)}')` : "";
 const propVisual = p => p.img ? `<div class="pimg" style="${bgi(p.img)}"></div>` : `<div class="pimg" ${p.bg ? `style="background-image:linear-gradient(135deg,${esc(p.bg)})"` : ""}>${p.bg ? "" : esc(p.e || "🎁")}</div>`;
-function recommend(q) {
-  const n = PKG.length, pick = i => PKG[Math.min(i, n - 1)]; let main = pick(q.people == 1 ? 1 : q.people == 2 ? 2 : 3); if (q.purpose && q.purpose.startsWith("Pas foto")) main = PKG[0];
-  if (eff(main) <= q.budget) return { main }; const alt = [...PKG].reverse().find(p => eff(p) <= q.budget); return { alt };
-}
-const recPkg = () => { if (!(S.quiz && S.quiz.ok && PKG.length)) return null; const r = recommend(S.quiz); return r.main || r.alt || PKG[0]; };
 
 // ---------- kalender ----------
 function calHTML(ctx, sel) {
@@ -29,20 +23,17 @@ function studioCard(s) {
 <div class="chips">${slots.map(h => `<button class="chip" onclick="quickBook(${s.id},'${d}',${h})">${slotLabel(h)}</button>`).join("") || `<span class="chip none">Tidak ada sesi tersedia</span>`}</div></article>`;
 }
 function pkgCards() {
-  const rec = recPkg();
-  return PKG.map(p => `<div class="pk ${rec && rec.id == p.id ? "rec" : ""}"><div class="row sp"><h4>${esc(p.name)}</h4>${rec && rec.id == p.id ? '<span class="tag">Rekomendasi</span>' : ""}</div><div class="price">${ptag(p)}</div>
+  return PKG.map(p => `<div class="pk"><div class="row sp"><h4>${esc(p.name)}</h4></div><div class="price">${ptag(p)}</div>
 <ul><li>${p.photo_count} foto · ${p.dur} menit</li><li>Strip ${esc(p.strip_size || "-")} · ${esc(p.strip_material || "-")}</li><li>Galeri online 30 hari</li></ul></div>`).join("");
 }
 V.home = () => {
-  const d = S.hDate || (S.hDate = todayS()), from = S.hFrom ?? 8, to = S.hTo ?? 20, rec = recPkg(), opt = (v, sel) => HRS.map(h => `<option value="${h}" ${h == sel ? "selected" : ""}>${pad(h)}:00</option>`).join("");
-  const banner = rec ? `<div class="rec-banner">${ic("star", 22)}<div class="grow"><b>Rekomendasi untuk kamu: Paket ${esc(rec.name)}</b><div class="sm m">${rec.photo_count} foto · ${rec.dur} menit · ${rp(eff(rec))} — sesuai preferensimu.</div></div><button class="btn sm" onclick="openAcct('pref')">Ubah</button></div>`
-    : `<div class="rec-banner">${ic("settings", 22)}<div class="grow"><b>Dapatkan rekomendasi paket</b><div class="sm m">Isi preferensi (tujuan, jumlah orang, vibe, budget) agar kami sarankan paket yang pas.</div></div><button class="btn sm" onclick="openAcct('pref')">Isi preferensi</button></div>`;
+  const d = S.hDate || (S.hDate = todayS()), from = S.hFrom ?? 8, to = S.hTo ?? 20, opt = (v, sel) => HRS.map(h => `<option value="${h}" ${h == sel ? "selected" : ""}>${pad(h)}:00</option>`).join("");
   return `<div class="home"><aside class="filter card soft"><h3 class="h3">Filter Jadwal</h3><p class="sub" style="margin-bottom:12px">Pilih waktu yang sesuai, kami tampilkan studio yang tersedia.</p>${calHTML("home", d)}
 <div class="trange"><div><label>Dari jam</label><select onchange="S.hFrom=+this.value;render()">${opt(0, from)}</select></div><div><label>Sampai jam</label><select onchange="S.hTo=+this.value;render()">${opt(0, to)}</select></div></div></aside>
-<section style="min-width:0"><h1 class="h1">Browse</h1><p class="sub">Temukan studio yang cocok sama selera kamu.</p>${banner}<div class="grid3">${STUDIOS.map(studioCard).join("")}</div>
+<section style="min-width:0"><h1 class="h1">Browse</h1><p class="sub">Temukan studio yang cocok sama selera kamu.</p><div class="grid3">${STUDIOS.map(studioCard).join("")}</div>
 <h2 class="h2" style="margin-top:36px">Paket</h2><p class="sub">Pilih paket saat memesan — harga sudah termasuk diskon yang berlaku.</p><div class="pk-grid">${pkgCards()}</div></section></div>`;
 };
-function ensurePkg() { if (!S.pkg || !PKG.find(p => p.id == S.pkg)) S.pkg = (recPkg() || PKG[0]).id; }
+function ensurePkg() { if (!S.pkg || !PKG.find(p => p.id == S.pkg)) S.pkg = PKG[0].id; }
 function quickBook(sid, date, h) { editId = null; B = { studio: sid, date, slot: `${date} ${h}:00` }; ensurePkg(); go("time"); }
 function startBook(sid) { editId = null; B = { studio: sid, date: S.hDate || todayS(), slot: null }; ensurePkg(); go("time"); }
 
@@ -195,26 +186,15 @@ V.refund = () => {
   return `<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Booking Dibatalkan</h1><p class="m" style="margin:10px 0 18px">Booking belum dibayar, jadi tidak ada refund yang diperlukan.</p><button class="btn block" onclick="go('home')">Kembali ke Beranda</button></div></div>`;
 };
 
-// ---------- akun: profil, preferensi, riwayat pembayaran ----------
+// ---------- akun: profil, riwayat pembayaran ----------
 V.account = () => {
-  const tab = S.acct || "profile", u = me(), tabs = [["profile", "Edit Profil"], ["pref", "Preferensi"], ["pay", "Riwayat Pembayaran"]];
+  const tab = S.acct || "profile", u = me(), tabs = [["profile", "Edit Profil"], ["pay", "Riwayat Pembayaran"]];
   let body = "";
   if (tab == "profile") body = `<div class="card"><h3 class="h3">Edit Profil</h3><label>Nama</label><input id="pn" value="${esc(u.name)}"><label>Telepon</label><input id="pp" value="${esc(u.phone || "")}" inputmode="numeric"><label>Email</label><input value="${esc(u.email)}" disabled>
 <div class="row" style="margin-top:18px"><button class="btn" onclick="saveProfile()">Simpan</button><button class="btn ghost" onclick="changePw()">${ic("mail", 16)} Ubah sandi via email</button></div></div>`;
-  if (tab == "pref") { const q = S.quiz || {}, rec = recPkg(); body = `<div class="card"><h3 class="h3">Preferensi</h3><p class="sub">Dipakai untuk merekomendasikan paket yang paling pas.</p>
-<label>Tujuan sesi foto</label><select id="q1"><option value="">-- pilih --</option>${PURPOSES.map(x => `<option ${q.purpose == x ? "selected" : ""}>${x}</option>`).join("")}</select>
-<label>Jumlah peserta</label><select id="q2"><option value="">-- pilih --</option>${PEOPLE.map(x => `<option value="${x.id}" ${q.people == x.id ? "selected" : ""}>${x.range} orang</option>`).join("")}</select>
-<label>Vibe / style</label><select id="q3"><option value="">-- pilih --</option>${VIBES.map(x => `<option value="${x.id}" ${q.vibe == x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select>
-<label>Budget (Rp)</label><input id="q4" type="number" min="0" value="${q.budget || ""}"><button class="btn" style="margin-top:18px" onclick="savePref()">Simpan Preferensi</button></div>
-${rec ? `<div class="card soft" style="margin-top:14px"><div class="row sp"><div><span class="tag">Rekomendasi</span><h3 class="h3" style="margin-top:6px">Paket ${esc(rec.name)} — ${rp(eff(rec))}</h3><p class="sm m">${rec.photo_count} foto · ${rec.dur} menit · strip ${esc(rec.strip_size || "-")}</p></div><button class="btn" onclick="go('home')">Cari studio</button></div></div>` : ""}`; }
   if (tab == "pay") { const L = S.bookings.filter(b => b.pay_status && !["pending", "batal"].includes(b.pay_status)).sort((a, b) => (b.paid_at || 0) - (a.paid_at || 0));
     body = `<div class="card"><h3 class="h3">Riwayat Pembayaran</h3>${L.length ? `<div class="tbl"><table><tr><th>Waktu</th><th>Studio</th><th>Paket</th><th>Total</th><th>Status</th><th></th></tr>${L.map(b => `<tr><td>${fmtTime(b.paid_at)}</td><td>${esc(studioOf(b.studio).name)}</td><td>${esc(pkOf(b.package_id).name)}</td><td>${rp(b.amount)}</td><td><span class="tag ${b.pay_status == "paid" ? "ok" : b.pay_status == "refunded" ? "" : "no"}">${PAYLBL[b.pay_status]}</span></td>
 <td>${b.paid && b.status != "Dibatalkan" ? `<a class="btn sm ghost" href="${API.invUrl(b.id, 0)}" target="_blank" rel="noopener">${ic("receipt", 14)} Kwitansi Digital</a>` : ""}</td></tr>`).join("")}</table></div>` : `<p class="m" style="margin-top:8px">Belum ada transaksi.</p>`}</div>`; }
   return `<div class="panel"><h1 class="h1">Pengaturan Akun</h1><div class="seg">${tabs.map(t => `<button class="${t[0] == tab ? "on" : ""}" onclick="S.acct='${t[0]}';msg=err='';render()">${t[1]}</button>`).join("")}</div>${body}<div style="margin-top:18px"><button class="btn ghost" onclick="logout()">${ic("logout", 16)} Keluar</button></div></div>`;
 };
 async function saveProfile() { msg = err = ""; try { const r = await API.patch("/me", { name: $("#pn").value, phone: $("#pp").value }); S.user = { ...S.user, ...r }; save(); msg = "Profil disimpan."; } catch (e) { err = e.message; } render(); }
-async function savePref() {
-  const q = { purpose: $("#q1").value, people: +$("#q2").value, vibe: +$("#q3").value, budget: +$("#q4").value }; msg = err = "";
-  if (!q.purpose || !q.people || !q.vibe || !(q.budget > 0)) { err = "Lengkapi semua preferensi dengan benar."; S.quiz = { ...q }; return render(); }
-  q.ok = true; S.quiz = q; save(); try { await API.put("/preferences", { people: q.people, budget: q.budget, vibe: q.vibe }); msg = "Preferensi disimpan."; } catch (e) { err = e.message; } render();
-}
