@@ -147,9 +147,10 @@ export function createPhotoSessionController({ api, store, ui, router, models, s
       router.navigate(id ? `/sessions/${id}` : "/gallery");
     },
 
-    // kait after() rute /sessions/:id (setiap render): kunjungan baru = kamera + timer; render ulang sesi yang sama = pasang lagi ke elemen baru
-    enter() {
-      const session = currentSession();
+    // kait after() rute /sessions/:id (setiap render): kunjungan baru = kamera + timer; render ulang sesi yang sama = pasang lagi ke elemen baru.
+    // Sesi = id di URL (sama dengan view), id yang tidak dikenal → sesi aktif user
+    enter(match) {
+      const session = sessions.shownSession(state().data.sessions, state().persisted.me, match.params.id);
       if (!session) {
         return;
       }

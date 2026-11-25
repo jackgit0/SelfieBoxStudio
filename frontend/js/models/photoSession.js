@@ -37,7 +37,7 @@ export function activeSession(sessions, userId) {
   return sessions.filter(session => session.user_id == userId && session.status == "Aktif").pop();
 }
 
-// sesi yang tampil di layar Sesi Foto: yang sedang dibuka (currentId), selain itu sesi aktif user
+// sesi yang tampil di layar Sesi Foto: sesi dengan id itu (dari URL atau yang sedang dibuka), selain itu sesi aktif user
 export function shownSession(sessions, userId, currentId) {
   return sessions.find(session => session.id == currentId) || activeSession(sessions, userId);
 }

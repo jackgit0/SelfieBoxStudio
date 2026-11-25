@@ -124,7 +124,7 @@ function pagesFor({ studio, payment, landing, photo, gallery }, links) {
     "/forgot-password": { view: forgotView },
     "/reset-password": { view: resetView },
     // Sesi Foto (PhotoSessionController): kamera dan timer berjalan selama halaman terbuka, berhenti saat ditinggalkan
-    "/sessions/:id": { view: photoSessionView, after: () => photo.enter(), leave: () => photo.stopTimers() },
+    "/sessions/:id": { view: photoSessionView, after: match => photo.enter(match), leave: () => photo.stopTimers() },
     // Galeri (GalleryController)
     "/gallery": { view: galleryView },
   };

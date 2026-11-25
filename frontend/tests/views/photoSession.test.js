@@ -56,3 +56,11 @@ test("stopSessionModal: Konfirmasi Hentikan Sesi, Batal + Hentikan", () => {
   assert.equal(String(options.body), "<p>Hentikan sesi?</p>");
   assert.deepEqual(options.buttons, [{ label: "Batal", value: false, style: "ghost" }, { label: "Hentikan", value: true, style: "danger" }]);
 });
+
+test("sesi di URL yang tampil (juga setelah dimuat ulang); id yang tidak dikenal → sesi aktif user", () => {
+  const sessions = [session({ id: 40, status: "Selesai", pkg: 2 }), session()];
+  const shown = (id, current) => String(photoSessionView(stateWith({ sessions, current }), { ...match, params: { id: String(id) }, path: `/sessions/${id}` }));
+  assert.match(shown(40, 41), /Paket Standard/);
+  assert.match(shown(40, null), /Paket Standard/);
+  assert.match(shown(999, null), /Paket Basic/);
+});

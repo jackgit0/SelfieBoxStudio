@@ -54,7 +54,8 @@ function staffControls(persisted) {
 }
 
 export function photoSessionView(state, match) {
-  const session = shownSession(state.data.sessions, state.persisted.me, state.photo.session);
+  // sesi di URL (/sessions/:id); id yang tidak dikenal → sesi aktif user
+  const session = shownSession(state.data.sessions, state.persisted.me, match.params.id);
   if (!session) {
     return html`<div class="panel"><div class="card center"><h1 class="h2">Belum ada sesi aktif</h1><p class="m">Mulai dari menu Booking → pilih booking → Check-in & Mulai Sesi.</p><button class="btn" style="margin-top:12px" data-route="/bookings">Ke Booking Saya</button></div></div>`;
   }

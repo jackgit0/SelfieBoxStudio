@@ -285,3 +285,11 @@ test("start: sesi lain yang dipilih di Galeri dilepas, jadi Galeri membuka sesi 
   await controller.start({ id: "7" });
   assert.equal(store.get().photo.gallerySession, null);
 });
+
+test("enter memakai sesi di URL: sesi yang sudah selesai dibuka tanpa kamera, walau ada sesi aktif lain", async () => {
+  const { store, log, controller } = setup({ sessions: [activeSession({ id: 40, status: "Selesai" }), activeSession()], current: 41 });
+  controller.enter(routeMatch(40));
+  await settle();
+  assert.equal(store.get().photo.session, 40);
+  assert.ok(!log.some(entry => entry.startsWith("getUserMedia")));
+});
