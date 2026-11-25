@@ -254,3 +254,16 @@ test("pickDate mengosongkan sesi; pickSlot memilih sesi; moveMonth tidak mundur 
   controller.moveMonth({ context: "book", step: "1" });
   assert.deepEqual(store.get().runtime.calendar.book, { year: 2027, month: 0 });
 });
+
+test("moveMonth berangkat dari bulan tanggal booking; memulai booking/reschedule/draf membuang bulan tersimpan", async () => {
+  const december = setup({ booking: { date: "2026-12-02" } });
+  december.controller.moveMonth({ context: "book", step: "1" });
+  assert.deepEqual(december.store.get().runtime.calendar.book, { year: 2027, month: 0 });
+  const calendar = { home: { year: 2026, month: 11 }, book: { year: 2027, month: 2 } };
+  const quote = { total: 1 };
+  for (const run of [c => c.quickBook({ studio: "1", date: "2026-11-28", hour: "9" }), c => c.start({ id: "1" }), c => c.startReschedule({ id: "7" }), c => c.resumeDraft()]) {
+    const { store, controller } = setup({ persisted: { draft: { studio: 1, date: "2026-11-28", slot: "2026-11-28 9:00" } }, runtime: { calendar: { ...calendar } }, responses: { "POST /quote": { body: quote } } });
+    await run(controller);
+    assert.deepEqual(store.get().runtime.calendar, { home: { year: 2026, month: 11 } });
+  }
+});

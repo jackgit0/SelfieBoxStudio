@@ -53,7 +53,7 @@ function syncReschedule(id) {
   if (!id) { BK.rescheduleId = null; return; }
   if (BK.rescheduleId == id) return;
   const b = D.bookings.find(x => x.id == id);
-  if (b && ["Menunggu Pembayaran", "Terbayar"].includes(b.status)) Object.assign(BK, { rescheduleId: id, studio: b.studio, date: parseSlot(b.date).date, slot: null, quote: null });
+  if (b && ["Menunggu Pembayaran", "Terbayar"].includes(b.status)) { Object.assign(BK, { rescheduleId: id, studio: b.studio, date: parseSlot(b.date).date, slot: null, quote: null }); delete R.calendar.book; } // kalender membuka bulan booking itu
 }
 // dialog bersama: components/modal.js openModal(); body dan kicker kode lama berupa HTML yang sudah di-escape pemanggil, cls = kelas tambahan .mbox
 const modal = ({ body = "", kicker = "", cls = "", ...options }) => openModal({ ...options, body: raw(body), kicker: raw(kicker), className: cls });

@@ -7,7 +7,7 @@
 import { isoDate, parseSlot, slotLabel } from "../core/format.js";
 import { isStudioShown } from "../models/master.js";
 import { filterDate } from "../models/studio.js";
-import { shiftMonth } from "../components/calendar.js";
+import { monthOf, shiftMonth } from "../components/calendar.js";
 import { bookingFailedModal, inputInvalidModal, loginRequiredModal, sessionBookedModal, sessionGoneModal } from "../views/customer/bookingPopups.js";
 
 const EMPTY_BOOKING = { studio: null, date: null, slot: null, quote: null, rescheduleId: null };
@@ -47,8 +47,15 @@ export function createBookingController({ api, store, ui, router, models, packag
     store.update("booking", { quote }, { silent: true });
   }
 
+  // bulan kalender yang dipindah dengan panah dilupakan, jadi kalender membuka bulan tanggal booking yang baru (decisions.md 52)
+  function forgetMonth() {
+    const { book, ...others } = state().runtime.calendar;
+    store.update("runtime", { calendar: others }, { silent: true });
+  }
+
   // booking baru dari Browse / Detail Studio: draf tamu lama dan reschedule dibuang
   function begin(fields) {
+    forgetMonth();
     store.update("persisted", { draft: null }, { silent: true });
     store.update("booking", { rescheduleId: null, ...fields }, { silent: true });
     router.navigate("/book/time");
@@ -80,6 +87,7 @@ export function createBookingController({ api, store, ui, router, models, packag
       if (!existing) {
         return;
       }
+      forgetMonth();
       store.update("booking", { rescheduleId: id, studio: existing.studio, date: parseSlot(existing.date).date, slot: null }, { silent: true });
       router.navigate(timePath());
     },
@@ -91,7 +99,8 @@ export function createBookingController({ api, store, ui, router, models, packag
 
     moveMonth(dataset) {
       const calendars = state().runtime.calendar;
-      const next = shiftMonth(calendars.book || currentMonth(), dataset.step, currentMonth());
+      const shown = calendars.book || monthOf(booking().date || isoDate(now()));
+      const next = shiftMonth(shown, dataset.step, currentMonth());
       if (!next) {
         return;
       }
@@ -134,6 +143,7 @@ export function createBookingController({ api, store, ui, router, models, packag
     // draf booking tamu setelah Masuk/Daftar (popup Belum Login): kembali ke Paket & Pembayaran dengan studio, sesi dan paket yang sama
     async resumeDraft() {
       const draft = state().persisted.draft;
+      forgetMonth();
       store.update("persisted", { draft: null }, { silent: true });
       store.update("booking", { rescheduleId: null, studio: draft.studio, date: draft.date, slot: draft.slot, quote: null }, { silent: true });
       try {

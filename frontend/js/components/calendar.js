@@ -29,3 +29,8 @@ export function shiftMonth(shown, step, current) {
   }
   return { year: Math.floor(target / 12), month: target % 12 };
 }
+
+// bulan sebuah tanggal "YYYY-MM-DD" → { year, month (0–11) }
+export function monthOf(isoDate) {
+  return { year: Number(isoDate.slice(0, 4)), month: Number(isoDate.slice(5, 7)) - 1 };
+}

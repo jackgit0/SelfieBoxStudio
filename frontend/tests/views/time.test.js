@@ -60,3 +60,9 @@ test("kalender konteks book: bulan dari runtime.calendar.book, tanggal booking t
   const november = String(timeView(state(), timeMatch, now));
   assert.match(november, /<button class="cd on"\s+data-action="calendar:pick" data-context="book" data-date="2026-11-27">27<\/button>/);
 });
+
+test("kalender tanpa bulan tersimpan membuka bulan tanggal booking (tanggal Desember terlihat dan terpilih)", () => {
+  const text = String(timeView(state({ date: "2026-12-02" }), timeMatch, now));
+  assert.match(text, /<b>Desember 2026<\/b>/);
+  assert.match(text, /<button class="cd on"\s+data-action="calendar:pick" data-context="book" data-date="2026-12-02">2<\/button>/);
+});
