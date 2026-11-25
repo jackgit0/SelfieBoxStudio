@@ -153,14 +153,15 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     const dl = await call('DELETE', '/admin/packages/4', null, AD); ok(dl.s === 200 && !(await call('GET', '/master')).j.PKG.some(p => p.id === 4), 'paket yang dihapus admin tidak ada di PKG');
     ok((await call('POST', '/quote', { package_id: 2, studio_id: 1 }, U)).j.error === 'Paket tidak valid', 'quote dengan paket nonaktif: "Paket tidak valid" (pemicu popup)');
     // 1–2. frontend
-    const JS = allJs(), aj = src('js/legacy/admin.js'), cj = src('js/legacy/customer.js'), boot = src('js/main.js'); // fase 2: berkas lama di js/legacy, isi boot.js di main.js
+    const JS = allJs(), aj = src('js/legacy/admin.js'); // fase 2: berkas lama di js/legacy
     // dialog bersama (aria-modal, Escape, fokus awal di tombol aksi): frontend/tests/components/modal.test.js + smoke walk K2 (refactor MVC fase 4)
     ok(!/function aModal\(/.test(aj) && /aModal\s*=.*modal\(/.test(aj), 'admin.js: aModal tidak lagi berdiri sendiri, memakai modal() bersama'); // kode: diganti di fase 8a (test-map.md)
     for (const s of ['Pilihan Paket', 'Temukan Paket Sesuai Kebutuhanmu', 'Pilih Paket Ini', 'Lihat semua paket', 'Paling Favorit', '/ sesi', 'Paket Foto Tidak Ditemukan', 'Lihat & Pilih Paket Lain', 'Hubungi Customer Service', 'Pilih studio untuk melanjutkan']) ok(JS.includes(s), `frontend memuat "${s}"`);
-    for (const s of ['V.packages', 'M.favouritePackageId', 'csContact()']) ok(cj.includes(s), `customer.js memuat "${s}"`); // kode: diganti di fase 5a (test-map.md)
+    // Pilihan Paket (lencana di favouritePackageId, Pilih Paket Ini = package:choose) dan Customer Service di popup paket: frontend/tests/views/packages.test.js, frontend/tests/controllers/PackageController.test.js (refactor MVC fase 5a)
     ok(!uiGradient(JS), 'frontend (JS) tanpa gradient');
     // FAV_PKG → M.favouritePackageId saat boot dan refreshMaster: frontend/tests/models/master.test.js (refactor MVC fase 2, keduanya memakai loadMaster)
-    ok(!/S\.pkg\s*&&\s*!M\.packages\.find\(p => p\.id == S\.pkg\)\)\s*S\.pkg = null/.test(boot), 'main.js (dulu boot.js) tidak diam-diam menghapus paket pilihan yang hilang (popup yang memberi tahu)'); } // kode: diganti di fase 5a (test-map.md)
+    // paket pilihan yang hilang tidak dibuang diam-diam (popup Paket Foto Tidak Ditemukan): frontend/tests/controllers/PackageController.test.js (refactor MVC fase 5a)
+  }
   await down(srv);
 
   // ===== Fase 4: popup galat Create Booking + akses tamu =====

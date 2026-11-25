@@ -11,8 +11,8 @@ import * as admin from "./legacy/admin.js";
 
 const BRIDGED = {
   state: ["BK", "R", "S"],
-  core: ["changePw", "csContact", "doReset", "forgot", "go", "ic", "login", "logout", "me", "modal", "refresh", "reg", "render"],
-  customer: ["choosePkg", "confirmPay", "doCancel", "mailInv", "nextTime", "openCancel", "payNow", "qr", "saveProfile", "selectPkg", "startReschedule"],
+  core: ["changePw", "doReset", "forgot", "go", "ic", "login", "logout", "me", "modal", "refresh", "reg", "render"],
+  customer: ["confirmPay", "doCancel", "mailInv", "nextTime", "openCancel", "payNow", "qr", "saveProfile", "selectPkg", "startReschedule"],
   session: ["P", "bulkDel", "confirmSel", "delPhoto", "dl", "fav", "nextPose", "ph", "selAllNonFav", "selPh", "shoot", "staffAct", "startSession", "toggleDel", "warn"],
   landing: ["lpMenu", "openAuth", "sendContact", "toSec"],
   admin: ["AD", "acctSave", "bookDel", "bookSave", "delCust", "discSave", "loading", "opDel", "opEdit", "opSave", "openBook", "openCust", "pkActive", "pkAdd", "pkDel", "pkSave", "poseDel", "poseSave", "propDel", "propSave", "pthumb", "sAdd", "sDay", "sDel", "sNav", "sSave", "sel", "stCancel", "stEdit", "stReview", "stSave", "stat", "studioDel", "studioSave", "upImg"],

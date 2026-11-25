@@ -10,7 +10,7 @@ V.session = () => {
   const s = sesOf() || D.sessions.filter(x => x.user_id == S.me && x.status == "Aktif").pop();
   if (!s) return `<div class="panel"><div class="card center"><h1 class="h2">Belum ada sesi aktif</h1><p class="m">Mulai dari menu Booking → pilih booking → Check-in & Mulai Sesi.</p><button class="btn" style="margin-top:12px" onclick="go('my')">Ke Booking Saya</button></div></div>`;
   P.session = s.id; const p = pkOf(s.pkg);
-  return `<div class="panel" style="max-width:1100px"><div class="row sp"><div><h1 class="h1">Sesi Foto</h1><p class="sub">Paket ${esc(p.name)} · target ${p.photo_count} foto (maks. ambil ${p.photo_count * 2}) · ${p.dur} menit</p></div><button class="btn ghost sm" onclick="csContact()">Customer Service</button></div>
+  return `<div class="panel" style="max-width:1100px"><div class="row sp"><div><h1 class="h1">Sesi Foto</h1><p class="sub">Paket ${esc(p.name)} · target ${p.photo_count} foto (maks. ambil ${p.photo_count * 2}) · ${p.dur} menit</p></div><button class="btn ghost sm" data-action="package:contactCs">Customer Service</button></div>
 <div class="sess" style="margin-top:14px"><div class="card"><div id="tm" class="timer"></div><video id="v" autoplay playsinline muted></video><canvas id="cv" hidden></canvas>
 <div class="row" style="margin-top:12px"><button class="btn" id="shot" onclick="shoot()">${ic("camera", 18)} Ambil Foto</button><span id="cnt" class="m"></span></div><small id="ds" class="m"></small><div id="strip" class="strip"></div></div>
 <div class="stack"><div class="card"><h3 class="h3">Pose Rekomendasi</h3><p id="pose" style="font-size:17px;margin:10px 0"></p><button class="btn sm ghost" onclick="nextPose()">Pose lain</button></div>

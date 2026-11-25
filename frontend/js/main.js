@@ -1,7 +1,7 @@
 // Titik masuk aplikasi (satu-satunya <script type="module"> di index.html).
 // Menyiapkan API, store, router, renderer dan event data-*, membungkus objek state kode lama (js/legacy) dengan store, memasang jembatan window
 // untuk atribut onclick lama, lalu menjalankan isi boot.js lama: muat data master, tautan #reset= (router), pulihkan login, render pertama.
-import { API_BASE } from "./config.js";
+import { API_BASE, CS_EMAIL, CS_WA } from "./config.js";
 import { createStore } from "./core/store.js";
 import { ROUTES, createRouter } from "./core/router.js";
 import { createEvents } from "./core/events.js";
@@ -11,8 +11,10 @@ import * as masterModel from "./models/master.js";
 import * as studioModel from "./models/studio.js";
 import { openModal } from "./components/modal.js";
 import { createStudioController } from "./controllers/StudioController.js";
+import { createPackageController } from "./controllers/PackageController.js";
 import { browseView } from "./views/customer/browse.js";
 import { studioView } from "./views/customer/studio.js";
+import { packagesView } from "./views/customer/packages.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
 import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell, refresh, logout } from "./legacy/core.js";
 import { calNav, calPick } from "./legacy/customer.js";
@@ -58,6 +60,7 @@ function pagesFor({ studio }) {
       },
     },
     "/studios/:id": { view: studioView, after: () => studio.refreshMaster() },
+    "/packages": { view: packagesView },
     // langkah Pilih Waktu masih kode lama sampai fase 5b, jam kosongnya sudah dari StudioController
     "/book/time": { after: showAvailability },
     "/bookings/:id/reschedule": { after: showAvailability },
@@ -65,8 +68,10 @@ function pagesFor({ studio }) {
 }
 
 // aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu, fase 5b)
-function controllerActions({ studio }) {
+function controllerActions({ studio, package: packages }) {
   return {
+    "package:choose": packages.choose,
+    "package:contactCs": packages.contactCs,
     "studio:toggleBookmark": studio.toggleBookmark,
     "studio:setHourFrom": studio.setHourFrom,
     "studio:setHourTo": studio.setHourTo,
@@ -85,7 +90,9 @@ async function start() {
   const ui = createUi(store);
   const navigation = { navigate: path => goPath(path) };
   const models = { master: masterModel, studio: studioModel };
-  const controllers = { studio: createStudioController({ api, store, ui, router: navigation, models }) };
+  const studio = createStudioController({ api, store, ui, router: navigation, models });
+  const packages = createPackageController({ store, ui, router: navigation, config: { wa: CS_WA, email: CS_EMAIL }, refreshMaster: studio.refreshMaster });
+  const controllers = { studio, package: packages };
   const pages = pagesFor(controllers);
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({

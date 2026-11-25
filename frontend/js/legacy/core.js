@@ -1,6 +1,6 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
 import { API, BK, D, M, R, RENDERER, ROUTER, S, V, save, saveBooking } from "./state.js";
-import { BRAND, CS_EMAIL, CS_WA } from "../config.js";
+import { BRAND } from "../config.js";
 import { esc, raw } from "../core/html.js";
 import { icon, iconFilled } from "../components/icon.js";
 import { openModal } from "../components/modal.js";
@@ -136,5 +136,4 @@ async function adminLogin(username, password) {
   const r = await API.post("/admin/login", { username, password }); API.token = r.token; S.admin = true; S.draft = null; S.user = { name: "Admin", id: 0 }; S.me = "admin"; AD.me = r.admin; go(r.admin.must_change ? "aacct" : "adash");
 }
 async function changePw() { try { await API.post("/auth/forgot", { email: me().email }); R.toast.message = "Tautan untuk mengubah sandi telah dikirim ke " + me().email; } catch (x) { R.toast.error = x.message; } render(); }
-function csContact() { const wa = CS_WA, mail = CS_EMAIL; if (wa) window.open("https://wa.me/" + wa, "_blank"); else if (mail) location.href = "mailto:" + mail; else modal({ title: "Hubungi Customer Service", body: "<p>Silakan hubungi staf di studio atau kontak Customer Service Anda. (Atur nomor di frontend/js/config.js)</p>" }); } // dulu dialog bawaan browser (decisions.md 4, 27)
-export { $, capLabel, changePw, csContact, doReset, eff, forgot, go, goPath, ic, icf, login, logout, me, modal, pkOf, priceRange, refresh, reg, render, renderAfter, renderBefore, renderContent, renderShell, staffToggle, studioOf, toasts };
+export { $, capLabel, changePw, doReset, eff, forgot, go, goPath, ic, icf, login, logout, me, modal, pkOf, priceRange, refresh, reg, render, renderAfter, renderBefore, renderContent, renderShell, staffToggle, studioOf, toasts };

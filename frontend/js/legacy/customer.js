@@ -6,7 +6,7 @@ import { SESSION_HOURS as HRS, formatDayMonthYear as fmtDMY, formatDate as fmtDa
 import { isStudioShown } from "../models/master.js";
 import { modalIcon } from "../components/modal.js";
 import { calendar } from "../components/calendar.js";
-import { $, csContact, eff, go, ic, me, modal, pkOf, refresh, render, studioOf } from "./core.js";
+import { $, go, ic, me, modal, pkOf, refresh, render, studioOf } from "./core.js";
 import { freeHours } from "../models/studio.js";
 import { priceTag } from "../components/packageCards.js";
 import { studioUnavailable } from "../views/customer/studio.js";
@@ -24,36 +24,11 @@ function calNav(ctx, dir) { const t = new Date(), c = R.calendar[ctx] || (R.cale
 function calPick(ctx, ds) { BK.date = ds; BK.slot = null; render(); }
 
 // ---------- chip jam di kartu studio dan Book Now (data-action booking:quickBook / booking:start lewat legacy-actions.js; fase 5b: BookingController) ----------
-// paket pilihan (dari Pilihan Paket atau pilihan sebelumnya) dipakai bila masih aktif; bila sudah dinonaktifkan/dihapus admin: popup Paket Foto Tidak Ditemukan
-function ensurePkg(next) { if (S.pkg && !M.packages.find(p => p.id == S.pkg)) { pkgMissing(next); return false; } if (!S.pkg) S.pkg = M.packages[0].id; return true; }
+// paket pilihan masih aktif, atau popup Paket Foto Tidak Ditemukan: PackageController.ensureSelected
+const ensurePkg = next => CONTROLLERS.package.ensureSelected(next);
 function quickBook(sid, date, h) { if (!ensurePkg(() => quickBook(sid, date, h))) return; BK.rescheduleId = null; S.draft = null; Object.assign(BK, { studio: sid, date, slot: `${date} ${h}:00` }); go("time"); }
 function startBook(sid) { if (!ensurePkg(() => startBook(sid))) return; BK.rescheduleId = null; S.draft = null; Object.assign(BK, { studio: sid, date: S.hDate || todayS(), slot: null }); go("time"); }
 
-
-// ---------- Pilihan Paket (Figma 660:5062) ----------
-const pkgDesc = p => `${p.photo_count} foto · ${p.dur} menit${p.strip_size ? " · cetak " + esc(p.strip_size) : ""}`;
-const pkgFeat = p => [`<b>${p.photo_count} foto</b> cetak strip ${esc(p.strip_size || "")}`, `Kertas foto <b>${esc(p.strip_material || "standar")}</b>`, `Durasi sesi <b>${p.dur} menit</b>`, "Galeri online 30 hari", "Akses semua properti studio"];
-V.packages = () => `<div class="pkpage"><div class="row" style="margin-bottom:16px"><button class="ib" aria-label="Kembali ke Browse" onclick="go('home')">${ic("left", 18)}</button><h1 class="h1">Pilihan Paket</h1></div>
-<div class="pkwrap"><div class="ctr"><h2 class="h2">Temukan Paket Sesuai Kebutuhanmu</h2><p class="m" style="margin-top:8px">Nikmati pengalaman foto studio mandiri dengan hasil cetak berkualitas premium dan fasilitas lengkap.</p></div>
-<div class="pkl">${M.packages.map(p => { const fav = p.id == M.favouritePackageId; return `<article class="pkc ${fav ? "fav" : ""}">${fav ? '<span class="badge">Paling Favorit</span>' : ""}<div class="row sp" style="flex-wrap:nowrap"><h3>Paket ${esc(p.name)}</h3>${p.id == S.pkg ? '<span class="tag">Dipilih</span>' : ""}</div><p class="pd">${pkgDesc(p)}</p>
-<div class="pp">${M.discount.pct ? `<s>${rp(p.price)}</s> ` : ""}${rp(eff(p))} <small>/ sesi</small></div><ul>${pkgFeat(p).map(f => `<li>${ic("check", 16)}<span>${f}</span></li>`).join("")}</ul>
-<button class="btn block ${fav ? "" : "ghost"}" onclick="choosePkg(${p.id})">Pilih Paket Ini</button></article>`; }).join("")}</div></div></div>`;
-function choosePkg(id) { const p = M.packages.find(x => x.id == id); if (!p) return pkgMissing(); S.pkg = p.id; go("home"); R.toast.message = `Paket ${p.name} dipilih. Pilih studio untuk melanjutkan.`; render(); }
-
-// ---------- popup Paket Foto Tidak Ditemukan (Figma 660:5538) ----------
-// next: lanjutkan alur semula setelah customer memilih paket lain langsung dari daftar di popup
-// booking = muncul di langkah Create Booking: judul dan kalimat dari Figma "Create Booking - Paket Tidak Ditemukan" (585:4251)
-async function pkgMissing(next, booking = false) {
-  S.pkg = null; save(); render();
-  const v = await modal({ title: booking ? "Paket Tidak Ditemukan" : "Paket Foto Tidak Ditemukan", cls: "wide center", kicker: `<span class="tag no mkick">STATUS PAKET: TIDAK TERSEDIA</span>`,
-    body: `<p>${booking ? "Paket tidak ditemukan. Silakan pilih paket lain." : "Maaf, paket foto yang Anda pilih saat ini sudah tidak tersedia atau telah habis kuotanya untuk sesi ini. Rincian paket tidak dapat ditampilkan."}</p><div class="mnote">Jangan khawatir, masih ada berbagai paket foto menarik lainnya yang siap kamu pesan! Silakan cek opsi paket studio di bawah ini.</div>
-<div class="mpk">${M.packages.map(p => `<button class="mpkr" data-v="${p.id}"><span><b>Paket ${esc(p.name)}</b><small>${pkgDesc(p)}</small></span><b>${rp(eff(p))}</b></button>`).join("")}</div>`,
-    buttons: [{ label: "Lihat & Pilih Paket Lain", value: "list", icon: "box" }, { label: "Hubungi Customer Service", value: "cs", style: "soft", icon: "mail" }] });
-  if (v === "list") go("packages"); else if (v === "cs") csContact();
-  else if (v && M.packages.find(p => p.id == v)) { S.pkg = +v; save(); if (next) next(); else render(); }
-}
-// error API "Paket tidak valid": muat ulang data master; bila paket memang sudah tidak aktif, tampilkan popup (true), selain itu biarkan pemanggil menampilkan pesan error
-async function onPkgErr(e, next) { if (e.status != 400 || !/^Paket(\/studio)? tidak valid/.test(e.message)) return false; await CONTROLLERS.studio.refreshMaster(); if (M.packages.find(p => p.id == S.pkg)) return false; pkgMissing(next, true); return true; }
 
 // ---------- studio tidak tersedia (Detail Studio sendiri: views/customer/studio.js) ----------
 // studio yang tidak tersedia/dihapus tidak bisa dibuka untuk dipesan (riwayat booking tetap memakai studioOf)
@@ -92,7 +67,7 @@ async function bookingErr(e, next) {
   const m = e.message || "";
   if (e.status == 401) return needLogin();
   if (e.status == 409 && /^Jadwal (sudah|baru) tidak tersedia/.test(m)) return sesiBooked(); // "Jadwal sudah tidak tersedia" (booking) / "Jadwal baru tidak tersedia" (reschedule)
-  if (await onPkgErr(e, next)) return;                                                       // "Paket tidak valid" / "Paket/studio tidak valid" dengan paket nonaktif
+  if (await CONTROLLERS.package.handleError(e, next)) return;                                // "Paket tidak valid" / "Paket/studio tidak valid" dengan paket nonaktif
   if (m === "Format/jam slot tidak valid") return inputInvalid();
   if (["Jadwal sudah lewat", "Studio tidak tersedia", "Paket/studio tidak valid"].includes(m)) return sesiGone(); // paket masih aktif: studionya yang hilang
   await modal({ title: "Booking Gagal", cls: "center", kicker: mIcon("alert"), body: `<p>${esc(m)}</p>`, buttons: [{ label: "Tutup", value: null }] });
@@ -230,7 +205,7 @@ V.refund = () => {
   const r = S.cancelRes, b = bookOf(); if (!r || !b) return `<div class="panel"><div class="card center">Booking dibatalkan.<div style="margin-top:12px"><button class="btn" onclick="go('home')">Kembali ke Beranda</button></div></div></div>`;
   const st = r.refund.state;
   if (st == "refunded") return `<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Refund Berhasil</h1><img class="ill" src="/img/ill-refund-ok.png" alt=""><div style="text-align:left">${kvs([["Waktu", fmtTime(r.refund.at)], ["Status", "Refunded"], ["Total", rp(r.refund.amount)]])}</div><button class="btn block" style="margin-top:18px" onclick="go('home')">Kembali ke Beranda</button></div></div>`;
-  if (st == "failed") return `<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Maaf Refund Gagal</h1><img class="ill" src="/img/ill-refund-fail.png" alt=""><p class="m sm">Booking sudah dibatalkan, namun refund hanya tersedia untuk pembatalan minimal ${r.refund.min_hours} jam sebelum sesi.</p><button class="btn block" style="margin-top:18px" onclick="csContact()">Hubungi Customer Service</button><button class="btn ghost block" style="margin-top:10px" onclick="go('home')">Kembali ke Beranda</button></div></div>`;
+  if (st == "failed") return `<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Maaf Refund Gagal</h1><img class="ill" src="/img/ill-refund-fail.png" alt=""><p class="m sm">Booking sudah dibatalkan, namun refund hanya tersedia untuk pembatalan minimal ${r.refund.min_hours} jam sebelum sesi.</p><button class="btn block" style="margin-top:18px" data-action="package:contactCs">Hubungi Customer Service</button><button class="btn ghost block" style="margin-top:10px" onclick="go('home')">Kembali ke Beranda</button></div></div>`;
   return `<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Booking Dibatalkan</h1><p class="m" style="margin:10px 0 18px">Booking belum dibayar, jadi tidak ada refund yang diperlukan.</p><button class="btn block" onclick="go('home')">Kembali ke Beranda</button></div></div>`;
 };
 
@@ -246,4 +221,4 @@ V.account = () => {
   return `<div class="panel"><h1 class="h1">Pengaturan Akun</h1><div class="seg">${tabs.map(t => `<button class="${t[0] == tab ? "on" : ""}" onclick="go('account',{tab:'${t[0]}'})">${t[1]}</button>`).join("")}</div>${body}<div style="margin-top:18px"><button class="btn ghost" onclick="logout()">${ic("logout", 16)} Keluar</button></div></div>`;
 };
 async function saveProfile() { R.toast.message = R.toast.error = ""; try { const r = await API.patch("/me", { name: $("#pn").value, phone: $("#pp").value }); S.user = { ...S.user, ...r }; save(); R.toast.message = "Profil disimpan."; } catch (e) { R.toast.error = e.message; } render(); }
-export { PAYLBL, calNav, calPick, choosePkg, confirmPay, doCancel, kvs, mailInv, nextTime, openCancel, payNow, qr, quickBook, resumeDraft, saveProfile, selectPkg, startBook, startReschedule };
+export { PAYLBL, calNav, calPick, confirmPay, doCancel, kvs, mailInv, nextTime, openCancel, payNow, qr, quickBook, resumeDraft, saveProfile, selectPkg, startBook, startReschedule };
