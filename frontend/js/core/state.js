@@ -3,8 +3,8 @@
 // Setiap panggilan memberi objek baru, jadi tes tidak berbagi state.
 export function createInitialState() {
   return {
-    // state tersimpan (localStorage["snapia"]): user, peran admin, paket pilihan, bookmark studio, Mode Staf, …
-    persisted: { user: null, me: null, admin: false, pkg: null, bm: [], staff: false, log: [] },
+    // state tersimpan (localStorage["snapia"]): user, peran admin, paket pilihan, bookmark studio, kamera tablet per studio, …
+    persisted: { user: null, me: null, admin: false, pkg: null, bm: [], cameras: {} },
     // data master dari /api/master (models/master.js loadMaster); json = isi terakhir untuk refreshMaster
     master: {
       packages: [],

@@ -5,7 +5,6 @@ import { loginView } from "../../js/views/auth/login.js";
 import { registerView } from "../../js/views/auth/register.js";
 import { forgotView } from "../../js/views/auth/forgot.js";
 import { resetView } from "../../js/views/auth/reset.js";
-import { staffPinModal } from "../../js/views/auth/staff.js";
 import { sampleState } from "../helpers/fixtures.js";
 import { flat } from "../helpers/markup.js";
 
@@ -60,13 +59,3 @@ test("forgot dan reset: tanpa tab dan tanpa catatan draf; Kembali ke /login", ()
   assert.match(reset, /<h2 class="h2">Buat Sandi Baru<\/h2><form novalidate data-submit="auth:reset"><label for="pw">Password baru<\/label><input id="pw" name="password" type="password" autocomplete="new-password"><label for="pw2">Ulangi password<\/label><input id="pw2" name="confirmation" type="password" autocomplete="new-password"><div style="margin-top:18px"><button class="btn block" type="submit">Simpan Sandi<\/button><\/div><\/form>/);
 });
 
-test("staffPinModal: judul, isian PIN numerik dan fokus awal di isian, Enter = Masuk, fokus kembali ke avatar", () => {
-  const options = staffPinModal();
-  assert.equal(options.title, "Masuk Mode Staf");
-  assert.match(flat(options.body), /<p>Masukkan PIN staf untuk mengaktifkan Mode Staf\.<\/p><label for="staff-pin">PIN staf<\/label><input id="staff-pin" type="password" inputmode="numeric" autocomplete="off">/);
-  assert.deepEqual(options.buttons, [{ label: "Batal", value: null, style: "ghost" }, { label: "Masuk", value: "ok" }]);
-  assert.equal(options.initialFocus, "#staff-pin");
-  assert.equal(options.returnFocus, ".avatar");
-  assert.equal(options.enterValue, "ok");
-  assert.equal(options.read({ querySelector: () => ({ value: " 1234 " }) }), "1234");
-});

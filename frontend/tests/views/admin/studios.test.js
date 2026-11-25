@@ -22,6 +22,7 @@ test("studios: baris accordion (nama di-escape, status, biaya · sesi · alamat,
   assert.match(out, /<span class="tag off">Tidak tersedia<\/span>/);
   assert.ok(out.includes("Rp15.000 · 4 sesi<"));
   assert.match(out, /data-action="studio:delete" data-id="3"/);
+  assert.match(out, /<button class="ibtn" data-route="\/admin\/studios\/3\/live" title="Buka Session Assistant \(tablet studio\)" aria-label="Buka Session Assistant Melati &lt;b&gt;"><svg[^]*?<\/svg><\/button><button class="ibtn del" data-action="studio:delete" data-id="3"/); // ikon mata di samping ikon hapus
   assert.match(out, /aria-label="Hapus Melati &lt;b&gt;"/);
   assert.match(out, /data-action="studio:toggleStudio" data-id="4"/);
   assert.match(out, /data-action="studio:openNew"[^>]*aria-expanded="false"/);

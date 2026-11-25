@@ -1,20 +1,21 @@
+// Session Assistant di tablet studio (/admin/studios/:id/live): layar tunggu, Mulai Sesi, kamera + timer, timer foto 3/5 detik,
+// ambil/hapus foto, background, Akhiri Sesi dan Keluar dengan password admin.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createStore } from "../../js/core/store.js";
 import { createPhotoSessionController, createPhotoState } from "../../js/controllers/PhotoSessionController.js";
-import * as photoSessionModel from "../../js/models/photoSession.js";
-import * as driveModel from "../../js/models/drive.js";
+import * as liveSessionModel from "../../js/models/admin/liveSession.js";
 import { createFakeApi } from "../helpers/fakeApi.js";
 import { createFakeUi } from "../helpers/fakeUi.js";
 import { createFakeStorage } from "../helpers/fakeStorage.js";
 import { sampleState } from "../helpers/fixtures.js";
 
-// timer palsu: interval dijalankan manual lewat run(id)
+// timer palsu: interval dijalankan manual lewat fire(delay), timeout lewat runTimeouts()
 function fakeTimers() {
   let next = 1;
   const timers = {
     intervals: new Map(),
-    timeouts: [],
+    timeouts: new Map(),
     setInterval(callback, delay) {
       const id = next++;
       timers.intervals.set(id, { callback, delay });
@@ -24,13 +25,26 @@ function fakeTimers() {
       timers.intervals.delete(id);
     },
     setTimeout(callback, delay) {
-      timers.timeouts.push({ callback, delay });
+      const id = next++;
+      timers.timeouts.set(id, { callback, delay });
+      return id;
+    },
+    clearTimeout(id) {
+      timers.timeouts.delete(id);
     },
     every(delay) {
       return [...timers.intervals.values()].filter(item => item.delay === delay);
     },
     fire(delay) {
       for (const item of timers.every(delay)) item.callback();
+    },
+    // jalankan timeout yang menunggu (satu putaran)
+    runTimeouts(delay = 1000) {
+      const due = [...timers.timeouts.entries()].filter(([, item]) => item.delay === delay);
+      for (const [id, item] of due) {
+        timers.timeouts.delete(id);
+        item.callback();
+      }
     },
   };
   return timers;
@@ -42,11 +56,13 @@ function fakeScreen(log) {
     attachStream: stream => log.push(`attach ${stream.name}`),
     cameraUnavailable: () => log.push("cameraUnavailable"),
     showPose: (url, alt) => log.push(`pose ${url} | ${alt}`),
+    showCountdown: seconds => log.push(`count ${seconds}`),
+    hideCountdown: () => log.push("hideCount"),
     update(status, strip) {
       this.updates.push({ status, strip });
     },
-    capture: ({ emojis }) => {
-      log.push(`capture ${emojis.join("")}`);
+    capture: ({ fill }) => {
+      log.push(`capture ${fill}`);
       return "data:image/jpeg;base64,QUJD";
     },
   };
@@ -56,16 +72,19 @@ function fakeStream(name, log) {
   return { name, getTracks: () => [{ stop: () => log.push(`stop ${name}`) }] };
 }
 
-const activeSession = (extra = {}) => ({ id: 41, user_id: 5, pkg: 1, status: "Aktif", left: 62, paused: false, photos: [], ...extra });
+const running = (extra = {}) => ({ id: 41, status: "Aktif", left: 62, studio_name: "Mawar", customer: "Ana", package: { name: "Basic", photo_count: 3 }, photos: [], ...extra });
+const liveAnswer = (state = "running", extra = {}) => ({ studio: { id: 2, name: "Mawar" }, state, session: state == "running" ? running() : undefined, booking: null, next: null, ...extra });
 
-function setup({ responses = {}, sessions = [activeSession()], staff = false, modalAnswers = [], cameraFails = false, current = null, clearToastOnNavigate = false, driveFetch = null } = {}) {
+function setup({ responses = {}, modalAnswers = [], cameraFails = false, live = null, cameras = {}, devices = [] } = {}) {
   const log = [];
-  const state = sampleState({ persisted: { me: 5, user: { id: 5, name: "Ana" }, staff, log: [] }, master: { poses: { 1: ["/img/a.jpg", "/media/b.jpg", "/img/c.jpg"] }, peopleRanges: [{ id: 1, range: "1-2" }] } });
-  state.data.sessions = sessions;
-  state.photo = { ...createPhotoState(), session: current };
+  const state = sampleState({ persisted: { me: "admin", admin: true, cameras }, master: { poses: { 1: ["/img/a.jpg", "/media/b.jpg"] }, peopleRanges: [{ id: 1, range: "1-2" }] } });
+  state.photo = createPhotoState();
+  if (live) {
+    state.photo.live = { ...state.photo.live, studioId: 2, cameras: [], ...live };
+  }
   const store = createStore(state, { storage: createFakeStorage(), persistKey: "snapia" });
   store.subscribe(() => log.push("render"));
-  const api = createFakeApi(responses);
+  const api = createFakeApi({ "GET /admin/studios/2/live": { body: liveAnswer("idle") }, ...responses });
   const ui = createFakeUi({ modalAnswers });
   const timers = fakeTimers();
   const screen = fakeScreen(log);
@@ -76,236 +95,235 @@ function setup({ responses = {}, sessions = [activeSession()], staff = false, mo
       if (cameraFails) throw new Error("NotAllowedError");
       return fakeStream(`kamera${++streams}`, log);
     },
+    enumerateDevices: async () => devices,
   };
-  const sound = { beep: () => log.push("beep") };
-  // clearToastOnNavigate: seperti goPath() di aplikasi, pindah halaman mengosongkan toast
-  const router = {
-    navigate: path => {
-      log.push(`navigate ${path}`);
-      if (clearToastOnNavigate) store.update("runtime", { toast: { message: "", error: "" } }, { silent: true });
-    },
-  };
-  const refreshData = async () => log.push("refreshData");
+  const sound = { beep: () => log.push("beep"), tick: () => log.push("tick") };
+  const router = { navigate: path => log.push(`navigate ${path}`) };
+  const denied = [];
   const controller = createPhotoSessionController({
-    api, store, ui, router, timers, screen, media, sound, refreshData,
-    models: { photoSession: photoSessionModel, drive: driveModel },
-    drive: { clientId: "", google: () => undefined, fetch: driveFetch || (async () => assert.fail("Drive tidak boleh dipanggil tanpa token")) },
-    brand: "SelfieBox Studio",
+    api, store, ui, router, timers, screen, media, sound,
+    models: { admin: { liveSession: liveSessionModel } },
+    photoUrl: id => `/api/admin/photos/${id}/image`,
+    admin: { handleAccessError: error => (error.status == 403 && /Hanya admin/.test(error.message) ? denied.push(error.message) > 0 : false) },
   });
-  return { store, api, ui, log, timers, screen, controller };
+  return { store, api, ui, log, timers, screen, controller, denied };
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
-const routeMatch = id => ({ route: { name: "session" }, params: { id: String(id) }, query: {}, path: `/sessions/${id}` });
+const routeMatch = id => ({ route: { name: "alive" }, params: { id: String(id) }, query: {}, path: `/admin/studios/${id}/live` });
+const live = store => store.get().photo.live;
 
-test("start: POST /bookings/:id/start, muat ulang data, sesi dibuka, toast Drive, ke /sessions/:id", async () => {
-  const { store, api, log, controller } = setup({ responses: { "POST /bookings/7/start": { body: { id: 41 } } } });
-  await controller.start({ id: "7" });
-  assert.deepEqual(api.calls, [{ method: "POST", path: "/bookings/7/start", body: {} }]);
-  assert.equal(store.get().photo.session, 41);
-  assert.ok(log.includes("refreshData"));
-  assert.ok(log.indexOf("navigate /sessions/41") > log.indexOf("refreshData"));
-  assert.equal(store.get().runtime.toast.message, "Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server.");
-});
-
-test("start gagal: toast galat dan render, tidak pindah halaman", async () => {
-  const { store, log, controller } = setup({ responses: { "POST /bookings/7/start": { status: 400, body: { error: "Booking belum dibayar" } } } });
-  await controller.start({ id: "7" });
-  assert.equal(store.get().runtime.toast.error, "Booking belum dibayar");
-  assert.deepEqual(log, ["render"]);
-});
-
-test("open: ke sesi yang sedang dibuka / aktif, selain itu ke Galeri", () => {
-  const { log, controller } = setup();
-  controller.open();
-  assert.equal(log.at(-1), "navigate /sessions/41");
-  const none = setup({ sessions: [] });
-  none.controller.open();
-  assert.equal(none.log.at(-1), "navigate /gallery");
-});
-
-test("enter: kamera diminta sekali, pose tiap 8 detik, hitung mundur tiap detik; render ulang sesi yang sama tidak meminta kamera lagi", async () => {
-  const { store, log, timers, screen, controller } = setup();
-  controller.enter(routeMatch(41));
+test("enter studio baru: keadaan tablet dimuat sekali (GET /admin/studios/:id/live), render", async () => {
+  const { store, api, log, controller } = setup();
+  controller.enter(routeMatch(2));
+  controller.enter(routeMatch(2));
   await settle();
-  assert.equal(store.get().photo.session, 41);
-  assert.equal(log.filter(entry => entry.startsWith("getUserMedia")).length, 1);
+  assert.deepEqual(api.calls.filter(call => call.path.includes("/live")).length, 1);
+  assert.equal(live(store).studioId, 2);
+  assert.equal(live(store).data.state, "idle");
+  assert.ok(log.includes("render"));
+});
+
+test("galat muat: pesan tampil di layar, Akses ditolak diteruskan ke admin", async () => {
+  const failed = setup({ responses: { "GET /admin/studios/2/live": { status: 404, body: { error: "Studio tidak ditemukan" } } } });
+  failed.controller.enter(routeMatch(2));
+  await settle();
+  assert.equal(live(failed.store).error, "Studio tidak ditemukan");
+  assert.equal(failed.store.get().runtime.toast.error, "Studio tidak ditemukan");
+  const denied = setup({ responses: { "GET /admin/studios/2/live": { status: 403, body: { error: "Hanya admin" } } } });
+  denied.controller.enter(routeMatch(2));
+  await settle();
+  assert.deepEqual(denied.denied, ["Hanya admin"]);
+});
+
+test("daftar kamera: video input saja, layar tunggu dirender ulang bila berubah", async () => {
+  const { store, controller } = setup({ devices: [{ kind: "videoinput", deviceId: "a", label: "Depan" }, { kind: "audioinput", deviceId: "m", label: "Mik" }, { kind: "videoinput", deviceId: "b", label: "USB" }] });
+  controller.enter(routeMatch(2));
+  await settle();
+  assert.deepEqual(live(store).cameras, [{ deviceId: "a", label: "Depan" }, { deviceId: "b", label: "USB" }]);
+});
+
+test("refresh (Muat ulang): data dibuang lalu dimuat lagi", async () => {
+  const { store, api, controller } = setup({ live: { data: liveAnswer("idle"), ended: { customer: "Ana" } } });
+  controller.refresh();
+  await settle();
+  assert.equal(live(store).ended, null);
+  assert.deepEqual(api.calls.map(call => call.path), ["/admin/studios/2/live"]);
+});
+
+test("start (Mulai Sesi): POST /admin/bookings/:id/start, layar sesi berjalan; galat → toast dan muat ulang", async () => {
+  const { store, api, controller } = setup({ live: { data: liveAnswer("ready") }, responses: { "POST /admin/bookings/7/start": { body: running() } } });
+  await controller.start({ id: "7" });
+  assert.deepEqual(api.calls[0], { method: "POST", path: "/admin/bookings/7/start", body: {} });
+  assert.equal(live(store).data.state, "running");
+  assert.equal(live(store).data.session.id, 41);
+  const early = setup({ live: { data: liveAnswer("ready") }, responses: { "POST /admin/bookings/7/start": { status: 409, body: { error: "Sesi baru dapat dimulai pukul 11:00" } } } });
+  await early.controller.start({ id: "7" });
+  await settle();
+  assert.equal(early.store.get().runtime.toast.error, "Sesi baru dapat dimulai pukul 11:00");
+  assert.ok(early.api.calls.some(call => call.path == "/admin/studios/2/live"));
+});
+
+test("enter sesi berjalan: kamera diminta sekali (kamera pilihan studio), pose tiap 8 detik, hitung mundur tiap detik; render ulang tidak meminta kamera lagi", async () => {
+  const { store, log, timers, screen, controller } = setup({ live: { data: liveAnswer("running") }, cameras: { 2: "usb-1" } });
+  controller.enter(routeMatch(2));
+  await settle();
+  assert.deepEqual(log.filter(entry => entry.startsWith("getUserMedia")), ['getUserMedia {"video":{"deviceId":{"exact":"usb-1"}}}']);
   assert.ok(log.includes("attach kamera1"));
   assert.ok(log.includes("pose /img/a.jpg | Contoh pose untuk 1-2 orang"));
   assert.equal(timers.every(8000).length, 1);
   assert.equal(timers.every(1000).length, 1);
   assert.equal(screen.updates.at(-1).status.timer, "01:02");
-  controller.enter(routeMatch(41));
+  assert.equal(screen.updates.at(-1).status.count, "Foto 0/6");
+  controller.enter(routeMatch(2));
   await settle();
   assert.equal(log.filter(entry => entry.startsWith("getUserMedia")).length, 1);
   assert.equal(log.filter(entry => entry === "attach kamera1").length, 2);
   assert.equal(timers.intervals.size, 2);
+  assert.equal(store.get().photo.stream.name, "kamera1");
 });
 
 test("enter tanpa izin kamera: catatan Kamera tidak tersedia, juga setelah render ulang", async () => {
-  const { log, controller } = setup({ cameraFails: true });
-  controller.enter(routeMatch(41));
+  const { log, controller } = setup({ live: { data: liveAnswer("running") }, cameraFails: true });
+  controller.enter(routeMatch(2));
   await settle();
-  controller.enter(routeMatch(41));
+  controller.enter(routeMatch(2));
   assert.equal(log.filter(entry => entry === "cameraUnavailable").length, 2);
 });
 
-test("enter sesi yang sudah selesai: tanpa kamera; tanpa sesi: tidak ada timer", async () => {
-  const ended = setup({ sessions: [activeSession({ status: "Selesai" })], current: 41 });
-  ended.controller.enter(routeMatch(41));
+test("hitung mundur sesi: sisa berkurang, bunyi peringatan dua kali di 60 detik, sinkron tiap 5 detik; waktu habis di server → layar selesai", async () => {
+  const { store, api, log, timers, controller } = setup({ live: { data: liveAnswer("running") }, responses: { "GET /admin/photo-sessions/41": { body: { left: 0, status: "Selesai" } } } });
+  controller.enter(routeMatch(2));
   await settle();
-  assert.ok(!ended.log.some(entry => entry.startsWith("getUserMedia")));
-  const none = setup({ sessions: [] });
-  none.controller.enter(routeMatch(41));
-  assert.equal(none.timers.intervals.size, 0);
-});
-
-test("hitung mundur: sisa berkurang, bunyi peringatan dua kali di 60 detik, sinkron ke server tiap 5 detik", async () => {
-  const { store, api, log, timers, screen, controller } = setup({ responses: { "GET /sessions/41": { body: { left: 57, paused: false, status: "Aktif" } } } });
-  controller.enter(routeMatch(41));
-  await settle();
+  const session = live(store).data.session;
   timers.fire(1000);
   timers.fire(1000);
-  const session = store.get().data.sessions[0];
   assert.equal(session.left, 60);
   assert.equal(log.filter(entry => entry === "beep").length, 1);
-  assert.equal(timers.timeouts.at(-1).delay, 600);
-  timers.timeouts.at(-1).callback();
+  timers.runTimeouts(600);
   assert.equal(log.filter(entry => entry === "beep").length, 2);
-  assert.equal(screen.updates.at(-1).status.warn, true);
-  for (let second = 0; second < 3; second++) timers.fire(1000);
+  for (let i = 0; i < 3; i++) timers.fire(1000);
   await settle();
-  assert.deepEqual(api.calls.map(call => call.path), ["/sessions/41"]);
-  assert.equal(session.left, 57);
-});
-
-test("jeda: waktu tidak berkurang", async () => {
-  const { store, timers, controller } = setup({ sessions: [activeSession({ paused: true })] });
-  controller.enter(routeMatch(41));
-  timers.fire(1000);
-  assert.equal(store.get().data.sessions[0].left, 62);
-});
-
-test("sinkron: sesi berakhir di server → kamera dimatikan, toast Sesi telah berakhir., render", async () => {
-  const { store, log, timers, controller } = setup({ responses: { "GET /sessions/41": { body: { left: 0, paused: false, status: "Selesai" } } }, sessions: [activeSession({ left: 1 })] });
-  controller.enter(routeMatch(41));
-  await settle();
-  timers.fire(1000);
-  await settle();
-  assert.equal(store.get().data.sessions[0].status, "Selesai");
-  assert.ok(log.includes("stop kamera1"));
-  assert.equal(store.get().runtime.toast.message, "Sesi telah berakhir.");
-  assert.equal(log.at(-1), "render");
-});
-
-test("stopTimers (leave rute): kedua timer berhenti dan kamera dimatikan", async () => {
-  const { store, log, timers, controller } = setup();
-  controller.enter(routeMatch(41));
-  await settle();
-  controller.stopTimers();
+  assert.deepEqual(api.calls.filter(call => call.path == "/admin/photo-sessions/41").length, 1);
+  assert.deepEqual(live(store).ended, { customer: "Ana" });
+  assert.equal(live(store).data, null);
   assert.equal(timers.intervals.size, 0);
   assert.ok(log.includes("stop kamera1"));
-  assert.equal(store.get().photo.stream, null);
-  controller.enter(routeMatch(41));
+});
+
+test("setTimer: 3 atau 5 detik", () => {
+  const { store, controller } = setup({ live: { data: liveAnswer("running") } });
+  assert.equal(live(store).selfTimer, 3);
+  controller.setTimer({ seconds: "5" });
+  assert.equal(live(store).selfTimer, 5);
+});
+
+test("shoot: hitung mundur timer foto dengan detak tiap detik, lalu foto (warna background pilihan) diunggah dan masuk strip", async () => {
+  const { store, api, log, timers, screen, controller } = setup({ live: { data: liveAnswer("running"), backgrounds: { 41: 1 } }, responses: { "POST /admin/photo-sessions/41/photos": { body: { id: 90, t: 1000 } } } });
+  controller.enter(routeMatch(2));
   await settle();
-  assert.equal(log.filter(entry => entry.startsWith("getUserMedia")).length, 2);
-});
-
-test("nextPose berputar melewati daftar pose", () => {
-  const { log, controller } = setup();
-  controller.enter(routeMatch(41));
-  controller.nextPose();
-  controller.nextPose();
-  controller.nextPose();
-  assert.deepEqual(log.filter(entry => entry.startsWith("pose")), ["pose /img/a.jpg | Contoh pose untuk 1-2 orang", "pose /media/b.jpg | Contoh pose untuk 1-2 orang", "pose /img/c.jpg | Contoh pose untuk 1-2 orang", "pose /img/a.jpg | Contoh pose untuk 1-2 orang"]);
-});
-
-test("staffAction: hanya Mode Staf; jeda memanggil model, log staf, status sesi diperbarui", async () => {
-  const notStaff = setup();
-  await notStaff.controller.staffAction({ command: "pause" });
-  assert.equal(notStaff.api.calls.length, 0);
-  const { store, api, log, controller } = setup({ staff: true, current: 41, responses: { "POST /sessions/41/control": { body: { left: 50, paused: true, status: "Aktif" } } } });
-  await controller.staffAction({ command: "pause" });
-  assert.deepEqual(api.calls, [{ method: "POST", path: "/sessions/41/control", body: { action: "pause" } }]);
-  assert.match(store.get().persisted.log[0], /^pause /);
-  assert.equal(store.get().data.sessions[0].paused, true);
-  assert.equal(store.get().data.sessions[0].left, 50);
-  assert.equal(log.at(-1), "render");
-});
-
-test("staffAction stop: modal Konfirmasi Hentikan Sesi; Batal tidak memanggil server; Hentikan → toast Sesi dihentikan staf.", async () => {
-  const cancelled = setup({ staff: true, current: 41, modalAnswers: [false] });
-  await cancelled.controller.staffAction({ command: "stop" });
-  assert.equal(cancelled.ui.modals[0].title, "Konfirmasi Hentikan Sesi");
-  assert.equal(cancelled.api.calls.length, 0);
-  const { store, api, controller } = setup({ staff: true, current: 41, modalAnswers: [true], responses: { "POST /sessions/41/control": { body: { left: 30, paused: false, status: "Selesai" } } } });
-  await controller.staffAction({ command: "stop" });
-  assert.deepEqual(api.calls[0].body, { action: "stop" });
-  assert.equal(store.get().runtime.toast.message, "Sesi dihentikan staf.");
-});
-
-test("staffAction galat: toast galat", async () => {
-  const { store, controller } = setup({ staff: true, current: 41, responses: { "POST /sessions/41/control": { status: 400, body: { error: "Sesi tidak aktif" } } } });
-  await controller.staffAction({ command: "resume" });
-  assert.equal(store.get().runtime.toast.error, "Sesi tidak aktif");
-});
-
-test("shoot: ambil gambar, unggah, foto masuk strip, tanpa Drive → lokal", async () => {
-  const { store, api, screen, controller } = setup({ current: 41, responses: { "POST /sessions/41/photos": { body: { id: 90, t: 1000 } }, "PATCH /photos/90": { body: {} } } });
-  controller.enter(routeMatch(41));
-  await controller.shoot();
+  controller.shoot();
+  controller.shoot(); // klik kedua selama hitung mundur diabaikan
+  assert.equal(screen.updates.at(-1).status.shootDisabled, true);
+  assert.deepEqual(log.filter(entry => /^(count|tick)/.test(entry)), ["count 3", "tick"]);
+  timers.runTimeouts();
+  timers.runTimeouts();
+  timers.runTimeouts();
   await settle();
-  const photo = store.get().data.sessions[0].photos[0];
-  assert.deepEqual(photo, { id: 90, t: 1000, fav: false, sel: false, drive: "lokal", img: "data:image/jpeg;base64,QUJD" });
-  assert.deepEqual(api.calls.map(call => [call.method, call.path, call.body]), [["POST", "/sessions/41/photos", { img: "data:image/jpeg;base64,QUJD" }], ["PATCH", "/photos/90", { drive: "lokal" }]]);
+  assert.deepEqual(log.filter(entry => /^(count|tick|hideCount|capture)/.test(entry)), ["count 3", "tick", "count 2", "tick", "count 1", "tick", "hideCount", "capture #c33"]);
+  assert.deepEqual(api.calls.filter(call => call.method == "POST").map(call => [call.path, call.body]), [["/admin/photo-sessions/41/photos", { img: "data:image/jpeg;base64,QUJD" }]]);
+  assert.deepEqual(live(store).data.session.photos.map(photo => photo.id), [90]);
   assert.equal(screen.updates.at(-1).strip.key, "90");
+  assert.equal(screen.updates.at(-1).status.shootDisabled, false);
 });
 
-test("shoot: sesi dijeda tidak mengambil foto; galat unggah → toast galat, sinkron, render", async () => {
-  const paused = setup({ current: 41, sessions: [activeSession({ paused: true })] });
-  await paused.controller.shoot();
-  assert.equal(paused.api.calls.length, 0);
-  const { store, api, log, controller } = setup({ current: 41, responses: { "POST /sessions/41/photos": { status: 400, body: { error: "Kuota foto habis" } }, "GET /sessions/41": { body: { left: 40, paused: false, status: "Aktif" } } } });
-  await controller.shoot();
-  assert.equal(store.get().runtime.toast.error, "Kuota foto habis");
-  assert.deepEqual(api.calls.map(call => call.path), ["/sessions/41/photos", "/sessions/41"]);
-  assert.equal(log.at(-1), "render");
-});
-
-test("start: toast Drive tetap tampil di layar sesi (diisi sesudah pindah halaman, yang mengosongkan toast)", async () => {
-  const { store, log, controller } = setup({ clearToastOnNavigate: true, responses: { "POST /bookings/7/start": { body: { id: 41 } } } });
-  await controller.start({ id: "7" });
-  assert.ok(log.includes("navigate /sessions/41"));
-  assert.equal(store.get().runtime.toast.message, "Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server.");
-  assert.equal(log.at(-1), "render");
-});
-
-test("start: sesi lain yang dipilih di Galeri dilepas, jadi Galeri membuka sesi baru", async () => {
-  const { store, controller } = setup({ responses: { "POST /bookings/7/start": { body: { id: 41 } } } });
-  store.get().photo.gallerySession = 12;
-  await controller.start({ id: "7" });
-  assert.equal(store.get().photo.gallerySession, null);
-});
-
-test("enter memakai sesi di URL: sesi yang sudah selesai dibuka tanpa kamera, walau ada sesi aktif lain", async () => {
-  const { store, log, controller } = setup({ sessions: [activeSession({ id: 40, status: "Selesai" }), activeSession()], current: 41 });
-  controller.enter(routeMatch(40));
+test("shoot gagal: toast galat, sinkron, render", async () => {
+  const { store, api, log, timers, controller } = setup({ live: { data: liveAnswer("running") }, responses: { "POST /admin/photo-sessions/41/photos": { status: 409, body: { error: "Kuota pengambilan foto habis" } }, "GET /admin/photo-sessions/41": { body: { left: 50, status: "Aktif" } } } });
+  controller.enter(routeMatch(2));
   await settle();
-  assert.equal(store.get().photo.session, 40);
-  assert.ok(!log.some(entry => entry.startsWith("getUserMedia")));
+  controller.setTimer({ seconds: "3" });
+  controller.shoot();
+  for (let i = 0; i < 3; i++) timers.runTimeouts();
+  await settle();
+  await settle();
+  assert.equal(store.get().runtime.toast.error, "Kuota pengambilan foto habis");
+  assert.ok(api.calls.some(call => call.path == "/admin/photo-sessions/41" && call.method == "GET"));
+  assert.equal(live(store).data.session.left, 50);
+  assert.equal(log.at(-1), "render");
 });
 
-test("shoot dengan Google Drive: folder bernama dari merek aplikasi, foto terkirim ke Drive", async () => {
-  const requests = [];
-  const driveFetch = async (url, options) => {
-    requests.push({ url, body: options.body });
-    return { ok: true, json: async () => ({ id: requests.length === 1 ? "folder1" : "file9" }) };
-  };
-  const { store, controller } = setup({ current: 41, driveFetch, responses: { "POST /sessions/41/photos": { body: { id: 90, t: 1000 } }, "PATCH /photos/90": { body: {} } } });
-  store.get().photo.drive.token = "tok";
-  await controller.shoot();
-  assert.match(JSON.parse(requests[0].body).name, /^SelfieBox Studio - /);
-  assert.equal(store.get().photo.drive.folder, "folder1");
-  const photo = store.get().data.sessions[0].photos[0];
-  assert.deepEqual([photo.drive, photo.driveId], ["drive", "file9"]);
+test("stopTimers (leave rute) saat hitung mundur foto: timer, hitung mundur dan kamera berhenti, tidak ada foto", async () => {
+  const { log, timers, controller } = setup({ live: { data: liveAnswer("running") } });
+  controller.enter(routeMatch(2));
+  await settle();
+  controller.shoot();
+  controller.stopTimers();
+  assert.equal(timers.intervals.size, 0);
+  assert.equal(timers.timeouts.size, 0);
+  assert.ok(log.includes("hideCount"));
+  assert.ok(log.includes("stop kamera1"));
+  assert.ok(!log.some(entry => entry.startsWith("capture")));
+});
+
+test("deletePhoto: DELETE /admin/photos/:id, strip diperbarui; galat → toast", async () => {
+  const session = running({ photos: [{ id: 90 }, { id: 91 }] });
+  const { store, screen, controller } = setup({ live: { data: { ...liveAnswer("running"), session } }, responses: { "DELETE /admin/photos/90": { body: { ok: true } } } });
+  await controller.deletePhoto({ photo: "90" });
+  assert.deepEqual(live(store).data.session.photos.map(photo => photo.id), [91]);
+  assert.equal(screen.updates.at(-1).strip.key, "91");
+  await controller.deletePhoto({ photo: "77" });
+  assert.equal(store.get().runtime.toast.error, "Endpoint tidak ada");
+});
+
+test("pickBackground: modal Pilih Background; PILIH → disimpan per sesi + toast; Batal → tidak berubah", async () => {
+  const picked = setup({ live: { data: liveAnswer("running") }, modalAnswers: [{ value: "ok", data: 1 }] });
+  await picked.controller.pickBackground();
+  assert.equal(picked.ui.modals[0].title, "Pilih Background");
+  assert.deepEqual(live(picked.store).backgrounds, { 41: 1 });
+  assert.equal(picked.store.get().runtime.toast.message, "Background diganti ke Latar Merah.");
+  const cancelled = setup({ live: { data: liveAnswer("running") }, modalAnswers: [{ value: null, data: 1 }] });
+  await cancelled.controller.pickBackground();
+  assert.deepEqual(live(cancelled.store).backgrounds, {});
+});
+
+test("end (Akhiri Sesi): password admin; Batal → tidak ada panggilan; salah → toast; benar → layar selesai", async () => {
+  const closed = setup({ live: { data: liveAnswer("running") }, modalAnswers: [null] });
+  await closed.controller.end();
+  assert.deepEqual(closed.api.calls, []);
+  assert.equal(closed.ui.modals[0].buttons[1].label, "Akhiri Sesi");
+  const wrong = setup({ live: { data: liveAnswer("running") }, modalAnswers: [{ value: "ok", data: "salah" }], responses: { "POST /admin/photo-sessions/41/end": { status: 403, body: { error: "Password admin salah" } } } });
+  await wrong.controller.end();
+  assert.equal(wrong.store.get().runtime.toast.error, "Password admin salah");
+  assert.equal(live(wrong.store).data.state, "running");
+  const right = setup({ live: { data: liveAnswer("running") }, modalAnswers: [{ value: "ok", data: "rahasia" }], responses: { "POST /admin/photo-sessions/41/end": { body: { status: "Selesai" } } } });
+  await right.controller.end();
+  assert.deepEqual(right.api.calls, [{ method: "POST", path: "/admin/photo-sessions/41/end", body: { password: "rahasia" } }]);
+  assert.deepEqual(live(right.store).ended, { customer: "Ana" });
+  assert.deepEqual(right.store.get().runtime.toast, { message: "Sesi diakhiri.", error: "" });
+});
+
+test("exit (Keluar): password admin dicek di server; benar → ke Admin → Studio, kamera berhenti; salah → tetap di tablet", async () => {
+  const wrong = setup({ live: { data: liveAnswer("idle") }, modalAnswers: [{ value: "ok", data: "x" }], responses: { "POST /admin/verify-password": { status: 403, body: { error: "Password admin salah" } } } });
+  await wrong.controller.exit();
+  assert.equal(wrong.store.get().runtime.toast.error, "Password admin salah");
+  assert.ok(!wrong.log.some(entry => entry.startsWith("navigate")));
+  const right = setup({ live: { data: liveAnswer("running") }, modalAnswers: [{ value: "ok", data: "rahasia" }], responses: { "POST /admin/verify-password": { body: { ok: true } } } });
+  right.controller.enter(routeMatch(2));
+  await settle();
+  await right.controller.exit();
+  assert.deepEqual(right.api.calls.at(-1), { method: "POST", path: "/admin/verify-password", body: { password: "rahasia" } });
+  assert.equal(right.log.at(-1), "navigate /admin/studios");
+  assert.ok(right.log.includes("stop kamera1"));
+  assert.equal(live(right.store).studioId, null);
+});
+
+test("setCamera: disimpan per studio di persisted; sesi berjalan → kamera diganti", async () => {
+  const { store, log, controller } = setup({ live: { data: liveAnswer("running") } });
+  controller.enter(routeMatch(2));
+  await settle();
+  controller.setCamera({}, { target: { value: "usb-2" } });
+  await settle();
+  assert.deepEqual(store.get().persisted.cameras, { 2: "usb-2" });
+  assert.ok(log.includes("stop kamera1"));
+  assert.ok(log.includes('getUserMedia {"video":{"deviceId":{"exact":"usb-2"}}}'));
 });

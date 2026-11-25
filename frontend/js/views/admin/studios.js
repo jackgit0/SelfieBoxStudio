@@ -160,6 +160,13 @@ function studioRow(studio, admin, master, today) {
         ><span class="meta">${meta}</span>
       </button>
       <button
+        class="ibtn"
+        data-route="/admin/studios/${studio.id}/live"
+        title="Buka Session Assistant (tablet studio)"
+        aria-label="Buka Session Assistant ${studio.name}"
+      >
+        ${icon("eye", 18)}</button
+      ><button
         class="ibtn del"
         data-action="studio:delete"
         data-id="${studio.id}"

@@ -34,7 +34,6 @@ function setup({ responses = {}, modalAnswers = [], route = "gallery", deleteMod
     models: { gallery: galleryModel, drive: driveModel },
     drive: { fetch: async (url, options) => driveCalls.push([url, options.method]) },
     files: { download: (url, name) => log.push(`download ${url} ${name}`) },
-    photoSession: { showSession: id => log.push(`showSession ${id}`) },
     refreshData: async () => log.push("refreshData"),
     brand: "SelfieBox Studio",
   });
@@ -112,13 +111,6 @@ test("deletePhoto: DELETE, hapus juga di Drive bila ada token, foto keluar, konf
   assert.deepEqual(session().photos.map(photo => photo.id), [1, 3]);
   assert.equal(session().confirmed, false);
   assert.equal(store.get().runtime.toast.message, "Foto dihapus.");
-});
-
-test("deletePhoto dari strip layar sesi: layar sesi diperbarui, tanpa toast", async () => {
-  const { log, store, controller } = setup({ modalAnswers: [true], route: "session", responses: { "DELETE /photos/2": { body: {} } } });
-  await controller.deletePhoto(ids);
-  assert.equal(log.at(-1), "showSession 41");
-  assert.equal(store.get().runtime.toast.message, "");
 });
 
 test("deletePhoto gagal: modal Foto Gagal Dihapus dengan pesan server, foto tetap", async () => {

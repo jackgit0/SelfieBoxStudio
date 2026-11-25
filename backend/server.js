@@ -3,7 +3,7 @@ const http = require('http'), fs = require('fs'), path = require('path'), crypto
 // Muat backend/.env (jika ada) tanpa dependensi; variabel yang sudah diset di shell tidak ditimpa
 try { for (const l of fs.readFileSync(path.join(__dirname, '.env'), 'utf8').split(/\r?\n/)) { const m = /^\s*([A-Za-z0-9_]+)\s*=\s*(.*?)\s*$/.exec(l); if (m && !l.trim().startsWith('#') && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ''); } } catch {}
 const db = require('./db'), { sendMail } = require('./mailer');
-const PORT = +process.env.PORT || 3000, SECRET = process.env.JWT_SECRET || 'dev-secret-ubah-di-produksi', STAFF_PIN = process.env.STAFF_PIN || '1234';
+const PORT = +process.env.PORT || 3000, SECRET = process.env.JWT_SECRET || 'dev-secret-ubah-di-produksi';
 // TZ_OFFSET_MIN=420 -> WIB. Akun admin ada di tabel `admin` pada database (bukan di kode).
 const TZ = +(process.env.TZ_OFFSET_MIN || 420), BRAND = process.env.BRAND || 'SelfieBox Studio';
 const FRONT = path.join(__dirname, '..', 'frontend'), UP = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads'); fs.mkdirSync(UP, { recursive: true });
@@ -17,7 +17,8 @@ const check = (pw, st) => { const [s, h] = st.split(':'); return crypto.timingSa
 class HttpErr extends Error { constructor(c, m, extra) { super(m); this.code = c; this.extra = extra; } } // extra: data tambahan di body error (mis. needs_confirm + impact)
 const bad = (m, c = 400, extra) => { throw new HttpErr(c, m, extra); };
 const tx = fn => { db.exec('BEGIN'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
-const now = () => Date.now(), q = (s, ...a) => db.prepare(s).all(...a), one = (s, ...a) => db.prepare(s).get(...a), run = (s, ...a) => db.prepare(s).run(...a);
+const CLOCK = +process.env.TEST_CLOCK_OFFSET_MS || 0; // hanya untuk tes (test-kiosk.js): menggeser jam server agar aturan check-in/mulai sesi dapat diuji kapan saja
+const now = () => Date.now() + CLOCK, q = (s, ...a) => db.prepare(s).all(...a), one = (s, ...a) => db.prepare(s).get(...a), run = (s, ...a) => db.prepare(s).run(...a);
 const sha = x => crypto.createHash('sha256').update(String(x)).digest('hex'), eq = (a, b) => crypto.timingSafeEqual(Buffer.from(sha(a)), Buffer.from(sha(b)));
 const getSet = k => (one('SELECT value FROM setting WHERE key=?', k) || {}).value;
 const rmFiles = rows => rows.forEach(r => { try { fs.unlinkSync(path.join(UP, r.img_url)); } catch {} });
@@ -34,13 +35,15 @@ const sessOut = s => { const l = left(s), b = one('SELECT * FROM booking WHERE i
   return { id: s.id, booking_id: s.booking_id, user_id: b.user_id, pkg: b.package_id, start_time: s.start_time, left: l, paused: !!s.paused_at, status: s.status, confirmed: !!s.confirmed,
     photos: q('SELECT id,taken_at t,fav,sel,drive FROM photo WHERE session_id=? ORDER BY id', s.id).map(p => ({ ...p, fav: !!p.fav, sel: !!p.sel })) }; };
 const bookOut = b => { const s = one('SELECT * FROM session WHERE booking_id=?', b.id), p = one('SELECT * FROM payment WHERE booking_id=?', b.id);
-  return { id: b.id, user_id: b.user_id, package_id: b.package_id, studio: s.studio_id, date: s.slot, amount: b.amount, subtotal: b.subtotal ?? b.amount, main_disc: b.main_disc || 0, status: b.status, expire_at: p.expire_at, session_id: s.id, paid: p.status === 'paid', studio_fee: b.studio_fee || 0, cancel_reason: b.cancel_reason, pay_status: p.status, method: p.method, paid_at: p.paid_at, refunded_at: p.refunded_at }; };
+  return { id: b.id, user_id: b.user_id, package_id: b.package_id, studio: s.studio_id, date: s.slot, amount: b.amount, subtotal: b.subtotal ?? b.amount, main_disc: b.main_disc || 0, status: b.status, expire_at: p.expire_at, session_id: s.id, paid: p.status === 'paid', studio_fee: b.studio_fee || 0, cancel_reason: b.cancel_reason, pay_status: p.status, method: p.method, paid_at: p.paid_at, refunded_at: p.refunded_at, checked_in_at: b.checked_in_at || null }; };
 // studio bisa dipesan selama belum dihapus (soft delete); slot yang terisi ditolak di tempat lain
 const visible = st => !!st && !st.deleted_at, ACTIVE = `b.status IN ('Menunggu Pembayaran','Terbayar')`;
 const studioBookings = (sid, cond = '1') => q(`SELECT DISTINCT b.* FROM booking b LEFT JOIN session x ON x.booking_id=b.id LEFT JOIN studio_session ss ON ss.id=b.studio_session_id WHERE (x.studio_id=? OR ss.studio_id=?) AND ${cond} ORDER BY b.id`, sid, sid); // booking milik studio (lewat sesi runtime atau sesi studio)
 const ownBooking = (id, u) => one('SELECT * FROM booking WHERE id=? AND user_id=?', id, u.sub) || bad('Booking tidak ditemukan', 404);
 const ownSession = (id, u) => one('SELECT s.* FROM session s JOIN booking b ON b.id=s.booking_id WHERE s.id=? AND b.user_id=?', id, u.sub) || bad('Sesi tidak ditemukan', 404);
 const slotMs = slot => { const m = /^(\d{4}-\d{2}-\d{2}) (\d{1,2}):00$/.exec(slot); return Date.parse(`${m[1]}T${m[2].padStart(2, '0')}:00:00Z`) - TZ * 60000; };
+const slotEnd = slot => slotMs(slot) + 50 * 60e3; // setiap slot 50 menit
+const CHECKED_IN = 'Booking sudah check-in di studio dan tidak dapat diubah atau dibatalkan';
 function validSlot(slot) { const m = /^(\d{4}-\d{2}-\d{2}) (\d{1,2}):00$/.exec(slot || ''); if (!m || !HRS.includes(+m[2])) bad('Format/jam slot tidak valid'); if (slotMs(slot) < now() - 3000e3) bad('Jadwal sudah lewat'); }
 // harga: biaya studio + paket - diskon utama (satu fungsi untuk pratinjau, pembuatan booking, dan ubah paket oleh admin)
 function quote(pk, studio) { const fee = studio ? studio.price || 0 : 0, pct = +getSet('main_discount_pct') || 0, mainDisc = Math.round(pk.price * pct / 100);
@@ -105,10 +108,10 @@ route('GET', '/api/bookings/:id/invoice', 1, ({ params, query, user, res }) => {
   const v = invoice(b.id); res.setHeader('Content-Type', 'text/html; charset=utf-8'); if (query.dl) res.setHeader('Content-Disposition', `attachment; filename="${v.no}.html"`); return { raw: Buffer.from(v.html) }; });
 route('POST', '/api/bookings/:id/invoice/email', 1, async ({ params, user }) => { const b = ownBooking(params.id, user), p = one('SELECT status FROM payment WHERE booking_id=?', b.id); if (p.status !== 'paid' || b.status === 'Dibatalkan') bad('Invoice tersedia setelah pembayaran', 409);
   try { const r = await sendInvoice(b.id); return { ok: true, dev: !!r.dev }; } catch (e) { console.error('Gagal kirim invoice:', e.message); bad('Email gagal dikirim, coba lagi atau unduh invoice', 502); } });
-route('PATCH', '/api/bookings/:id', 1, ({ params, body, user }) => { expireStale(); const b = ownBooking(params.id, user); if (!['Menunggu Pembayaran', 'Terbayar'].includes(b.status)) bad('Booking tidak dapat diubah', 409);
+route('PATCH', '/api/bookings/:id', 1, ({ params, body, user }) => { expireStale(); const b = ownBooking(params.id, user); if (!['Menunggu Pembayaran', 'Terbayar'].includes(b.status)) bad('Booking tidak dapat diubah', 409); if (b.checked_in_at) bad(CHECKED_IN, 409);
   const st = one('SELECT * FROM studio WHERE id=?', body.studio_id); if (!st) bad('Studio tidak valid'); if (!visible(st)) bad('Studio tidak tersedia'); validSlot(body.date);
   try { run('UPDATE session SET studio_id=?,slot=? WHERE booking_id=?', body.studio_id, body.date, b.id); } catch (e) { if (/UNIQUE/.test(e.message)) bad('Jadwal baru tidak tersedia', 409); throw e; } return bookOut(b); });
-route('DELETE', '/api/bookings/:id', 1, ({ params, user }) => { const b = ownBooking(params.id, user); if (!['Menunggu Pembayaran', 'Terbayar'].includes(b.status)) bad('Booking tidak dapat dihapus', 409); cancel(b.id); return { ok: true }; });
+route('DELETE', '/api/bookings/:id', 1, ({ params, user }) => { const b = ownBooking(params.id, user); if (!['Menunggu Pembayaran', 'Terbayar'].includes(b.status)) bad('Booking tidak dapat dihapus', 409); if (b.checked_in_at) bad(CHECKED_IN, 409); cancel(b.id); return { ok: true }; });
 // pembatalan + refund (simulasi): refund berhasil bila sesi masih >= REFUND_MIN_HOURS jam lagi, selain itu refund gagal
 // force (admin) selalu me-refund; REFUND_SIMULATE_FAIL=1 hanya untuk tes: refund paksa dibuat gagal
 const REASONS = ['Tidak ada waktu', 'Penggunaan dana lain', 'Pemesanan ganda', 'Pembatalan lainnya'];
@@ -116,21 +119,19 @@ function cancelWithRefund(b, reason, detail, force) { const p = one('SELECT * FR
   tx(() => { cancel(b.id); run('UPDATE booking SET cancel_reason=?,cancel_detail=?,cancelled_at=? WHERE id=?', reason, detail, now(), b.id);
     if (p.status === 'paid') { const ok = force ? process.env.REFUND_SIMULATE_FAIL !== '1' : slotMs(s.slot) - now() >= REFUND_H * 3600e3; state = ok ? 'refunded' : 'failed'; run('UPDATE payment SET status=?,refunded_at=? WHERE id=?', ok ? 'refunded' : 'refund_failed', ok ? now() : null, p.id); } });
   return { ok: true, refund: { state, amount: state === 'none' ? 0 : p.amount, at: state === 'refunded' ? now() : null, min_hours: REFUND_H }, booking: bookOut(one('SELECT * FROM booking WHERE id=?', b.id)) }; }
-route('POST', '/api/bookings/:id/cancel', 1, ({ params, body, user }) => { expireStale(); const b = ownBooking(params.id, user); if (!['Menunggu Pembayaran', 'Terbayar'].includes(b.status)) bad('Booking tidak dapat dibatalkan', 409);
+route('POST', '/api/bookings/:id/cancel', 1, ({ params, body, user }) => { expireStale(); const b = ownBooking(params.id, user); if (!['Menunggu Pembayaran', 'Terbayar'].includes(b.status)) bad('Booking tidak dapat dibatalkan', 409); if (b.checked_in_at) bad(CHECKED_IN, 409);
   const reason = String(body.reason || ''), detail = String(body.detail || '').trim().slice(0, 300); if (!REASONS.includes(reason)) bad('Pilih alasan pembatalan'); if (reason === 'Pembatalan lainnya' && !detail) bad('Tuliskan alasan pembatalan Anda'); return cancelWithRefund(b, reason, detail, false); });
 route('GET', '/api/me', 1, ({ user }) => one('SELECT id,name,email,phone FROM user WHERE id=?', user.sub));
 route('PATCH', '/api/me', 1, ({ body, user }) => { const name = String(body.name || '').trim(), phone = String(body.phone || '').trim(); if (!name || !/^\d{8,15}$/.test(phone)) bad('Nama wajib diisi dan telepon 8-15 digit');
   try { run('UPDATE user SET name=?,phone=? WHERE id=?', name, phone, user.sub); } catch (e) { if (/UNIQUE/.test(e.message)) bad('Nomor telepon sudah dipakai', 409); throw e; } return one('SELECT id,name,email,phone FROM user WHERE id=?', user.sub); });
-route('POST', '/api/bookings/:id/start', 1, ({ params, user }) => { const b = ownBooking(params.id, user); if (b.status !== 'Terbayar') bad('Booking belum terbayar', 409);
-  const pk = one('SELECT * FROM package WHERE id=?', b.package_id), t = now(); run(`UPDATE session SET status='Aktif',start_time=?,end_time=?,paused_at=NULL WHERE booking_id=?`, t, t + pk.dur * 60e3, b.id); run(`UPDATE booking SET status='Sesi Berjalan' WHERE id=?`, b.id);
-  return sessOut(one('SELECT * FROM session WHERE booking_id=?', b.id)); });
 route('GET', '/api/sessions', 1, ({ user }) => q('SELECT s.* FROM session s JOIN booking b ON b.id=s.booking_id WHERE b.user_id=? AND s.status IN (\'Aktif\',\'Selesai\') ORDER BY s.id', user.sub).map(sessOut));
 route('GET', '/api/sessions/:id', 1, ({ params, user }) => sessOut(ownSession(params.id, user)));
-route('POST', '/api/sessions/:id/photos', 1, ({ params, body, user }) => { const s = ownSession(params.id, user), o = sessOut(s); if (o.status !== 'Aktif' || o.paused) bad('Sesi tidak aktif — pengambilan foto ditolak', 409);
-  const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(body.img || ''); if (!m) bad('Format foto harus JPEG data-URL'); const buf = Buffer.from(m[1], 'base64'); if (buf.length > 4e6) bad('Foto terlalu besar', 413);
+// foto diambil di tablet studio (rute admin /api/admin/photo-sessions/:id/photos); customer hanya melihat dan memilih di Galeri
+const addPhoto = (s, img) => { const o = sessOut(s); if (o.status !== 'Aktif') bad('Sesi tidak aktif — pengambilan foto ditolak', 409);
+  const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(img || ''); if (!m) bad('Format foto harus JPEG data-URL'); const buf = Buffer.from(m[1], 'base64'); if (buf.length > 4e6) bad('Foto terlalu besar', 413);
   const pk = one('SELECT p.photo_count FROM package p JOIN booking b ON b.package_id=p.id WHERE b.id=?', s.booking_id); if (o.photos.length >= pk.photo_count * 2) bad('Kuota pengambilan foto habis', 409);
   const f = `${s.id}-${now()}-${crypto.randomBytes(4).toString('hex')}.jpg`; fs.writeFileSync(path.join(UP, f), buf);
-  const id = run('INSERT INTO photo(session_id,img_url,expire_at,taken_at) VALUES(?,?,?,?)', s.id, f, now() + 30 * 864e5, now()).lastInsertRowid; return { id: +id, t: now(), fav: false, sel: false, drive: 'lokal' }; });
+  const id = run('INSERT INTO photo(session_id,img_url,expire_at,taken_at) VALUES(?,?,?,?)', s.id, f, now() + 30 * 864e5, now()).lastInsertRowid; return { id: +id, t: now(), fav: false, sel: false, drive: 'lokal' }; };
 const ownPhoto = (id, u) => one('SELECT p.*,s.confirmed,s.booking_id FROM photo p JOIN session s ON s.id=p.session_id JOIN booking b ON b.id=s.booking_id WHERE p.id=? AND b.user_id=?', id, u.sub) || bad('Foto tidak ditemukan', 404);
 route('PATCH', '/api/photos/:id', 1, ({ params, body, user }) => { const p = ownPhoto(params.id, user);
   if ('fav' in body) run('UPDATE photo SET fav=? WHERE id=?', body.fav ? 1 : 0, p.id); if (['lokal', 'drive', 'gagal'].includes(body.drive)) run('UPDATE photo SET drive=? WHERE id=?', body.drive, p.id);
@@ -146,14 +147,6 @@ route('POST', '/api/sessions/:id/confirm', 1, ({ params, user }) => { const s = 
 route('GET', '/api/photos/:id/image', 1, ({ params, query, user, res }) => { const p = ownPhoto(params.id, user); if (p.expire_at < now()) bad('Foto kedaluwarsa', 410);
   if (query.dl) { if (!p.sel || !p.confirmed) bad('Unduhan hanya untuk foto terpilih yang sudah dikonfirmasi', 403); res.setHeader('Content-Disposition', `attachment; filename="snapia-${p.id}.jpg"`); }
   res.setHeader('Content-Type', 'image/jpeg'); res.setHeader('Cache-Control', 'private, max-age=3600'); return { raw: fs.readFileSync(path.join(UP, p.img_url)) }; });
-// ---- staf ----
-route('POST', '/api/staff/login', 1, ({ body, user }) => { if (limited('pin' + user.sub)) bad('Terlalu banyak percobaan', 429); if (body.pin !== STAFF_PIN) bad('PIN staf salah', 401); return { token: sign({ sub: user.sub, role: 'staff' }, 8 * 3600) }; });
-route('POST', '/api/sessions/:id/control', 1, ({ params, body, user, req }) => { const st = verify(req.headers['x-staff-token'] || ''); if (!st || st.role !== 'staff') bad('Hanya staf berwenang', 403);
-  const s = one('SELECT * FROM session WHERE id=?', params.id) || bad('Sesi tidak ditemukan', 404); if (left(s) <= 0 && s.status !== 'Aktif') bad('Sesi sudah berakhir', 409); const a = body.action, t = now();
-  if (a === 'pause' && !s.paused_at) run('UPDATE session SET paused_at=? WHERE id=?', t, s.id);
-  else if (a === 'resume' && s.paused_at) run('UPDATE session SET end_time=end_time+?,paused_at=NULL WHERE id=?', t - s.paused_at, s.id);
-  else if (a === 'stop') { run(`UPDATE session SET status='Selesai' WHERE id=?`, s.id); run(`UPDATE booking SET status='Selesai' WHERE id=?`, s.booking_id); } else if (!['pause', 'resume'].includes(a)) bad('Aksi tidak dikenal');
-  run('INSERT INTO staff_log(session_id,action,at) VALUES(?,?,?)', s.id, a, t); return sessOut(one('SELECT * FROM session WHERE id=?', s.id)); });
 // ---- lupa sandi (tautan dikirim lewat email; token acak sekali pakai, berlaku 30 menit, hanya hash yang disimpan) ----
 route('POST', '/api/auth/forgot', 0, async ({ body, ip, req }) => { if (limited('fg' + ip)) bad('Terlalu banyak percobaan', 429);
   const u = one('SELECT * FROM user WHERE email=?', String(body.email || '').trim().toLowerCase());
@@ -323,7 +316,7 @@ route('POST', '/api/admin/poses', 2, ({ body }) => { const p = poseBody(body); r
 route('PATCH', '/api/admin/poses/:id', 2, ({ params, body }) => { const cur = one('SELECT * FROM pose WHERE id=?', params.id) || bad('Pose tidak ditemukan', 404); const p = poseBody(body, cur); run('UPDATE pose SET img_url=?,people_range_id=? WHERE id=?', p.img, p.pr, cur.id); return { ok: true }; });
 route('DELETE', '/api/admin/poses/:id', 2, ({ params }) => { run('DELETE FROM pose WHERE id=?', params.id); return { ok: true }; });
 route('GET', '/api/admin/bookings', 2, ({ query }) => { expireStale(); const st = query.status || '', term = '%' + String(query.q || '').toLowerCase() + '%';
-  return q(`SELECT b.id,b.status,b.amount,b.created_at,b.cancel_reason,u.name customer,u.email,pk.name package,st.name studio,s.slot,p.status pay_status,p.method FROM booking b JOIN user u ON u.id=b.user_id JOIN package pk ON pk.id=b.package_id JOIN session s ON s.booking_id=b.id
+  return q(`SELECT b.id,b.status,b.amount,b.created_at,b.cancel_reason,b.checked_in_at,u.name customer,u.email,pk.name package,st.name studio,s.slot,p.status pay_status,p.method FROM booking b JOIN user u ON u.id=b.user_id JOIN package pk ON pk.id=b.package_id JOIN session s ON s.booking_id=b.id
     JOIN studio st ON st.id=s.studio_id LEFT JOIN payment p ON p.booking_id=b.id WHERE (?='' OR b.status=?) AND (lower(u.name) LIKE ? OR lower(u.email) LIKE ? OR lower(st.name) LIKE ?) ORDER BY b.id DESC LIMIT 500`, st, st, term, term, term); });
 route('POST', '/api/admin/bookings/:id/cancel', 2, ({ params, body }) => { const b = one('SELECT * FROM booking WHERE id=?', params.id) || bad('Booking tidak ditemukan', 404); if (!['Menunggu Pembayaran', 'Terbayar'].includes(b.status)) bad('Booking tidak dapat dibatalkan', 409);
   return cancelWithRefund(b, 'Dibatalkan admin', String(body.detail || '').slice(0, 300), true); }); // admin selalu me-refund
@@ -336,7 +329,7 @@ const bookDetail = b => { const o = bookOut(b), u = one('SELECT name,email,phone
   return { ...o, customer: u, studio_name: one('SELECT name FROM studio WHERE id=?', o.studio).name, package_name: one('SELECT name FROM package WHERE id=?', b.package_id).name, slot: o.date, created_at: b.created_at, cancel_detail: b.cancel_detail, studio_session_id: b.studio_session_id,
     studio_session: ss ? { id: ss.id, date: ymd(ss.start_time), start: hm(ss.start_time), end: hm(ss.end_time), deleted: !!ss.deleted_at } : null, payment: { status: p.status, method: p.method, amount: p.amount, paid_at: p.paid_at, refunded_at: p.refunded_at, expire_at: p.expire_at },
     invoice: invNo(b), items_price: o.subtotal - o.studio_fee, // harga paket dari nilai tersimpan saat booking (harga paket bisa berubah sesudahnya)
-    packages: b.status === 'Menunggu Pembayaran' ? q('SELECT id,name,price FROM package WHERE active!=0 ORDER BY price,id') : [], allowed: NEXT[b.status] || [], delete_block: delBlock(b), impact: delImpact(b) }; };
+    packages: b.status === 'Menunggu Pembayaran' ? q('SELECT id,name,price FROM package WHERE active!=0 ORDER BY price,id') : [], allowed: NEXT[b.status] || [], delete_block: delBlock(b), impact: delImpact(b), checked_in_at: b.checked_in_at || null, checkin_block: checkinBlock(b) }; };
 route('GET', '/api/admin/bookings/:id', 2, ({ params }) => { expireStale(); return bookDetail(bookOr404(params.id)); });
 // hapus booking: selalu minta konfirmasi (status + dana refund); terbayar -> refund 100% dulu, bila gagal booking dipertahankan (Dibatalkan + refund gagal) untuk ditindaklanjuti manual
 const purgeBooking = b => { // status yang boleh dihapus tidak pernah punya foto; baris foto ikut dibersihkan hanya untuk berjaga
@@ -362,14 +355,51 @@ route('PATCH', '/api/admin/bookings/:id', 2, ({ params, body }) => { expireStale
     lines.push(`Paket diubah dari <b>${esc(one('SELECT name FROM package WHERE id=?', b.package_id).name)}</b> menjadi <b>${esc(pk.name)}</b>; total baru <b>${idr(x.total)}</b>.`); }
   let refund = null; const t = now();
   if (to === 'Dibatalkan') refund = cancelWithRefund(one('SELECT * FROM booking WHERE id=?', b.id), 'Dibatalkan admin', '', true).refund; // transaksi sendiri
-  else if (to === 'Sesi Berjalan') { const dur = one('SELECT dur FROM package WHERE id=?', b.package_id).dur; tx(() => { run(`UPDATE session SET status='Aktif',start_time=?,end_time=?,paused_at=NULL WHERE booking_id=?`, t, t + dur * 60e3, b.id); run(`UPDATE booking SET status='Sesi Berjalan' WHERE id=?`, b.id); }); } // seperti customer memulai sesi
-  else if (to === 'Selesai') tx(() => { run(`UPDATE session SET status='Selesai',paused_at=NULL WHERE booking_id=?`, b.id); run(`UPDATE booking SET status='Selesai' WHERE id=?`, b.id); }); // seperti staf menghentikan sesi
+  else if (to === 'Sesi Berjalan') startSession(b, t); // seperti Mulai Sesi di tablet studio, tanpa syarat check-in dan jam
+  else if (to === 'Selesai') tx(() => { run(`UPDATE session SET status='Selesai',paused_at=NULL WHERE booking_id=?`, b.id); run(`UPDATE booking SET status='Selesai' WHERE id=?`, b.id); }); // seperti Akhiri Sesi di tablet studio
   if (to && b.studio_session_id) syncSessStatus(b.studio_session_id);
   const nb = one('SELECT * FROM booking WHERE id=?', b.id);
   if (refund) notifyCancel(nb, refund, 'dibatalkan oleh admin'); // pembatalan memakai email pembatalan (berisi refund)
   else if (to) lines.push(`Status booking diubah dari <b>${esc(b.status)}</b> menjadi <b>${esc(to)}</b>.`);
   if (!refund && lines.length) { const w = bookWhere(nb); notifyCustomer(b.id, `Booking #${b.id} diperbarui`, `<p>Admin memperbarui booking #${b.id} di <b>${esc(w.name)}</b> pada <b>${esc(w.slot)} WIB</b>:</p><ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul><p>Hubungi kami bila ada yang tidak sesuai.</p>`); }
   return { ...bookDetail(nb), notified: !!(refund || lines.length), refund }; });
+// ---- check-in (meja depan) dan sesi foto di tablet studio (Admin → Studio → ikon mata) ----
+// check-in: booking Terbayar, pada hari sesi (WIB), sampai slot berakhir; Mulai Sesi di tablet: sudah check-in dan jam slot sudah tiba
+// timer = min(mulai + durasi paket, akhir slot), jadi customer berikutnya tidak pernah tertunda
+const checkinBlock = b => { if (b.checked_in_at) return 'Booking sudah check-in'; if (b.status !== 'Terbayar') return 'Hanya booking terbayar yang dapat check-in';
+  const s = one('SELECT slot FROM session WHERE booking_id=?', b.id), t = now(); if (ymd(slotMs(s.slot)) !== ymd(t)) return 'Check-in hanya dapat dilakukan pada hari sesi';
+  if (slotEnd(s.slot) <= t) return 'Waktu sesi sudah lewat'; return null; };
+const startSession = (b, t = now()) => { const s = one('SELECT * FROM session WHERE booking_id=?', b.id), dur = one('SELECT dur FROM package WHERE id=?', b.package_id).dur * 60e3, z = slotEnd(s.slot);
+  tx(() => { run(`UPDATE session SET status='Aktif',start_time=?,end_time=?,paused_at=NULL WHERE booking_id=?`, t, z > t ? Math.min(t + dur, z) : t + dur, b.id); run(`UPDATE booking SET status='Sesi Berjalan' WHERE id=?`, b.id); });
+  if (b.studio_session_id) syncSessStatus(b.studio_session_id); };
+const firstName = n => String(n || '').trim().split(/\s+/)[0]; // tablet ada di ruang studio: hanya nama depan
+const liveOut = s => { const o = sessOut(s), b = one('SELECT b.package_id,u.name FROM booking b JOIN user u ON u.id=b.user_id WHERE b.id=?', s.booking_id), pk = one('SELECT id,name,photo_count,dur FROM package WHERE id=?', b.package_id);
+  return { ...o, studio_id: s.studio_id, studio_name: one('SELECT name FROM studio WHERE id=?', s.studio_id).name, slot: s.slot, slot_end: slotEnd(s.slot), customer: firstName(b.name), package: pk }; };
+const liveCard = (r, t) => !r ? null : { booking_id: r.id, customer: firstName(r.customer), package: r.package, slot: r.slot, time: hm(slotMs(r.slot)), end: hm(slotEnd(r.slot)), checked_in: !!r.checked_in_at, can_start: !!r.checked_in_at && slotMs(r.slot) <= t };
+route('POST', '/api/admin/bookings/:id/checkin', 2, ({ params }) => { expireStale(); const b = bookOr404(params.id), blk = checkinBlock(b); if (blk) bad(blk, 409);
+  run('UPDATE booking SET checked_in_at=? WHERE id=?', now(), b.id); return bookDetail(one('SELECT * FROM booking WHERE id=?', b.id)); });
+// layar tablet: sesi yang sedang berjalan di studio ini, selain itu booking terawal yang sudah check-in dan slotnya belum berakhir, plus booking berikutnya hari ini
+route('GET', '/api/admin/studios/:id/live', 2, ({ params }) => { expireStale(); const st = liveStudio(params.id), t = now(), studio = { id: st.id, name: st.name };
+  q(`SELECT * FROM session WHERE studio_id=? AND status='Aktif'`, st.id).forEach(left);
+  const cur = one(`SELECT * FROM session WHERE studio_id=? AND status='Aktif' ORDER BY start_time DESC`, st.id); if (cur) return { studio, state: 'running', session: liveOut(cur), now: t };
+  const rows = q(`SELECT b.id,b.checked_in_at,x.slot,u.name customer,pk.name package FROM booking b JOIN session x ON x.booking_id=b.id JOIN user u ON u.id=b.user_id JOIN package pk ON pk.id=b.package_id WHERE x.studio_id=? AND b.status='Terbayar'`, st.id)
+    .filter(r => slotEnd(r.slot) > t && ymd(slotMs(r.slot)) === ymd(t)).sort((a, z) => slotMs(a.slot) - slotMs(z.slot));
+  const ready = rows.find(r => r.checked_in_at); return { studio, state: ready ? 'ready' : 'idle', booking: liveCard(ready, t), next: liveCard(rows[0], t), now: t }; });
+route('POST', '/api/admin/bookings/:id/start', 2, ({ params }) => { expireStale(); const b = bookOr404(params.id); if (b.status !== 'Terbayar') bad('Booking tidak dapat dimulai', 409); if (!b.checked_in_at) bad('Booking belum check-in', 409);
+  const s = one('SELECT * FROM session WHERE booking_id=?', b.id), t = now(); if (slotMs(s.slot) > t) bad(`Sesi baru dapat dimulai pukul ${hm(slotMs(s.slot))}`, 409); if (slotEnd(s.slot) <= t) bad('Waktu sesi sudah lewat', 409);
+  q(`SELECT * FROM session WHERE studio_id=? AND status='Aktif'`, s.studio_id).forEach(left); if (one(`SELECT 1 FROM session WHERE studio_id=? AND status='Aktif'`, s.studio_id)) bad('Masih ada sesi yang sedang berlangsung di studio ini', 409);
+  startSession(b, t); return liveOut(one('SELECT * FROM session WHERE booking_id=?', b.id)); });
+const photoSess = id => one('SELECT * FROM session WHERE id=?', id) || bad('Sesi tidak ditemukan', 404);
+route('GET', '/api/admin/photo-sessions/:id', 2, ({ params }) => liveOut(photoSess(params.id)));
+route('POST', '/api/admin/photo-sessions/:id/photos', 2, ({ params, body }) => addPhoto(photoSess(params.id), body.img));
+route('DELETE', '/api/admin/photos/:id', 2, ({ params }) => { const p = one('SELECT p.*,s.status sstatus FROM photo p JOIN session s ON s.id=p.session_id WHERE p.id=?', params.id) || bad('Foto tidak ditemukan', 404);
+  if (p.sstatus !== 'Aktif') bad('Foto hanya dapat dihapus dari tablet selama sesi berjalan', 409); run('DELETE FROM photo WHERE id=?', p.id); rmFiles([p]); if (p.sel) run('UPDATE session SET confirmed=0 WHERE id=?', p.session_id); return { ok: true }; });
+// password admin: Keluar dari layar tablet dan Akhiri Sesi (tablet berada di ruang studio bersama customer)
+const adminPw = (user, ip, pw) => { if (limited('vp' + ip)) bad('Terlalu banyak percobaan', 429); const a = one('SELECT password FROM admin WHERE id=?', user.sub); if (!a || !check(String(pw || ''), a.password)) bad('Password admin salah', 403); };
+route('POST', '/api/admin/verify-password', 2, ({ body, user, ip }) => { adminPw(user, ip, body.password); return { ok: true }; });
+route('POST', '/api/admin/photo-sessions/:id/end', 2, ({ params, body, user, ip }) => { adminPw(user, ip, body.password); const s = photoSess(params.id); if (sessOut(s).status !== 'Aktif') bad('Sesi sudah berakhir', 409);
+  const b = one('SELECT * FROM booking WHERE id=?', s.booking_id); tx(() => { run(`UPDATE session SET status='Selesai',paused_at=NULL WHERE id=?`, s.id); run(`UPDATE booking SET status='Selesai' WHERE id=?`, b.id); });
+  if (b.studio_session_id) syncSessStatus(b.studio_session_id); return liveOut(photoSess(s.id)); });
 route('GET', '/api/admin/transactions', 2, () => { const rows = q(`SELECT p.id,p.booking_id,p.amount,p.status,p.method,p.paid_at,p.refunded_at,b.created_at,u.name customer,u.email FROM payment p JOIN booking b ON b.id=p.booking_id JOIN user u ON u.id=b.user_id WHERE p.status!='pending' AND p.status!='batal' ORDER BY COALESCE(p.paid_at,b.created_at) DESC LIMIT 500`).map(r => ({ ...r, invoice: invNo({ id: r.booking_id, created_at: r.created_at }) }));
   const sum = st => rows.filter(r => st.includes(r.status)).reduce((a, r) => a + r.amount, 0); return { rows, paid: sum(['paid', 'refund_failed']), refunded: sum(['refunded']) }; });
 // ---------- HTTP server ----------
@@ -377,7 +407,7 @@ const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript
 const readBody = req => new Promise((ok, no) => { let n = 0; const c = []; req.on('data', d => { n += d.length; if (n > 8e6) { no(new HttpErr(413, 'Payload terlalu besar')); req.destroy(); } else c.push(d); }); req.on('end', () => { try { ok(c.length ? JSON.parse(Buffer.concat(c)) : {}); } catch { no(new HttpErr(400, 'JSON tidak valid')); } }); });
 http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x'), send = (c, o) => { if (o && o.raw) { res.writeHead(c); return res.end(o.raw); } res.writeHead(c, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
-  res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*'); res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type,X-Staff-Token'); res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE');
+  res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*'); res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type'); res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   if (!u.pathname.startsWith('/api/')) { // file statis frontend (+ /media = gambar unggahan admin)
     const isM = u.pathname.startsWith('/media/'), root = isM ? MEDIA : FRONT, f = path.join(root, isM ? path.normalize(u.pathname.slice(7)) : u.pathname === '/' ? 'index.html' : path.normalize(u.pathname)); const found = f.startsWith(root) && fs.existsSync(f);

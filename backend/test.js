@@ -1,7 +1,7 @@
 // Tes integrasi: node --test tidak dipakai agar sederhana. Jalankan: npm test
 const { spawn } = require('child_process'), assert = require('assert'), os = require('os'), path = require('path');
 const PORT = 3919, DB = path.join(os.tmpdir(), 'snapia-test-' + Date.now() + '.db'), B = `http://localhost:${PORT}/api`;
-const srv = spawn('node', ['--disable-warning=ExperimentalWarning', 'server.js'], { env: { ...process.env, PORT, DB_FILE: DB, STAFF_PIN: '4321' }, cwd: __dirname });
+const srv = spawn('node', ['--disable-warning=ExperimentalWarning', 'server.js'], { env: { ...process.env, PORT, DB_FILE: DB, ADMIN_PASS: 'Admin#12345' }, cwd: __dirname });
 const call = async (m, p, body, tok, extra = {}) => { const r = await fetch(B + p, { method: m, headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}), ...extra }, body: body ? JSON.stringify(body) : undefined }); let j = {}; try { j = await r.json(); } catch {} return { s: r.status, j }; };
 const JPG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==';
 (async () => {
@@ -17,24 +17,19 @@ const JPG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////
   ok((await call('POST', '/bookings', { package_id: 2, studio_id: 1, date: slot }, Bb.token)).s === 409, 'slot ganda ditolak (409)');
   ok(!(await call('GET', `/availability?studio_id=1&date=${day}`)).j.free.includes(11), 'availability menyembunyikan slot terisi');
   ok((await call('POST', `/bookings/${bk.j.id}/pay`, {}, Bb.token)).s === 404, 'user lain tidak bisa membayar booking orang');
-  ok((await call('POST', `/bookings/${bk.j.id}/start`, {}, A.token)).s === 409, 'sesi tidak bisa mulai sebelum bayar');
+  const AD = (await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token;
+  ok((await call('POST', `/admin/bookings/${bk.j.id}/checkin`, {}, AD)).s === 409, 'check-in ditolak sebelum bayar');
   ok((await call('POST', `/bookings/${bk.j.id}/pay`, { method: 'QRIS' }, A.token)).j.status === 'Terbayar', 'pembayaran berhasil');
   ok((await call('PATCH', `/bookings/${bk.j.id}`, { studio_id: 1, date: day + ' 12:00' }, A.token)).s === 200, 'ubah jadwal berhasil');
-  const se = (await call('POST', `/bookings/${bk.j.id}/start`, {}, A.token)).j; ok(se.status === 'Aktif' && se.left > 800, 'sesi mulai otomatis, timer server berjalan');
-  const ph = await call('POST', `/sessions/${se.id}/photos`, { img: JPG }, A.token); ok(ph.s === 200, 'upload foto berhasil');
-  ok((await call('POST', `/sessions/${se.id}/photos`, { img: 'bukan-gambar' }, A.token)).s === 400, 'format foto tidak valid ditolak');
-  ok((await call('POST', `/sessions/${se.id}/control`, { action: 'pause' }, A.token)).s === 403, 'kendali sesi butuh staf');
-  const st = (await call('POST', '/staff/login', { pin: '4321' }, null, {})).s; ok(st === 401, 'staf login perlu user login');
-  const tok = (await call('POST', '/staff/login', { pin: '4321' }, A.token)).j.token; ok(tok, 'PIN staf benar menghasilkan token staf');
-  const pa = await call('POST', `/sessions/${se.id}/control`, { action: 'pause' }, A.token, { 'X-Staff-Token': tok }); ok(pa.j.paused, 'staf menjeda sesi');
-  ok((await call('POST', `/sessions/${se.id}/photos`, { img: JPG }, A.token)).s === 409, 'foto ditolak saat sesi dijeda');
-  const l1 = (await call('GET', `/sessions/${se.id}`, null, A.token)).j.left; await new Promise(r => setTimeout(r, 1500)); ok((await call('GET', `/sessions/${se.id}`, null, A.token)).j.left === l1, 'waktu tidak berkurang saat jeda');
-  await call('POST', `/sessions/${se.id}/control`, { action: 'resume' }, A.token, { 'X-Staff-Token': tok });
+  const sid = (await call('PATCH', `/admin/bookings/${bk.j.id}`, { status: 'Sesi Berjalan' }, AD)).j.session_id, se = (await call('GET', `/sessions/${sid}`, null, A.token)).j; ok(se.status === 'Aktif' && se.left > 800, 'sesi dimulai (tablet studio / admin), timer server berjalan');
+  const ph = await call('POST', `/admin/photo-sessions/${se.id}/photos`, { img: JPG }, AD); ok(ph.s === 200, 'upload foto dari tablet berhasil');
+  ok((await call('POST', `/admin/photo-sessions/${se.id}/photos`, { img: 'bukan-gambar' }, AD)).s === 400, 'format foto tidak valid ditolak');
+  ok((await call('POST', '/staff/login', { pin: '4321' }, A.token)).s === 404, 'Mode Staf sudah dihapus');
   ok((await call('PATCH', `/photos/${ph.j.id}`, { sel: true }, Bb.token)).s === 404, 'foto milik user lain tidak bisa diubah');
   const dl = u => fetch(`${B}/photos/${ph.j.id}/image?${u}&t=${A.token}`).then(r => r.status);
   ok(await dl('dl=1') === 403, 'unduh ditolak sebelum konfirmasi pilihan');
   await call('PATCH', `/photos/${ph.j.id}`, { sel: true }, A.token); ok((await call('POST', `/sessions/${se.id}/confirm`, {}, A.token)).s === 200, 'konfirmasi pilihan dalam kuota');
   ok(await dl('dl=1') === 200, 'unduh foto terpilih berhasil'); ok(await fetch(`${B}/photos/${ph.j.id}/image?t=${Bb.token}`).then(r => r.status) === 404, 'foto tidak bisa diakses user lain');
-  await call('POST', `/sessions/${se.id}/control`, { action: 'stop' }, A.token, { 'X-Staff-Token': tok }); ok((await call('POST', `/sessions/${se.id}/photos`, { img: JPG }, A.token)).s === 409, 'foto ditolak setelah sesi berakhir');
+  await call('POST', `/admin/photo-sessions/${se.id}/end`, { password: 'Admin#12345' }, AD); ok((await call('POST', `/admin/photo-sessions/${se.id}/photos`, { img: JPG }, AD)).s === 409, 'foto ditolak setelah sesi berakhir');
   console.log(`\n${n} tes lulus`); srv.kill(); process.exit(0);
 })().catch(e => { console.error('✘ GAGAL:', e.message); srv.kill(); process.exit(1); });

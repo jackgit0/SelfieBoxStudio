@@ -586,7 +586,7 @@
         },
         {
           "id": "e43",
-          "from": "bdet",
+          "from": "as",
           "to": "sa",
           "relation": "crosslink"
         },

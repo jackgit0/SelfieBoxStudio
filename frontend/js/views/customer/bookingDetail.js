@@ -1,10 +1,11 @@
-// Detail Booking (/bookings/:id): jadwal, status, aksi (Reschedule, Batalkan, Bayar, Check-in, Buka Sesi), detail booking dan pembayaran,
+// Detail Booking (/bookings/:id): jadwal, status, aksi (Reschedule, Batalkan, Bayar), status sesi foto, detail booking dan pembayaran,
 // alasan pembatalan, unduh/kirim invoice. View murni (dulu V.bdetail di customer.js). links = { invoiceUrl(id, download) } dari main.js.
-// Check-in dan Buka Sesi (data-action photo:start / photo:open) ditangani PhotoSessionController.
+// Sesi foto tidak dimulai dari sini: check-in di meja depan (admin), lalu sesi dijalankan di tablet studio; di sini hanya statusnya.
 import { html } from "../../core/html.js";
 import { formatDate, parseSlot, slotRange } from "../../core/format.js";
 import { isStudioShown, studioOf } from "../../models/master.js";
 import { bookingById, canChange, withLocalExpiry } from "../../models/booking.js";
+import { sessionOfBooking } from "../../models/photoSession.js";
 import { bookingRows, paymentDetail } from "../../components/keyValueRows.js";
 import { icon } from "../../components/icon.js";
 import { statusTag } from "./bookings.js";
@@ -25,17 +26,30 @@ function actions(master, booking) {
   if (booking.status === "Menunggu Pembayaran") {
     buttons.push(html`<button class="btn sm" data-action="payment:payNow" data-id="${booking.id}">Bayar</button>`);
   }
-  if (booking.status === "Terbayar") {
-    buttons.push(
-      html`<button class="btn sm soft" data-action="photo:start" data-id="${booking.id}">
-        ${icon("camera", 16)} Check-in & Mulai Sesi
-      </button>`,
-    );
-  }
-  if (booking.status === "Sesi Berjalan") {
-    buttons.push(html`<button class="btn sm soft" data-action="photo:open">Buka Sesi</button>`);
-  }
   return buttons;
+}
+
+const twoDigits = value => String(value).padStart(2, "0");
+
+// status sesi foto: belum check-in → petunjuk; sudah check-in → mulai di tablet; berjalan → sisa waktu; selesai → Galeri
+export function sessionNote(booking, session, studioName) {
+  let text = "";
+  let action = "";
+  if (booking.status === "Terbayar") {
+    text = booking.checked_in_at
+      ? `Sudah check-in. Sesi foto dimulai dari tablet di ${studioName}.`
+      : "Tunjukkan booking ini di meja depan studio untuk check-in pada hari sesi.";
+  } else if (booking.status === "Sesi Berjalan") {
+    const left = Math.max(0, (session && session.left) || 0);
+    text = `Sesi berjalan di ${studioName} · sisa ${twoDigits(Math.floor(left / 60))}:${twoDigits(left % 60)}`;
+  } else if (booking.status === "Selesai" && session) {
+    text = "Sesi foto selesai. Pilih dan unduh fotomu di Galeri.";
+    action = html`<button class="btn sm soft" data-route="/gallery">${icon("images", 16)} Buka Galeri</button>`;
+  }
+  if (!text) {
+    return "";
+  }
+  return html`<div class="card sessnote row sp"><span>${icon("camera", 18)} ${text}</span>${action}</div>`;
 }
 
 export function bookingDetailView(state, match, links, now = new Date()) {
@@ -76,6 +90,7 @@ export function bookingDetailView(state, match, links, now = new Date()) {
       </div>
     </div>
     <div class="row" style="margin:16px 0">${actions(master, booking)}</div>
+    ${sessionNote(booking, sessionOfBooking(data.sessions, booking.id), studio.name)}
     <div class="card">
       <h3 class="h3" style="margin-bottom:6px">Detail Booking</h3>
       ${bookingRows(master, booking)}

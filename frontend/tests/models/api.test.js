@@ -30,15 +30,14 @@ test("tanpa token: hanya Content-Type, URL = base + /api + path", async () => {
   assert.equal(requests[0].options.body, undefined);
 });
 
-test("token dibaca dari storage snapia_t dan dikirim sebagai Bearer; token staf sebagai X-Staff-Token", async () => {
+test("token dibaca dari storage snapia_t dan dikirim sebagai Bearer; tanpa X-Staff-Token (Mode Staf dihapus)", async () => {
   const { fetch, requests } = fakeFetch();
   const api = createApi({ base: "", fetch, storage: createFakeStorage({ snapia_t: "jwt1" }) });
   assert.equal(api.token, "jwt1");
-  api.staffToken = "staf9";
-  await api.post("/sessions/1/control", { action: "pause" });
-  assert.equal(requests[0].url, "/api/sessions/1/control");
-  assert.deepEqual(requests[0].options.headers, { "Content-Type": "application/json", Authorization: "Bearer jwt1", "X-Staff-Token": "staf9" });
-  assert.equal(requests[0].options.body, JSON.stringify({ action: "pause" }));
+  await api.post("/admin/photo-sessions/1/end", { password: "x" });
+  assert.equal(requests[0].url, "/api/admin/photo-sessions/1/end");
+  assert.deepEqual(requests[0].options.headers, { "Content-Type": "application/json", Authorization: "Bearer jwt1" });
+  assert.equal(requests[0].options.body, JSON.stringify({ password: "x" }));
 });
 
 test("mengisi dan mengosongkan token menulis ke storage", () => {

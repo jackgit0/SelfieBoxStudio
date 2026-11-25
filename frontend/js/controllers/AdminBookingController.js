@@ -83,6 +83,15 @@ export function createAdminBookingController({ api, store, ui, models, admin: ad
       updateAdmin({ bookingDetail: null }, { silent: false });
     },
 
+    // Check-in di meja depan (pelanggan sudah datang): sesi kemudian dimulai dari tablet studio
+    checkIn({ id }) {
+      return adminCore.run(async () => {
+        const answer = await models.admin.liveSession.checkIn(api, id).catch(error => failWith(id, error));
+        updateAdmin({ bookingDetail: answer, bookings: null });
+        setToast({ message: `Check-in berhasil. Sesi dapat dimulai dari tablet ${answer.studio_name}.` });
+      });
+    },
+
     // values = { status, package_id } dari form Ubah Booking; paket hanya sebelum dibayar, status hanya ke tujuan server.
     // Dibatalkan / Sesi Berjalan / Selesai minta konfirmasi dulu; batal → pilihan tetap (draf)
     async save({ id }, values) {

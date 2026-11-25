@@ -9,5 +9,6 @@ export * as account from "./account.js";
 export * as studios from "./studios.js";
 export * as sessions from "./sessions.js";
 export * as bookings from "./bookings.js";
+export * as liveSession from "./liveSession.js";
 export * as properties from "./properties.js";
 export * as poses from "./poses.js";

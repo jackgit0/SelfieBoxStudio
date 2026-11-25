@@ -79,3 +79,15 @@ test("booking: selesai tanpa tujuan → tanpa form ubah; delete_block → tanpa 
   assert.ok(out.includes("Booking yang sudah selesai tidak dapat dihapus."));
   assert.ok(out.includes("<span>Refund</span>"));
 });
+
+test("booking: Check-in di panel detail (Terbayar): tombol aktif, atau mati dengan alasan server; sudah check-in → keterangan + lencana di daftar", () => {
+  const paid = { status: "Terbayar", allowed: ["Sesi Berjalan", "Selesai", "Dibatalkan"], payment: { status: "paid", paid_at: 1, method: "QRIS", amount: 45000 } };
+  const ready = render({ bookings: [row()], bookingDetail: detail({ ...paid, checkin_block: null }) });
+  assert.match(ready, /<div class="cibox"><button class="btn sm" data-action="adminBooking:checkIn" data-id="5" ?><svg[^]*?<\/svg> Check-in<\/button><span class="sm m">Pelanggan sudah datang di studio\.<\/span><\/div>/);
+  const early = render({ bookings: [row()], bookingDetail: detail({ ...paid, checkin_block: "Check-in hanya dapat dilakukan pada hari sesi" }) });
+  assert.match(early, /data-action="adminBooking:checkIn" data-id="5" ?disabled>[^]*?<span class="sm m">Check-in hanya dapat dilakukan pada hari sesi\.<\/span>/);
+  const done = render({ bookings: [row({ status: "Terbayar", checked_in_at: 1 })], bookingDetail: detail({ ...paid, checked_in_at: Date.UTC(2026, 10, 26, 2, 5), checkin_block: "Booking sudah check-in" }) });
+  assert.match(done, /<div class="cibox ok"><svg[^]*?<\/svg><span>Sudah check-in [^<]+\. Sesi dimulai dari tablet Melati\.<\/span><\/div>/);
+  assert.match(done, /<span class="tag ok">Terbayar<\/span><br><span class="tag ok">Sudah check-in<\/span>/);
+  assert.doesNotMatch(render({ bookings: [row()], bookingDetail: detail() }), /adminBooking:checkIn|cibox/);
+});

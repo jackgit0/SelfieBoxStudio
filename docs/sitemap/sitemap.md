@@ -34,7 +34,7 @@ Pembaruan 2026-11-25 (refactor MVC frontend, sudah digabung ke `main`; lihat `..
 | | Booking Details | | 1.2.1 | Detail booking + detail pembayaran, tombol Reschedule dan Batalkan |
 | | | Reschedule | 1.2.1.1 | Pilih tanggal dan sesi baru, **Konfirmasi**, layar berhasil |
 | | | Pembatalan & Refund | 1.2.1.2 | Alasan pembatalan, tombol **Refund**, layar Refund Berhasil / Gagal |
-| Session Assistant | | | 1.3 | Layar sesi foto di studio |
+| Session Assistant | | | 1.3 | Layar sesi foto di tablet studio (masuk sebagai admin) |
 | | Camera Preview & Timer | | 1.3 | Tampilan kamera, hitung mundur, pilihan timer |
 | | Background | | 1.3 | Pemilih warna background, **PILIH** |
 | | Pose Ideas | | — | Carousel rekomendasi pose |
@@ -89,7 +89,7 @@ Langkah di dalam satu alur (Tanggal & Waktu → Paket & Pembayaran → Berhasil,
 | Create Booking | Log In | Popup Belum Login saat tamu menekan Check Out, tombol "Masuk"; setelah login, Create Booking dilanjutkan di langkah yang sama |
 | Create Booking | Booking Saya | Dari layar berhasil, melihat booking yang baru dibuat |
 | Booking Saya | Browse Studio | Membuat booking baru (studio dipilih dulu); menggantikan "Create Booking" ganda di sitemap lama |
-| Booking Details | Session Assistant | Membuka sesi foto dari booking yang sedang berlangsung |
+| Studio Management | Session Assistant | Ikon mata di samping ikon hapus: tablet studio membuka Session Assistant untuk studio itu |
 | Booking Details | Album Sesi | Melihat foto dari booking yang sudah selesai |
 | Pembatalan & Refund | Help | Tombol "Hubungi Customer Service" saat refund gagal |
 | Account | Edit Profile | Ikon edit di samping nama |
@@ -123,7 +123,8 @@ Langkah di dalam satu alur (Tanggal & Waktu → Paket & Pembayaran → Berhasil,
 - **Revenue Dashboard** dan **Admin Account** tidak ada di daftar keputusan sitemap (keputusan 14), tetapi ditambahkan karena website punya menu Dashboard dan Akun Admin dan setiap menu admin sekarang punya frame. **Payment Dashboard** dipertahankan namanya dan dipetakan ke halaman Transaksi (total pembayaran masuk dan refund).
 - Halaman bertanda **—** di kolom Frame belum punya frame di Figma: Log In, Sign Up, Lupa Sandi, Buat Sandi Baru, Galeri dan turunannya, Pose Ideas, Panggil Staff, Help, Payment Method, Change Password, Privacy Policy. Halaman itu tetap dimasukkan karena ada di HTA, desain interaksi, atau menu di frame lain. Brief akhir meminta link antarhalaman berfungsi, jadi halaman yang tetap di sitemap perlu dibuatkan frame atau dikeluarkan dari sitemap.
 - Enam frame admin baru (Admin - Dashboard, Pengguna, Pose, Transaksi, Paket & Diskon, Akun Admin; desktop dan mobile) dibuat dari kode website dengan data demo. Menu samping desktop di frame baru berisi sembilan menu seperti website, sedangkan frame admin lama masih menampilkan enam menu.
-- Tautan silang Booking Details → Session Assistant dan Booking Details → Album Sesi adalah asumsi; frame Booking Details hanya menampilkan Reschedule dan Batalkan.
+- Tautan silang Booking Details → Album Sesi adalah asumsi; frame Booking Details hanya menampilkan Reschedule dan Batalkan.
+- **Session Assistant** tetap digambar sebagai menu di bawah Beranda karena di HTA dan desain interaksi ia adalah layar yang dipakai pelanggan di studio. Di website ia dijalankan di **tablet studio** yang masuk sebagai admin: dibuka dari Studio Management (ikon mata), dan sesi dimulai setelah admin melakukan check-in di Booking Management. Pelanggan tidak membukanya dari Booking Details (tautan silang lama `e43` dipindah ke Studio Management, 2026-11-25).
 - Label mengikuti frame, jadi campur bahasa Inggris dan Indonesia (frame akun dan admin berbahasa Inggris di sitemap, Indonesia di layar).
 - Bagikan foto memakai share sheet bawaan perangkat, jadi tidak digambar sebagai situs luar.
 - Email ke Buat Sandi Baru tidak digambar sebagai tautan silang dari Lupa Sandi (atau dari "Ubah sandi" di Pengaturan Akun website, yang mengirim tautan yang sama), karena pengguna membukanya dari kotak masuk email, bukan dengan klik di website. Catatan diagram menyebutkannya.
@@ -146,7 +147,7 @@ Sejak refactor MVC frontend setiap halaman website punya path sendiri: muat ulan
 | Booking Details | `/bookings/:id` | pelanggan |
 | Reschedule | `/bookings/:id/reschedule`, `/bookings/:id/rescheduled` (berhasil) | pelanggan |
 | Pembatalan & Refund | `/bookings/:id/cancel`, `/bookings/:id/refund` (hasil) | pelanggan |
-| Session Assistant (+ Camera Preview & Timer, Background, Pose Ideas, Panggil Staff) | `/sessions/:id` (satu layar) | pelanggan |
+| Session Assistant (+ Camera Preview & Timer, Background, Pose Ideas, Panggil Staff) | `/admin/studios/:id/live` (satu layar penuh di tablet studio) | admin (tablet studio) |
 | Galeri (+ Album Sesi, Preview Foto) | `/gallery` (satu layar) | pelanggan |
 | Account / Edit Profile | `/account` (Pengaturan Akun, tab Edit Profil) | pelanggan |
 | Payment History | `/account/payments` (tab Riwayat Pembayaran) | pelanggan |

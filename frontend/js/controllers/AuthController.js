@@ -1,10 +1,9 @@
-// AuthController: Masuk/Daftar/Lupa Sandi/Buat Sandi Baru, masuk admin, keluar, Mode Staf dan pemulihan login saat aplikasi dibuka
-// (dulu reg, login, adminLogin, afterAuth, forgot, doReset, logout, staffToggle di core.js dan isi boot.js).
+// AuthController: Masuk/Daftar/Lupa Sandi/Buat Sandi Baru, masuk admin, keluar dan pemulihan login saat aplikasi dibuka
+// (dulu reg, login, adminLogin, afterAuth, forgot, doReset, logout di core.js dan isi boot.js; PIN staf dihapus, sesi foto dijalankan admin dari tablet studio).
 // Metode form menerima isian sebagai objek biasa (main.js: formValues, decisions.md 54); galat tampil sebagai toast di kartu form,
 // dan isian yang diketik (bukan password) tetap ada setelah galat.
 // booking = BookingController (refreshData, resumeDraft, clearBooking); accessDenied = dialog Akses ditolak (AdminController.showAccessDenied).
 // Keluar mengosongkan slice admin ke isi awalnya (createAdminState, dulu adminReset di admin.js).
-import { staffPinModal } from "../views/auth/staff.js";
 import { createAdminState } from "./AdminController.js";
 
 const EMAIL = /\S+@\S+\.\S+/;
@@ -123,8 +122,7 @@ export function createAuthController({ api, store, ui, router, models, booking, 
     // Keluar: semua yang milik user dibuang, termasuk booking yang sedang diisi (decisions.md 58) dan state admin
     logout() {
       api.token = "";
-      api.staffToken = "";
-      store.update("persisted", { user: null, me: null, staff: false, admin: false, draft: null }, { silent: true });
+      store.update("persisted", { user: null, me: null, admin: false, draft: null }, { silent: true });
       store.update("data", { bookings: [], sessions: [] }, { silent: true });
       booking.clearBooking();
       store.update("admin", createAdminState(), { silent: true });
@@ -132,32 +130,9 @@ export function createAuthController({ api, store, ui, router, models, booking, 
       router.navigate("/");
     },
 
-    // Mode Staf di menu akun: aktif → nonaktif langsung; nonaktif → modal PIN
-    async toggleStaff() {
-      if (state().persisted.staff) {
-        api.staffToken = "";
-        store.update("persisted", { staff: false });
-        store.persist();
-        return;
-      }
-      const answer = await ui.modal(staffPinModal());
-      const pin = answer && answer.value === "ok" ? answer.data : "";
-      if (!pin) {
-        return;
-      }
-      try {
-        api.staffToken = (await auth.staffLogin(api, pin)).token;
-      } catch (error) {
-        return showToast({ error: error.message });
-      }
-      store.update("persisted", { staff: true });
-      store.persist();
-    },
-
-    // saat aplikasi dibuka: login tersimpan dipulihkan (Mode Staf tidak). true = pemanggil merender;
+    // saat aplikasi dibuka: login tersimpan dipulihkan. true = pemanggil merender;
     // false = sudah ditangani (logout pindah ke landing, atau dialog Akses Ditolak untuk token pelanggan di sesi admin)
     async restoreSession() {
-      store.update("persisted", { staff: false }, { silent: true });
       const { persisted } = state();
       if (!api.token || !persisted.user) {
         store.update("persisted", { me: null }, { silent: true });

@@ -74,7 +74,7 @@ const stop = () => { srv.kill(); srv2.kill(); smtp.close(); };
   const dx = await call('DELETE', `/admin/studios/${SD}`, null, AD), bx = (await call('GET', '/bookings', null, A)).j.find(b => b.id === x1.id);
   ok(dx.s === 200 && dx.j.cancelled === 0 && bx.status === 'Dibatalkan' && !bx.cancel_reason, 'studio tanpa booking aktif langsung dihapus; booking kedaluwarsa tidak dihitung sebagai dibatalkan admin');
   // sesi berjalan memblokir penghapusan
-  const e1 = await book(call, A, 1, far + ' 15:00'); await pay(call, A, e1.id); await call('POST', `/bookings/${e1.id}/start`, {}, A);
+  const e1 = await book(call, A, 1, far + ' 15:00'); await pay(call, A, e1.id); await call('PATCH', `/admin/bookings/${e1.id}`, { status: 'Sesi Berjalan' }, AD);
   const bl = await call('DELETE', '/admin/studios/1?confirm=1', null, AD); ok(bl.s === 409 && /sedang berlangsung/.test(bl.j.error) && (await call('GET', '/master')).j.STUDIOS.some(s => s.id === 1), 'studio dengan sesi berjalan tidak bisa dihapus');
   { const { DatabaseSync } = require('node:sqlite'), D = new DatabaseSync(DB('a')); D.prepare('UPDATE session SET end_time=? WHERE booking_id=?').run(Date.now() - 1000, e1.id); D.close(); } // waktu sesi habis tanpa customer membuka halaman sesi
   const tl = await call('DELETE', '/admin/studios/1', null, AD); ok(tl.s === 200 && (await call('GET', '/bookings', null, A)).j.find(b => b.id === e1.id).status === 'Selesai', 'sesi yang waktunya sudah habis tidak lagi memblokir penghapusan (booking jadi Selesai)');

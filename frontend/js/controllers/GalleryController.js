@@ -1,11 +1,11 @@
-// GalleryController: Galeri (/gallery) dan tombol hapus di strip layar Sesi Foto — pilih sesi, pilih foto untuk dicetak, favorit, hapus (satu / massal),
+// GalleryController: Galeri (/gallery) — pilih sesi, pilih foto untuk dicetak, favorit, hapus (satu / massal),
 // konfirmasi pilihan, unduh (dulu selPh, fav, delPhoto, toggleDel, togDel, selAllNonFav, bulkDel, confirmSel, dl di legacy/session.js;
 // fitur teman sekelompok, perilaku dipertahankan kecuali yang dicatat di Progress fase 7).
 // Foto di slice data diubah di tempat seperti kode lama. drive: { fetch } (hapus berkas Drive), files: { download(url, nama) },
-// photoSession: PhotoSessionController (strip layar sesi), refreshData: BookingController.refreshData.
+// refreshData: BookingController.refreshData. (Strip foto di tablet studio dihapus lewat PhotoSessionController.)
 import { deletePhotoModal, deleteSelectedModal, deleteFailedModal } from "../views/session/gallery.js";
 
-export function createGalleryController({ api, store, ui, models, drive, files, photoSession, refreshData, brand }) {
+export function createGalleryController({ api, store, ui, models, drive, files, refreshData, brand }) {
   const gallery = models.gallery;
   const state = () => store.get();
   const photo = () => state().photo;
@@ -84,11 +84,7 @@ export function createGalleryController({ api, store, ui, models, drive, files, 
       } catch (error) {
         return ui.modal(deleteFailedModal(error.message));
       }
-      if (state().runtime.route.name == "session") {
-        photoSession.showSession(session.id);
-      } else {
-        setToast({ message: "Foto dihapus." });
-      }
+      setToast({ message: "Foto dihapus." });
     },
 
     toggleDeleteMode() {

@@ -4,5 +4,6 @@
   --orange:#f28800;--red:#d64545;--green:#2e9e6a;
   --bg:#f1f5f9;--surface:#fff;--soft:#eef1fa;--line:#cbd5e1;--line-2:#e2e8f0;
   --ink:#020617;--ink-2:#334155;--muted:#94a3b8;--muted-2:#64748b;
+  --rail:#d9d9d9; /* kartu TIMER di Session Assistant (Figma "camera preview") */
   --r-lg:24px;--r-md:16px;--shadow:0 6px 24px rgba(28,39,72,.08);
 }

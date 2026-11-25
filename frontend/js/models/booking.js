@@ -67,8 +67,9 @@ export const CANCEL_REASONS = ["Tidak ada waktu", "Penggunaan dana lain", "Pemes
 const PENDING = "Menunggu Pembayaran";
 
 // booking yang masih bisa diubah jadwal atau dibatalkan
+// setelah check-in di studio, booking tidak dapat dijadwal ulang atau dibatalkan (server menolak dengan 409)
 export function canChange(booking) {
-  return [PENDING, "Terbayar"].includes(booking.status);
+  return [PENDING, "Terbayar"].includes(booking.status) && !booking.checked_in_at;
 }
 
 // warna label status: ok (hijau), no (merah), warn (kuning)

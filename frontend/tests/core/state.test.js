@@ -6,7 +6,7 @@ import { createInitialState } from "../../js/core/state.js";
 test("createInitialState: slice persisted, master, booking, runtime, data dengan isi awal lama", () => {
   const state = createInitialState();
   assert.deepEqual(Object.keys(state).sort(), ["booking", "data", "master", "persisted", "runtime"]);
-  assert.deepEqual(state.persisted, { user: null, me: null, admin: false, pkg: null, bm: [], staff: false, log: [] });
+  assert.deepEqual(state.persisted, { user: null, me: null, admin: false, pkg: null, bm: [], cameras: {} });
   assert.deepEqual(state.master, { packages: [], allPackages: [], favouritePackageId: null, discount: { pct: 0, label: "" }, peopleRanges: [], budgetRanges: [], studios: [], allStudios: [], properties: [], poses: {}, policy: { refund_hours: 2 }, json: "" });
   assert.deepEqual(state.booking, { studio: null, date: null, slot: null, quote: null, rescheduleId: null });
   assert.deepEqual(state.data, { bookings: [], sessions: [] });
