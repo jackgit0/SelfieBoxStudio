@@ -25,7 +25,6 @@ function setup({ persisted = {}, booking = {}, runtime = {}, admin = {}, respons
   const store = createStore(state, { storage, persistKey: "snapia", session: { storage: sessionStorage, key: "snapia_booking", slices: { booking: ["studio", "date", "slot", "rescheduleId"] } } });
   const api = createFakeApi(responses);
   api.token = token;
-  api.staffToken = "";
   api.imageUrl = id => `/img/${id}`;
   const log = [];
   const ui = createFakeUi({ modalAnswers });
@@ -131,15 +130,15 @@ test("reset: password pendek / tidak sama → pesan; valid → POST token + pass
   assert.equal(valid.store.get().runtime.toast.message, "Sandi berhasil diubah. Silakan masuk dengan sandi baru.");
 });
 
-test("logout: token dan token staf dibuang, slice user/admin/draf/data/booking berjalan dikosongkan, state admin direset, ke /", () => {
-  const { store, api, log, sessionStorage, controller } = setup({ token: "jwt", persisted: { me: 5, user, staff: true, draft: { studio: 1 } }, booking: { studio: 1, date: "2026-11-27", slot: "2026-11-27 10:00" } });
-  api.staffToken = "staf";
+test("logout: token dibuang, slice user/admin/draf/data/booking berjalan dikosongkan, state admin direset, ke /", () => {
+  const { store, api, log, sessionStorage, controller } = setup({ token: "jwt", persisted: { me: 5, user, draft: { studio: 1 }, cameras: { 1: "cam-usb" } }, booking: { studio: 1, date: "2026-11-27", slot: "2026-11-27 10:00" } });
   store.persistSession();
   const adminBefore = store.get().admin;
   controller.logout();
-  assert.deepEqual([api.token, api.staffToken], ["", ""]);
+  assert.equal(api.token, "");
   const { persisted, data, booking, runtime } = store.get();
-  assert.deepEqual([persisted.user, persisted.me, persisted.staff, persisted.admin, persisted.draft], [null, null, false, false, null]);
+  assert.deepEqual([persisted.user, persisted.me, persisted.admin, persisted.draft], [null, null, false, null]);
+  assert.deepEqual(persisted.cameras, { 1: "cam-usb" }); // pilihan kamera tablet studio tetap tersimpan
   assert.deepEqual(data, { bookings: [], sessions: [] });
   assert.deepEqual(booking, { studio: null, date: null, slot: null, quote: null, rescheduleId: null });
   assert.equal(runtime.auth.mode, "login");
@@ -150,33 +149,15 @@ test("logout: token dan token staf dibuang, slice user/admin/draf/data/booking b
   assert.equal(sessionStorage.getItem("snapia_booking"), null);
 });
 
-test("toggleStaff: modal PIN; ditutup → tidak ada apa-apa; PIN benar → Mode Staf aktif; salah → toast; aktif → nonaktif tanpa modal", async () => {
-  const closed = setup({ persisted: { me: 5, user }, modalAnswers: [{ value: null, data: "" }] });
-  await closed.controller.toggleStaff();
-  assert.deepEqual(closed.log, ["modal:Masuk Mode Staf"]);
-  assert.deepEqual(closed.api.calls, []);
-  const right = setup({ persisted: { me: 5, user }, modalAnswers: [{ value: "ok", data: "1234" }], responses: { "POST /staff/login": { body: { token: "staf" } } } });
-  await right.controller.toggleStaff();
-  assert.deepEqual(right.api.calls, [{ method: "POST", path: "/staff/login", body: { pin: "1234" } }]);
-  assert.equal(right.api.staffToken, "staf");
-  assert.equal(right.store.get().persisted.staff, true);
-  assert.deepEqual(right.log, ["modal:Masuk Mode Staf", "render"]);
-  const wrong = setup({ persisted: { me: 5, user }, modalAnswers: [{ value: "ok", data: "9" }], responses: { "POST /staff/login": { status: 401, body: { error: "PIN staf salah" } } } });
-  await wrong.controller.toggleStaff();
-  assert.equal(wrong.store.get().runtime.toast.error, "PIN staf salah");
-  assert.equal(wrong.store.get().persisted.staff, false);
-  const off = setup({ persisted: { me: 5, user, staff: true } });
-  off.api.staffToken = "staf";
-  await off.controller.toggleStaff();
-  assert.deepEqual([off.store.get().persisted.staff, off.api.staffToken], [false, ""]);
-  assert.deepEqual(off.log, ["render"]);
+test("Mode Staf sudah dihapus: tidak ada toggleStaff", () => {
+  assert.equal(setup().controller.toggleStaff, undefined);
 });
 
-test("restoreSession customer: Mode Staf tidak dipulihkan, data user dimuat, render diminta", async () => {
-  const { store, api, controller } = setup({ token: "jwt", persisted: { user, staff: true }, responses: mine });
+test("restoreSession customer: data user dimuat, render diminta", async () => {
+  const { store, api, controller } = setup({ token: "jwt", persisted: { user }, responses: mine });
   assert.equal(await controller.restoreSession(), true);
   assert.deepEqual(paths(api), ["GET /bookings", "GET /sessions"]);
-  assert.deepEqual([store.get().persisted.me, store.get().persisted.staff], [5, false]);
+  assert.equal(store.get().persisted.me, 5);
 });
 
 test("restoreSession admin: GET /admin/me ke slice admin", async () => {

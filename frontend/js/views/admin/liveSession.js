@@ -131,20 +131,23 @@ function waitingCard(live, chosenCamera) {
     body = html`<p class="kio-kicker">Sudah check-in</p>
       <h1 class="kio-h">Halo, ${ready.customer}!</h1>
       <p class="sub">Paket ${ready.package} · sesi ${ready.time} - ${ready.end}</p>
-      ${ready.can_start
-        ? html`<button class="btn kio-start" data-action="photo:start" data-id="${ready.booking_id}">
-            ${icon("camera", 22)} Mulai Sesi
-          </button>`
-        : html`<p class="kio-wait">Sesi mulai pukul ${ready.time}</p>`}`;
+      ${
+        ready.can_start
+          ? html`<button class="btn kio-start" data-action="photo:start" data-id="${ready.booking_id}">
+              ${icon("camera", 22)} Mulai Sesi
+            </button>`
+          : html`<p class="kio-wait">Sesi mulai pukul ${ready.time}</p>`
+      }`;
   } else {
     body = html`<p class="kio-kicker">${data.studio.name}</p>
       <h1 class="kio-h">Menunggu check-in</h1>
       <p class="sub">
-        ${next
-          ? html`Booking berikutnya: <b>${next.time}</b> · ${next.customer} · Paket ${next.package}${next.checked_in
-                ? ""
-                : " (belum check-in)"}`
-          : "Tidak ada booking lagi hari ini."}
+        ${
+          next
+            ? html`Booking berikutnya: <b>${next.time}</b> · ${next.customer} · Paket
+                ${next.package}${next.checked_in ? "" : " (belum check-in)"}`
+            : "Tidak ada booking lagi hari ini."
+        }
       </p>
       <p class="sm m">Check-in dilakukan admin di menu Booking.</p>`;
   }
@@ -172,10 +175,12 @@ function poseCard(master) {
   const poses = master.poses[1] || [];
   return html`<div class="kio-pose">
     <h3 class="h3">Pose Rekomendasi</h3>
-    ${poses.length
-      ? html`<img id="pose" class="pose-img" alt="" />
-          <button class="btn sm ghost" data-action="photo:nextPose">Pose lain</button>`
-      : html`<p class="m sm">Belum ada contoh pose.</p>`}
+    ${
+      poses.length
+        ? html`<img id="pose" class="pose-img" alt="" />
+            <button class="btn sm ghost" data-action="photo:nextPose">Pose lain</button>`
+        : html`<p class="m sm">Belum ada contoh pose.</p>`
+    }
   </div>`;
 }
 
@@ -249,4 +254,3 @@ export function liveSessionView(state, match) {
   }
   return html`<div class="kio-page">${topBar(name)}${content}</div>`;
 }
-

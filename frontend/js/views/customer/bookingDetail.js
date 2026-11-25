@@ -49,9 +49,7 @@ export function sessionNote(booking, session, studioName) {
   if (!text) {
     return "";
   }
-  return html`<div class="card sessnote row sp">
-    <span>${icon("camera", 18)} ${text}</span>${action}
-  </div>`;
+  return html`<div class="card sessnote row sp"><span>${icon("camera", 18)} ${text}</span>${action}</div>`;
 }
 
 export function bookingDetailView(state, match, links, now = new Date()) {

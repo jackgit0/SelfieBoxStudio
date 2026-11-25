@@ -232,3 +232,14 @@ test("createPageHooks outlet: isi view rute + toast; admin dengan header (judul 
   customer.hooks.before(plain);
   assert.equal(flat(customer.hooks.outlet(plain)), "");
 });
+
+test("layout kiosk: Session Assistant di tablet studio (admin) tanpa sidebar admin; satu #outlet, toast tetap tampil", () => {
+  assert.equal(layoutOf("alive", { admin: true }), "kiosk");
+  assert.equal(layoutOf("alive", { admin: false }), "customer"); // guard sudah mengalihkan non-admin; layout aman
+  const route = ROUTES.find(item => item.name === "alive");
+  const shell = flat(shellMarkup({ layout: "kiosk", route, session: { user: null } }));
+  assert.equal(shell, '<main id="outlet" class="kiosk"></main>');
+  assert.doesNotMatch(shell, /asb|adminSidebar|navbar/);
+  const outlet = flat(composeOutlet({ layout: "kiosk", content: html`<p>isi</p>`, toast: { message: "", error: "Password admin salah" } }));
+  assert.match(outlet, /Password admin salah[^]*<p>isi<\/p>$/);
+});

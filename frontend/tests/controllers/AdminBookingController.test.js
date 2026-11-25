@@ -155,3 +155,16 @@ test("dialog dibatalkan (hapus, Dibatalkan) → tanpa render ulang", async () =>
   await controller.save({ id: "5" }, { status: "Dibatalkan" });
   assert.equal(renders, 0);
 });
+
+test("checkIn: POST /admin/bookings/:id/checkin, panel memakai jawaban server, daftar dimuat ulang, toast; galat → toast server", async () => {
+  const answer = detail({ status: "Terbayar", checked_in_at: 1, checkin_block: "Booking sudah check-in" });
+  const ok = setup({ admin: { bookingDetail: detail({ status: "Terbayar" }), bookings: [] }, responses: { "POST /admin/bookings/5/checkin": { body: answer } } });
+  await ok.controller.checkIn({ id: "5" });
+  assert.deepEqual(ok.requests(), ["POST /admin/bookings/5/checkin"]);
+  assert.equal(ok.admin().bookingDetail.checked_in_at, 1);
+  assert.equal(ok.admin().bookings, null);
+  assert.equal(ok.toast().message, "Check-in berhasil. Sesi dapat dimulai dari tablet Melati.");
+  const late = setup({ admin: { bookingDetail: detail({ status: "Terbayar" }) }, responses: { "POST /admin/bookings/5/checkin": failure(409, "Waktu sesi sudah lewat"), "GET /admin/bookings/5": { body: detail({ status: "Terbayar" }) } } });
+  await late.controller.checkIn({ id: "5" });
+  assert.equal(late.toast().error, "Waktu sesi sudah lewat");
+});

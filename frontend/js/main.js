@@ -159,7 +159,11 @@ function pagesFor({ studio, payment, landing, photo, gallery, admin, adminBookin
     "/admin": { view: dashboardView, after: () => admin.loadDashboard() },
     "/admin/studios": { view: studiosView, after: () => studio.loadStudios() },
     // Session Assistant di tablet studio (PhotoSessionController): kamera dan timer berjalan selama halaman terbuka, berhenti saat ditinggalkan
-    "/admin/studios/:id/live": { view: liveSessionView, after: match => photo.enter(match), leave: () => photo.stopTimers() },
+    "/admin/studios/:id/live": {
+      view: liveSessionView,
+      after: match => photo.enter(match),
+      leave: () => photo.stopTimers(),
+    },
     "/admin/bookings": { view: adminBookingsView, after: () => adminBooking.load() },
     "/admin/props": { view: propertiesView, after: () => admin.loadProperties() },
     "/admin/poses": { view: posesView, after: () => admin.loadPoses() },

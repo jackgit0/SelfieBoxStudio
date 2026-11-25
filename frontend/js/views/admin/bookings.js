@@ -35,7 +35,12 @@ function checkInBox(detail) {
     </div>`;
   }
   return html`<div class="cibox">
-    <button class="btn sm" data-action="adminBooking:checkIn" data-id="${detail.id}" ${detail.checkin_block ? "disabled" : ""}>
+    <button
+      class="btn sm"
+      data-action="adminBooking:checkIn"
+      data-id="${detail.id}"
+      ${detail.checkin_block ? "disabled" : ""}
+    >
       ${icon("check", 16)} Check-in
     </button>
     <span class="sm m">${detail.checkin_block ? detail.checkin_block + "." : "Pelanggan sudah datang di studio."}</span>
@@ -58,9 +63,9 @@ function bookingRows(rows, openId) {
       <td>${booking.slot}</td>
       <td class="bx">${formatRupiah(booking.amount)}</td>
       <td>
-        ${statusTag(booking.status)}${checkedInTag(booking)}${booking.cancel_reason
-          ? html`<br /><small class="m">${booking.cancel_reason}</small>`
-          : ""}
+        ${statusTag(booking.status)}${checkedInTag(booking)}${
+          booking.cancel_reason ? html`<br /><small class="m">${booking.cancel_reason}</small>` : ""
+        }
       </td>
       <td class="bx">
         ${PAYMENT_LABELS[booking.pay_status] || "-"}${booking.method ? html`<br /><small class="m">${booking.method}</small>` : ""}

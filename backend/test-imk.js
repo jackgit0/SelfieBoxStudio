@@ -92,7 +92,9 @@ CREATE TABLE IF NOT EXISTS setup_preference(user_id INTEGER PRIMARY KEY REFERENC
     ok(JS.includes('Background dan aksesori yang tersedia di studio ini.'), 'frontend: subjudul Properti baru');
     for (const s of ['promoAdd', 'promoToggle', 'promoDel', '/admin/promos', 'add_ons', 'Kode promo', 'Harga add-on', 'add-on', 'promo_disc']) ok(!JS.includes(s), `frontend tanpa "${s}" (sisi admin)`);
     for (const s of ['previewHTML', 'setupItems']) ok(!JS.includes(s), `frontend tanpa "${s}" (sesi foto)`);
-    ok(JS.includes('Background dan properti tersedia di studio'), 'frontend: kartu Background & Properti sesi foto berisi satu kalimat statis');
+    ok(!JS.includes('Background dan properti tersedia di studio'), 'frontend: kalimat statis Background & Properti diganti pemilih background di tablet studio');
+    for (const s of ['TIMER', 'PILIH', 'Ganti Background', 'Panggil Staff', 'Akhiri Sesi', 'photo:setTimer', 'photo:pickBackground']) ok(JS.includes(s), `frontend Session Assistant tablet memuat "${s}" (Figma camera preview / background)`);
+    for (const s of ['staffToggle', 'Mode Staf', 'X-Staff-Token', 'Kendali Staf', '/staff/login']) ok(!JS.includes(s), `frontend tanpa "${s}" (Mode Staf dihapus)`);
     for (const s of ['promoCode', 'VIBES']) ok(!JS.includes(s), `frontend tanpa "${s}" (inti)`); ok(!JS.includes('VIBES'), 'frontend tanpa VIBES (boot)');
     ok(!/kode promo/i.test(JS), 'frontend tanpa sebutan kode promo (landing)');
     for (const s of ['.pchk', '.pv{', '.prop.on']) ok(!CSS.includes(s), `CSS tanpa "${s}"`); }
@@ -228,8 +230,8 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
 
   // ===== Refactor MVC fase 4: shell tanpa dialog bawaan browser (decisions.md 4, 27, 41) =====
   { const JS = allJs();
-    ok(!/\bprompt\(/.test(JS), 'frontend: tanpa prompt() bawaan browser (PIN staf lewat modal)');
-    for (const s of ['Masuk Mode Staf', 'Masukkan PIN staf', 'inputmode="numeric"', 'Hubungi Customer Service', 'Silakan hubungi staf di studio atau kontak Customer Service Anda.']) ok(JS.includes(s), `frontend memuat "${s}"`);
+    ok(!/\bprompt\(/.test(JS), 'frontend: tanpa prompt() bawaan browser (password admin di tablet studio lewat modal)');
+    for (const s of ['Password admin', 'autocomplete="current-password"', 'Hubungi Customer Service', 'Silakan hubungi staf di studio atau kontak Customer Service Anda.']) ok(JS.includes(s), `frontend memuat "${s}"`);
   }
 
   // ===== Refactor MVC fase 6: teks modal pengganti confirm() di sisi pelanggan (decisions.md 4, 27, 57; tanpa confirm() dicek di blok fase 8a–8b untuk semua berkas) =====
@@ -241,7 +243,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
   { const JS = allJs();
     ok(!/\balert\(/.test(JS), 'frontend: tanpa alert() bawaan browser');
     ok(!/gradient/i.test(JS), 'frontend (JS): tanpa gradient sama sekali, juga foto simulasi canvas di sesi foto (decisions.md 64)');
-    for (const s of ['Konfirmasi Hentikan Sesi', 'Hentikan sesi?', 'Konfirmasi Hapus Foto', 'Hapus foto ini secara permanen?', 'foto terpilih secara permanen? Foto favorit tidak ikut terhapus.', 'Foto Gagal Dihapus']) ok(JS.includes(s), `frontend memuat "${s}"`);
+    for (const s of ['Akhiri sesi sekarang?', 'Sisa waktu sesi tidak dapat dikembalikan', 'Konfirmasi Hapus Foto', 'Hapus foto ini secara permanen?', 'foto terpilih secara permanen? Foto favorit tidak ikut terhapus.', 'Foto Gagal Dihapus']) ok(JS.includes(s), `frontend memuat "${s}"`);
   }
   // ===== Refactor MVC fase 8a–8b: panel admin tanpa confirm() bawaan browser (decisions.md 4, 27) =====
   { const JS = allJs();

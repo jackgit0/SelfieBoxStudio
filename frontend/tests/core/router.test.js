@@ -25,10 +25,10 @@ const expected = [
   ["/account", "account", {}, { tab: "profile" }],
   ["/account/payments", "account", {}, { tab: "pay" }],
   ["/gallery", "gallery", {}],
-  ["/sessions/41", "session", { id: "41" }],
   ["/admin", "adash", {}],
   ["/admin/users", "acust", {}],
   ["/admin/studios", "astudio", {}],
+  ["/admin/studios/3/live", "alive", { id: "3" }],
   ["/admin/bookings", "abook", {}],
   ["/admin/props", "aprop", {}],
   ["/admin/poses", "apose", {}],
@@ -64,8 +64,8 @@ test("match: path tak dikenal atau parameter kosong → null", () => {
 
 test("setiap rute punya akses yang sah, judul dan tab seperti TITLES/TABGROUP lama", () => {
   for (const route of ROUTES) assert.ok(["public", "guest", "customer", "admin"].includes(route.access), route.path);
-  const titles = { home: "Browse", packages: "Pilihan Paket", studio: "Studio", time: "Pilih Waktu", pay: "Pembayaran", my: "Booking Saya", bdetail: "Detail Booking", cancel: "Pembatalan", refund: "Refund", success: "Booking", rescheduled: "Reschedule", gallery: "Galeri", session: "Sesi Foto", account: "Akun" };
-  const tabs = { home: ["home", "packages", "studio", "time", "pay", "success", "rescheduled"], my: ["my", "bdetail", "cancel", "refund"], gallery: ["gallery", "session"] };
+  const titles = { home: "Browse", packages: "Pilihan Paket", studio: "Studio", time: "Pilih Waktu", pay: "Pembayaran", my: "Booking Saya", bdetail: "Detail Booking", cancel: "Pembatalan", refund: "Refund", success: "Booking", rescheduled: "Reschedule", gallery: "Galeri", alive: "Session Assistant", account: "Akun" };
+  const tabs = { home: ["home", "packages", "studio", "time", "pay", "success", "rescheduled"], my: ["my", "bdetail", "cancel", "refund"], gallery: ["gallery"] };
   for (const route of ROUTES) {
     if (titles[route.name]) assert.equal(route.title, titles[route.name], route.path);
     const tab = Object.keys(tabs).find(key => tabs[key].includes(route.name)) || null;
@@ -77,7 +77,7 @@ test("setiap rute punya akses yang sah, judul dan tab seperti TITLES/TABGROUP la
 
 // salinan aturan render() lama: S.view diganti view akhir
 const GUEST_VIEWS = ["auth", "landing", "home", "packages", "studio", "time", "pay"];
-const ADMIN_VIEWS = ["adash", "acust", "astudio", "abook", "aprop", "apose", "atrx", "apkg", "aacct"];
+const ADMIN_VIEWS = ["adash", "acust", "astudio", "alive", "abook", "aprop", "apose", "atrx", "apkg", "aacct"]; // + alive: Session Assistant di tablet studio (sejak sesi foto dijalankan admin)
 function oldRender(view, S, AD) {
   if (!S.me && !GUEST_VIEWS.includes(view)) view = "landing";
   if (S.admin && !ADMIN_VIEWS.includes(view)) view = "adash";
@@ -116,7 +116,7 @@ test("guard: contoh dari test-map (tamu di /bookings → /, customer di /admin/s
   const guest = { loggedIn: false, admin: false, mustChange: false };
   const customer = { loggedIn: true, admin: false, mustChange: false };
   const admin = { loggedIn: true, admin: true, mustChange: false };
-  for (const path of ["/bookings", "/account", "/gallery", "/bookings/3", "/sessions/1", "/admin"]) assert.equal(guard(match(path), guest), "/", path);
+  for (const path of ["/bookings", "/account", "/gallery", "/bookings/3", "/admin/studios/1/live", "/admin"]) assert.equal(guard(match(path), guest), "/", path);
   for (const path of ["/browse", "/studios/1", "/packages", "/book/time", "/book/pay", "/login", "/register", "/forgot-password", "/reset-password", "/"]) assert.equal(guard(match(path), guest), null, path);
   assert.equal(guard(match("/admin/studios"), customer), "/browse");
   assert.equal(guard(match("/browse"), admin), "/admin");
@@ -290,33 +290,34 @@ test("leave() rute sebelumnya berjalan sebelum after() rute berikutnya", () => {
   router = createRouter({ routes: hookedRoutes(log), history: browser.history, location: browser.location, events: browser.events, getSession: () => session, onChange: render });
   router.start();
   render();
-  router.navigate("/sessions/41");
+  router.navigate("/bookings/41");
   router.navigate("/gallery");
-  assert.deepEqual(log, ["after /", "leave /", "after /sessions/41", "leave /sessions/41", "after /gallery"]);
+  assert.deepEqual(log, ["after /", "leave /", "after /bookings/41", "leave /bookings/41", "after /gallery"]);
 });
 
 test("leave() tidak berjalan saat rute yang sama dirender ulang, tetapi berjalan saat id path berubah", () => {
-  const browser = fakeBrowser("/sessions/1");
+  const browser = fakeBrowser("/admin/studios/1/live");
   const log = [];
-  const { router } = routerFor(browser, { loggedIn: true, admin: false, mustChange: false }, { routes: hookedRoutes(log) });
+  const { router } = routerFor(browser, { loggedIn: true, admin: true, mustChange: false }, { routes: hookedRoutes(log) });
   router.start();
   router.resolve();
   router.resolve();
   assert.deepEqual(log, []);
-  router.navigate("/sessions/2");
+  router.navigate("/admin/studios/2/live");
   router.resolve();
-  assert.deepEqual(log, ["leave /sessions/1"]);
+  assert.deepEqual(log, ["leave /admin/studios/1/live"]);
 });
 
-test("leave() juga berjalan saat guard mengalihkan (keluar dari sesi foto → landing)", () => {
-  const browser = fakeBrowser("/sessions/1");
+test("leave() juga berjalan saat guard mengalihkan (admin keluar dari layar tablet → landing: kamera dan timer berhenti)", () => {
+  const browser = fakeBrowser("/admin/studios/1/live");
   const log = [];
-  const session = { loggedIn: true, admin: false, mustChange: false };
+  const session = { loggedIn: true, admin: true, mustChange: false };
   const { router } = routerFor(browser, session, { routes: hookedRoutes(log) });
   router.start();
   router.resolve();
   session.loggedIn = false;
+  session.admin = false;
   router.resolve();
-  assert.deepEqual(log, ["leave /sessions/1"]);
+  assert.deepEqual(log, ["leave /admin/studios/1/live"]);
   assert.equal(router.current().path, "/");
 });

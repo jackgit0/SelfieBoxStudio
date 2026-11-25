@@ -1,5 +1,5 @@
 // AuthController: Masuk/Daftar/Lupa Sandi/Buat Sandi Baru, masuk admin, keluar dan pemulihan login saat aplikasi dibuka
-// (dulu reg, login, adminLogin, afterAuth, forgot, doReset, logout di core.js dan isi boot.js; Mode Staf dihapus, sesi foto dijalankan admin dari tablet studio).
+// (dulu reg, login, adminLogin, afterAuth, forgot, doReset, logout di core.js dan isi boot.js; PIN staf dihapus, sesi foto dijalankan admin dari tablet studio).
 // Metode form menerima isian sebagai objek biasa (main.js: formValues, decisions.md 54); galat tampil sebagai toast di kartu form,
 // dan isian yang diketik (bukan password) tetap ada setelah galat.
 // booking = BookingController (refreshData, resumeDraft, clearBooking); accessDenied = dialog Akses ditolak (AdminController.showAccessDenied).

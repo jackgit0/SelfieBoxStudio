@@ -20,7 +20,16 @@ export function createPhotoState() {
     countTimer: null,
     stream: null,
     // studioId, data = jawaban /live, error, ended = { customer }, cameras, selfTimer, backgrounds = { [sessionId]: propertyId }, counting
-    live: { studioId: null, data: null, error: "", ended: null, cameras: null, selfTimer: 3, backgrounds: {}, counting: false },
+    live: {
+      studioId: null,
+      data: null,
+      error: "",
+      ended: null,
+      cameras: null,
+      selfTimer: 3,
+      backgrounds: {},
+      counting: false,
+    },
   };
 }
 

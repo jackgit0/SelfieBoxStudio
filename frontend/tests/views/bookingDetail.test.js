@@ -9,9 +9,10 @@ const now = new Date(2026, 10, 25, 9, 30);
 const links = { invoiceUrl: (id, download) => `/api/bookings/${id}/invoice?t=tok${download ? "&dl=1" : ""}` };
 const matchFor = id => ({ route: { name: "bdetail" }, params: { id: flat(id) }, query: {}, path: `/bookings/${id}` });
 const base = { id: 12, user_id: 5, studio: 1, package_id: 2, date: "2026-11-27 10:00", paid_at: Date.UTC(2026, 10, 25, 3, 4, 5), pay_status: "paid", method: "QRIS", studio_fee: 0, subtotal: 90000, main_disc: 0, amount: 90000, paid: 1 };
-function view(fields = {}, id = 12) {
+function view(fields = {}, id = 12, sessions = []) {
   const value = sampleState({ persisted: { me: 5 } });
   value.data.bookings = [{ ...base, ...fields }];
+  value.data.sessions = sessions;
   return flat(bookingDetailView(value, matchFor(id), links, now));
 }
 
@@ -22,12 +23,13 @@ test("bookingDetail: tidak ditemukan → kembali ke Booking Saya", () => {
   assert.match(flat(markup), /<button class="back" data-route="\/bookings"><svg[^]*?<\/svg> Kembali<\/button><div class="card">Booking tidak ditemukan\.<\/div>/);
 });
 
-test("bookingDetail: Terbayar → Reschedule, Batalkan, Check-in; tautan studio; detail + invoice", () => {
+test("bookingDetail: Terbayar → Reschedule, Batalkan, petunjuk check-in di meja depan; tautan studio; detail + invoice", () => {
   const text = view({ status: "Terbayar" });
   assert.match(text, /<button class="back" data-route="\/bookings"><svg[^]*?<\/svg> Booking Saya<\/button>/);
   assert.match(text, /<a href="\/studios\/1" data-route="\/studios\/1" style="color:inherit;text-decoration:none">Melati <svg/);
   assert.match(text, /<button class="btn sm" data-action="booking:startReschedule" data-id="12">Reschedule<\/button><button class="btn sm ghost" data-action="booking:openCancel" data-id="12">Batalkan<\/button>/);
-  assert.match(text, /<button class="btn sm soft" data-action="photo:start" data-id="12"><svg[^]*?<\/svg> Check-in & Mulai Sesi<\/button>/);
+  assert.match(text, /<div class="card sessnote row sp"><span><svg[^]*?<\/svg> Tunjukkan booking ini di meja depan studio untuk check-in pada hari sesi\.<\/span><\/div>/);
+  assert.doesNotMatch(text, /photo:start|photo:open|Mulai Sesi/);
   assert.doesNotMatch(text, /payment:payNow/);
   assert.match(text, /<span>Studio<\/span><b>Melati<\/b>/);
   assert.match(text, /<span>Metode<\/span><b>QRIS<\/b>/);
@@ -51,8 +53,19 @@ test("bookingDetail: belum dibayar dan lewat batas → Dibatalkan, tanpa tombol 
   assert.doesNotMatch(text, /payment:payNow|booking:openCancel/);
 });
 
-test("bookingDetail: Sesi Berjalan → Buka Sesi; Dibatalkan → alasan, tanpa invoice", () => {
-  assert.match(view({ status: "Sesi Berjalan" }), /<button class="btn sm soft" data-action="photo:open">Buka Sesi<\/button>/);
+test("bookingDetail: sudah check-in → tanpa Reschedule/Batalkan, sesi dimulai dari tablet; Sesi Berjalan → sisa waktu; Selesai → Galeri", () => {
+  const checkedIn = view({ status: "Terbayar", checked_in_at: now.getTime() });
+  assert.doesNotMatch(checkedIn, /booking:startReschedule|booking:openCancel/);
+  assert.match(checkedIn, /Sudah check-in\. Sesi foto dimulai dari tablet di Melati\./);
+  assert.match(checkedIn, /<span class="tag ok">Terbayar<\/span> <span class="tag ok">Sudah check-in<\/span>/);
+  const running = view({ status: "Sesi Berjalan" }, 12, [{ id: 41, booking_id: 12, status: "Aktif", left: 605, photos: [] }]);
+  assert.match(running, /Sesi berjalan di Melati · sisa 10:05/);
+  assert.doesNotMatch(running, /photo:open|Buka Sesi/);
+  const done = view({ status: "Selesai" }, 12, [{ id: 41, booking_id: 12, status: "Selesai", left: 0, photos: [] }]);
+  assert.match(done, /Sesi foto selesai\. Pilih dan unduh fotomu di Galeri\.<\/span><button class="btn sm soft" data-route="\/gallery"><svg[^]*?<\/svg> Buka Galeri<\/button>/);
+});
+
+test("bookingDetail: Dibatalkan → alasan, tanpa invoice", () => {
   const cancelled = view({ status: "Dibatalkan", cancel_reason: "Tidak ada <waktu>" });
   assert.match(cancelled, /<hr><div class="kv"><span>Alasan pembatalan<\/span><b>Tidak ada &lt;waktu&gt;<\/b><\/div>/);
   assert.doesNotMatch(cancelled, /Unduh invoice|data-action="booking:/);

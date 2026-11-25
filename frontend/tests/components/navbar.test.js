@@ -5,8 +5,8 @@ import { navbar, bottomBar } from "../../js/components/navbar.js";
 import { flat } from "../helpers/markup.js";
 
 const browse = { title: "Browse", tab: "home" };
-const guest = { user: null, staff: false };
-const customer = { user: { name: "Dewi <b>" }, staff: false };
+const guest = { user: null };
+const customer = { user: { name: "Dewi <b>" } };
 
 const tabRoutes = markup => [...flat(markup).matchAll(/<button class="tab[^"]*" data-route="([^"]+)">/g)].map(found => found[1]);
 
@@ -41,23 +41,17 @@ test("tab yang menyala mengikuti tab rute; judul seluler dari rute", () => {
   assert.equal((flat(navbar({ title: "Akun", tab: null }, customer)).match(/class="tab on"/g) || []).length, 0);
 });
 
-test("menu akun: Pengaturan Akun, Riwayat Pembayaran, Mode Staf, Keluar lewat data-*", () => {
+test("menu akun: Pengaturan Akun, Riwayat Pembayaran, Keluar lewat data-*; Mode Staf sudah dihapus", () => {
   const text = flat(navbar(browse, customer));
   assert.match(text, /<button class="avatar" aria-label="Menu akun" aria-haspopup="true" aria-expanded="false" data-action="ui:toggleMenu">/);
   assert.match(text, /<div id="menu" class="menu" hidden>/);
   assert.match(text, /data-route="\/account">[^]*?Pengaturan Akun<\/button>/);
   assert.match(text, /data-route="\/account\/payments">[^]*?Riwayat Pembayaran<\/button>/);
-  assert.match(text, /data-action="auth:staffToggle">[^]*? Mode Staf<\/button>/);
+  assert.doesNotMatch(text, /Staf|staffToggle/);
   assert.match(text, /data-action="auth:logout">[^]*?Keluar<\/button>/);
   assert.doesNotMatch(text, /onclick=/);
 });
 
-test("Mode Staf aktif: tanda Staf dan tombol Nonaktifkan Mode Staf", () => {
-  const text = flat(navbar(browse, { ...customer, staff: true }));
-  assert.match(text, /<span class="tag warn">Staf<\/span>/);
-  assert.match(text, /Nonaktifkan Mode Staf<\/button>/);
-  assert.doesNotMatch(flat(navbar(browse, customer)), /tag warn/);
-});
 
 test("bilah bawah: tiga tab, yang menyala dari rute, tamu ke /login", () => {
   const text = flat(bottomBar({ tab: "gallery" }, customer));

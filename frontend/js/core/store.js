@@ -8,7 +8,7 @@
 const PERSISTED = "persisted";
 // kunci state lama yang dibuang saat dimuat: kuis rekomendasi paket dan pilihan properti (fitur sudah dihapus),
 // booking dan sesi foto (dulu disimpan di state, kini di slice data), halaman aktif view/p (sejak fase 3 dari URL lewat router),
-// serta Mode Staf dan lognya (dihapus: sesi foto kini dijalankan admin dari tablet studio)
+// serta PIN staf dan lognya (staff, log; dihapus: sesi foto kini dijalankan admin dari tablet studio)
 const DROPPED_KEYS = ["quiz", "setup", "bookings", "sessions", "view", "p", "staff", "log"];
 
 export function migrateSaved(saved) {
