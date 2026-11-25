@@ -11,6 +11,7 @@ backend/   server.js (REST API + file statis) · db.js (skema + migrasi) · mail
            reset-admin.js · reset-db.js · seed-demo.js · test.js · test-admin.js · test-v3.js · test-v4.js
            test-admin-studio.js · test-admin-session.js · test-admin-booking.js (fitur admin studio, sesi, booking)
            test-imk.js (lingkup IMK: tanpa onboarding/promo/add-on, Pilihan Paket, popup booking, Ringkasan Studio, Akses Ditolak)
+docs/      openapi/ (spesifikasi REST API, lihat docs/openapi/README.md) · sitemap/ (sitemap IMK untuk DUMA, lihat docs/sitemap/sitemap.md)
 ```
 
 Frontend memakai struktur MVC dengan modul ES (HTML/CSS/JS murni, tanpa build step); strukturnya dijelaskan di [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md). Kode `frontend/js/` dirapikan dengan Prettier (`cd frontend && npm run format`, lewat `npx` tanpa dependensi terpasang).

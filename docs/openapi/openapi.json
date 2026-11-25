@@ -1,0 +1,6406 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SelfieBox Studio API",
+    "version": "1.0.0",
+    "description": "REST API aplikasi SelfieBox Studio (versi IMK, Kelompok 6), ditulis dari `backend/server.js` apa adanya (bukan dari desain APS yang direvisi).\n\n**Konvensi**\n\n- Body dan respons JSON (`Content-Type: application/json`), kecuali invoice (`text/html`) dan foto (`image/jpeg`). Body pada GET dan DELETE diabaikan.\n\n- Uang dalam rupiah (bilangan bulat). Waktu `*_at`, `start_time`, `end_time`, `expire_at` dalam epoch milidetik. Tanggal dan jam dalam WIB (`TZ_OFFSET_MIN=420`).\n\n- Galat selalu `{ \"error\": \"<pesan>\" }` dengan kode HTTP-nya: 400 data tidak valid / JSON tidak valid, 401 belum login atau token kedaluwarsa, 403 bukan haknya, 404 tidak ada (termasuk `Endpoint tidak ada`), 409 bentrok status, 413 body > 8 MB, 429 terlalu banyak percobaan, 500 `Kesalahan server`.\n\n- Login, daftar, reset sandi, login admin dan ganti akun admin dibatasi `AUTH_RATE_LIMIT` (10) percobaan per IP per menit.\n\n**Autentikasi**: JWT HS256 di header `Authorization: Bearer <token>`; boleh juga sebagai query `?t=<token>` (dipakai untuk `<img>` dan tautan invoice). Peran ada di token: `customer` (24 jam), `admin` (8 jam), `staff` (8 jam). Token yang terbit sebelum password diganti ditolak. Selama admin masih memakai password bawaan, semua endpoint admin selain `/api/admin/me` dan `/api/admin/account` menjawab 403. Ekstensi `x-role` pada tiap operasi menyebut peran yang dibutuhkan.\n\n**Konfirmasi**: hapus studio, ubah/hapus sesi studio, dan hapus booking oleh admin menjawab 409 dengan `needs_confirm: true` dan `impact` sampai dipanggil ulang dengan `?confirm=1`.\n\n**Pembayaran** masih simulasi (tanpa Midtrans); booking belum dibayar dibatalkan otomatis 15 menit setelah dibuat. Email (invoice, notifikasi, reset sandi) dikirim lewat SMTP, atau ditulis ke `backend/outbox/` bila `SMTP_HOST` kosong."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Lokal (npm start)"
+    },
+    {
+      "url": "https://selfieboxstudio.onrender.com",
+      "description": "Render"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Daftar, masuk, lupa sandi (customer)"
+    },
+    {
+      "name": "Master",
+      "description": "Data master dan ketersediaan jam"
+    },
+    {
+      "name": "Booking",
+      "description": "Harga, membuat, mengubah jadwal, dan membatalkan booking"
+    },
+    {
+      "name": "Pembayaran & Invoice",
+      "description": "Pembayaran (simulasi) dan invoice"
+    },
+    {
+      "name": "Profil",
+      "description": "Profil customer"
+    },
+    {
+      "name": "Sesi & Foto",
+      "description": "Sesi foto, pengambilan dan pemilihan foto, galeri"
+    },
+    {
+      "name": "Staf",
+      "description": "Kontrol sesi oleh staf studio"
+    },
+    {
+      "name": "Kontak",
+      "description": "Formulir Contact Us di landing page"
+    },
+    {
+      "name": "Admin Akun",
+      "description": "Login dan akun admin"
+    },
+    {
+      "name": "Admin Pendapatan & Rekap",
+      "description": "Pendapatan dan rekap operasional"
+    },
+    {
+      "name": "Admin Customer",
+      "description": "Data customer"
+    },
+    {
+      "name": "Admin Paket & Diskon",
+      "description": "Paket dan diskon utama"
+    },
+    {
+      "name": "Admin Media",
+      "description": "Unggah gambar"
+    },
+    {
+      "name": "Admin Studio",
+      "description": "Studio (soft delete dengan konfirmasi)"
+    },
+    {
+      "name": "Admin Sesi Studio",
+      "description": "Sesi studio yang dibuat admin"
+    },
+    {
+      "name": "Admin Properti",
+      "description": "Properti studio"
+    },
+    {
+      "name": "Admin Pose",
+      "description": "Referensi pose"
+    },
+    {
+      "name": "Admin Booking",
+      "description": "Booking (detail, ubah, batal, hapus)"
+    },
+    {
+      "name": "Admin Transaksi",
+      "description": "Transaksi pembayaran"
+    }
+  ],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "register",
+        "summary": "Daftar akun customer",
+        "description": "Email disimpan huruf kecil; email dan telepon harus unik (409).\n\nPublik (tanpa login).",
+        "x-role": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Akun dibuat, langsung masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "login",
+        "summary": "Masuk sebagai customer",
+        "description": "Publik (tanpa login).",
+        "x-role": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          }
+        }
+      }
+    },
+    "/api/auth/forgot": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "forgotPassword",
+        "summary": "Minta tautan atur ulang sandi",
+        "description": "Bila email terdaftar, tautan `BASE_URL/#reset=<token>` (berlaku 30 menit) dikirim lewat email. Permintaan baru membatalkan token lama.\n\nPublik (tanpa login).",
+        "x-role": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Selalu pesan yang sama, terdaftar atau tidak (anti enumerasi)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOk"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          }
+        }
+      }
+    },
+    "/api/auth/reset": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "resetPassword",
+        "summary": "Atur ulang sandi dengan token",
+        "description": "Semua token login lama customer itu tidak berlaku lagi.\n\nPublik (tanpa login).",
+        "x-role": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          }
+        }
+      }
+    },
+    "/api/master": {
+      "get": {
+        "tags": [
+          "Master"
+        ],
+        "operationId": "getMaster",
+        "summary": "Data master (paket, studio, properti, pose, diskon)",
+        "description": "Publik (tanpa login).",
+        "x-role": "public",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Data master",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Master"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/availability": {
+      "get": {
+        "tags": [
+          "Master"
+        ],
+        "operationId": "getAvailability",
+        "summary": "Jam kosong sebuah studio pada satu tanggal",
+        "description": "Booking belum dibayar yang lewat batas waktu dibatalkan dulu. Studio UNAVAILABLE/dihapus → 400.\n\nPublik (tanpa login).",
+        "x-role": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "studio_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Jam mulai yang kosong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Availability"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/quote": {
+      "post": {
+        "tags": [
+          "Booking"
+        ],
+        "operationId": "quote",
+        "summary": "Pratinjau total harga",
+        "description": "Total = harga paket − diskon utama + biaya studio. Fungsi yang sama dipakai saat booking dibuat.\n\nPublik (tanpa login).",
+        "x-role": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rincian harga",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/bookings": {
+      "get": {
+        "tags": [
+          "Booking"
+        ],
+        "operationId": "listMyBookings",
+        "summary": "Daftar booking milik customer",
+        "description": "Perlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Terbaru dulu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Booking"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Booking"
+        ],
+        "operationId": "createBooking",
+        "summary": "Buat booking",
+        "description": "Satu transaksi: booking + sesi (slot) + pembayaran `pending` yang kedaluwarsa 15 menit. Slot boleh sudah mulai paling lama 50 menit lalu. Slot terisi → 409.\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Booking dibuat (Menunggu Pembayaran) beserta sesi dan pembayaran pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/bookings/{id}/pay": {
+      "post": {
+        "tags": [
+          "Pembayaran & Invoice"
+        ],
+        "operationId": "payBooking",
+        "summary": "Bayar booking (simulasi)",
+        "description": "Pembayaran disimulasikan (tanpa gateway). Invoice dikirim otomatis ke email customer. Booking yang kedaluwarsa atau sudah dibayar → 409.\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Booking Terbayar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/bookings/{id}/invoice": {
+      "get": {
+        "tags": [
+          "Pembayaran & Invoice"
+        ],
+        "operationId": "getInvoice",
+        "summary": "Invoice HTML",
+        "description": "Hanya setelah dibayar dan tidak dibatalkan. `?dl=1` → diunduh sebagai `INV-....html`.\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "tokenQuery": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/dl"
+          },
+          {
+            "$ref": "#/components/parameters/t"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Halaman invoice",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/bookings/{id}/invoice/email": {
+      "post": {
+        "tags": [
+          "Pembayaran & Invoice"
+        ],
+        "operationId": "emailInvoice",
+        "summary": "Kirim ulang invoice ke email",
+        "description": "Perlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Terkirim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEmailResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "502": {
+            "$ref": "#/components/responses/MailFailed"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/bookings/{id}": {
+      "patch": {
+        "tags": [
+          "Booking"
+        ],
+        "operationId": "rescheduleBooking",
+        "summary": "Ubah jadwal booking",
+        "description": "Untuk booking Menunggu Pembayaran atau Terbayar, tanpa batas waktu; boleh pindah studio. Slot baru terisi → 409.\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Booking dengan jadwal baru",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Booking"
+        ],
+        "operationId": "deleteMyBooking",
+        "summary": "Batalkan booking (lama, tanpa refund)",
+        "description": "Endpoint lama: status menjadi Dibatalkan tanpa alasan dan tanpa refund. UI memakai `POST /api/bookings/{id}/cancel`.\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/bookings/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Booking"
+        ],
+        "operationId": "cancelMyBooking",
+        "summary": "Batalkan booking dengan alasan + refund",
+        "description": "Untuk booking Menunggu Pembayaran atau Terbayar. Bila sudah dibayar: refund berhasil hanya bila sesi masih ≥ `REFUND_MIN_HOURS` (2) jam lagi; selain itu `refund_failed` (dana tidak dikembalikan).\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Booking dibatalkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/me": {
+      "get": {
+        "tags": [
+          "Profil"
+        ],
+        "operationId": "getProfile",
+        "summary": "Profil customer",
+        "description": "Perlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Profil"
+        ],
+        "operationId": "updateProfile",
+        "summary": "Ubah nama dan telepon",
+        "description": "Email tidak dapat diubah. Telepon dipakai akun lain → 409.\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profil baru",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/bookings/{id}/start": {
+      "post": {
+        "tags": [
+          "Sesi & Foto"
+        ],
+        "operationId": "startSession",
+        "summary": "Mulai sesi foto",
+        "description": "Booking harus Terbayar; status menjadi Sesi Berjalan dan timer berjalan selama durasi paket.\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sesi aktif",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/sessions": {
+      "get": {
+        "tags": [
+          "Sesi & Foto"
+        ],
+        "operationId": "listMySessions",
+        "summary": "Sesi foto aktif dan selesai milik customer",
+        "description": "Perlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar sesi (galeri)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Session"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}": {
+      "get": {
+        "tags": [
+          "Sesi & Foto"
+        ],
+        "operationId": "getSession",
+        "summary": "Detail sesi foto",
+        "description": "Perlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sesi; yang waktunya habis otomatis Selesai",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/sessions/{id}/photos": {
+      "post": {
+        "tags": [
+          "Sesi & Foto"
+        ],
+        "operationId": "uploadPhoto",
+        "summary": "Simpan foto hasil kamera",
+        "description": "Sesi harus aktif dan tidak dijeda. Kuota pengambilan = 2 × jumlah foto paket (409 bila habis).\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Foto tersimpan (berlaku 30 hari)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Photo"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/photos/{id}": {
+      "patch": {
+        "tags": [
+          "Sesi & Foto"
+        ],
+        "operationId": "updatePhoto",
+        "summary": "Tandai favorit, pilih, atau status Drive",
+        "description": "Perlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Sesi & Foto"
+        ],
+        "operationId": "deletePhoto",
+        "summary": "Hapus satu foto",
+        "description": "Perlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/photos/bulk-delete": {
+      "post": {
+        "tags": [
+          "Sesi & Foto"
+        ],
+        "operationId": "bulkDeletePhotos",
+        "summary": "Hapus banyak foto",
+        "description": "Foto favorit dan id milik orang lain dilewati.\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDeleteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ringkasan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkDeleteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/confirm": {
+      "post": {
+        "tags": [
+          "Sesi & Foto"
+        ],
+        "operationId": "confirmSelection",
+        "summary": "Konfirmasi pilihan foto",
+        "description": "Minimal satu foto terpilih dan tidak melebihi jumlah foto paket (422).\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/photos/{id}/image": {
+      "get": {
+        "tags": [
+          "Sesi & Foto"
+        ],
+        "operationId": "getPhotoImage",
+        "summary": "File foto (JPEG)",
+        "description": "`?dl=1` (unduh) hanya untuk foto terpilih pada sesi yang sudah dikonfirmasi (403). Foto lewat 30 hari → 410.\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "tokenQuery": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/dl"
+          },
+          {
+            "$ref": "#/components/parameters/t"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gambar JPEG",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "410": {
+            "$ref": "#/components/responses/Gone"
+          }
+        }
+      }
+    },
+    "/api/staff/login": {
+      "post": {
+        "tags": [
+          "Staf"
+        ],
+        "operationId": "staffLogin",
+        "summary": "Masuk staf dengan PIN",
+        "description": "Dilakukan dari perangkat customer yang sedang login (token customer wajib). PIN dari `STAFF_PIN`.\n\nPerlu token customer.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffLoginInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token staf",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffToken"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/control": {
+      "post": {
+        "tags": [
+          "Staf"
+        ],
+        "operationId": "controlSession",
+        "summary": "Jeda, lanjutkan, atau hentikan sesi",
+        "description": "`resume` memperpanjang waktu selesai sebanyak lama jeda; `stop` menyelesaikan sesi dan booking. Sesi siapa pun (bukan hanya milik customer itu).\n\nPerlu token customer **dan** header `X-Staff-Token`.",
+        "x-role": "customer",
+        "security": [
+          {
+            "bearerAuth": [],
+            "staffToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionControlInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesi setelah aksi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/contact": {
+      "post": {
+        "tags": [
+          "Kontak"
+        ],
+        "operationId": "sendContact",
+        "summary": "Kirim pesan Contact Us",
+        "description": "Dikirim ke `CONTACT_EMAIL` / `MAIL_FROM` / `SMTP_USER`. Batas 5 pesan per menit per IP.\n\nPublik (tanpa login).",
+        "x-role": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pesan terkirim ke email admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOk"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "502": {
+            "$ref": "#/components/responses/MailFailed"
+          }
+        }
+      }
+    },
+    "/api/admin/login": {
+      "post": {
+        "tags": [
+          "Admin Akun"
+        ],
+        "operationId": "adminLogin",
+        "summary": "Masuk sebagai admin",
+        "description": "5 kali salah → akun terkunci 15 menit (429).\n\nPublik (tanpa login).",
+        "x-role": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminLoginInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          }
+        }
+      }
+    },
+    "/api/admin/me": {
+      "get": {
+        "tags": [
+          "Admin Akun"
+        ],
+        "operationId": "adminMe",
+        "summary": "Akun admin yang login",
+        "description": "Tetap bisa dipanggil saat password bawaan belum diganti.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Akun",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMe"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/account": {
+      "patch": {
+        "tags": [
+          "Admin Akun"
+        ],
+        "operationId": "updateAdminAccount",
+        "summary": "Ganti username dan/atau password admin",
+        "description": "Tetap bisa dipanggil saat password bawaan belum diganti. Mengganti password mencabut semua token admin lama.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminAccountInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tersimpan; pakai token baru",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccountResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Password saat ini salah, atau token bukan admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          }
+        }
+      }
+    },
+    "/api/admin/revenue": {
+      "get": {
+        "tags": [
+          "Admin Pendapatan & Rekap"
+        ],
+        "operationId": "getRevenue",
+        "summary": "Ringkasan pendapatan",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pendapatan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Revenue"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/ops": {
+      "get": {
+        "tags": [
+          "Admin Pendapatan & Rekap"
+        ],
+        "operationId": "getOps",
+        "summary": "Rekap operasional (omset kotor, biaya, omset bersih)",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month",
+                "all"
+              ],
+              "default": "month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rekap",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpsSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin Pendapatan & Rekap"
+        ],
+        "operationId": "createOpsItem",
+        "summary": "Tambah item biaya/pemasukan",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Id item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/ops/{id}": {
+      "patch": {
+        "tags": [
+          "Admin Pendapatan & Rekap"
+        ],
+        "operationId": "updateOpsItem",
+        "summary": "Ubah item rekap",
+        "description": "Semua field wajib dikirim ulang.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Admin Pendapatan & Rekap"
+        ],
+        "operationId": "deleteOpsItem",
+        "summary": "Hapus item rekap",
+        "description": "Id yang tidak ada tetap 200.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/customers": {
+      "get": {
+        "tags": [
+          "Admin Customer"
+        ],
+        "operationId": "listCustomers",
+        "summary": "Daftar customer",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Terbaru dulu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerRow"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/customers/{id}/bookings": {
+      "get": {
+        "tags": [
+          "Admin Customer"
+        ],
+        "operationId": "listCustomerBookings",
+        "summary": "Booking seorang customer",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer + booking",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerBookings"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/customers/{id}/photos": {
+      "get": {
+        "tags": [
+          "Admin Customer"
+        ],
+        "operationId": "listCustomerPhotos",
+        "summary": "Foto seorang customer",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer + foto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerPhotos"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/photos/{id}/image": {
+      "get": {
+        "tags": [
+          "Admin Customer"
+        ],
+        "operationId": "adminGetPhotoImage",
+        "summary": "File foto customer (JPEG)",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "tokenQuery": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/t"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gambar JPEG",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/admin/customers/{id}": {
+      "delete": {
+        "tags": [
+          "Admin Customer"
+        ],
+        "operationId": "deleteCustomer",
+        "summary": "Hapus customer beserta seluruh datanya",
+        "description": "Hapus permanen: foto (file juga), log staf, sesi, pembayaran, booking, token reset, akun. Tanpa konfirmasi di server.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Terhapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDeleteResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/packages": {
+      "get": {
+        "tags": [
+          "Admin Paket & Diskon"
+        ],
+        "operationId": "listPackages",
+        "summary": "Semua paket",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aktif dulu, urut harga",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Package"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin Paket & Diskon"
+        ],
+        "operationId": "createPackage",
+        "summary": "Tambah paket",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PackageInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Id paket",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/admin/packages/{id}": {
+      "patch": {
+        "tags": [
+          "Admin Paket & Diskon"
+        ],
+        "operationId": "updatePackage",
+        "summary": "Ubah paket / aktif-nonaktif",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PackagePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Admin Paket & Diskon"
+        ],
+        "operationId": "deletePackage",
+        "summary": "Hapus paket",
+        "description": "Paket yang sudah dipakai booking hanya dinonaktifkan. Paket aktif terakhir tidak dapat dihapus (409).\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dihapus atau dinonaktifkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageDeleteResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/discount": {
+      "get": {
+        "tags": [
+          "Admin Paket & Diskon"
+        ],
+        "operationId": "getDiscount",
+        "summary": "Diskon utama",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diskon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Discount"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin Paket & Diskon"
+        ],
+        "operationId": "setDiscount",
+        "summary": "Atur diskon utama (persen untuk semua paket)",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscountInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/media": {
+      "post": {
+        "tags": [
+          "Admin Media"
+        ],
+        "operationId": "uploadMedia",
+        "summary": "Unggah gambar (studio/properti)",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "URL gambar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          }
+        }
+      }
+    },
+    "/api/admin/studios": {
+      "get": {
+        "tags": [
+          "Admin Studio"
+        ],
+        "operationId": "listStudios",
+        "summary": "Studio yang belum dihapus",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Studio + jumlah booking/sesi + dampak hapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminStudio"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin Studio"
+        ],
+        "operationId": "createStudio",
+        "summary": "Tambah studio",
+        "description": "Nama dipakai studio lain yang belum dihapus → 409. Gambar tidak wajib di API (UI mewajibkannya).\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Id studio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/admin/studios/{id}": {
+      "patch": {
+        "tags": [
+          "Admin Studio"
+        ],
+        "operationId": "updateStudio",
+        "summary": "Ubah studio",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Admin Studio"
+        ],
+        "operationId": "deleteStudio",
+        "summary": "Hapus studio (soft delete)",
+        "description": "Studio terakhir atau studio dengan sesi berlangsung tidak dapat dihapus (409). Ada booking aktif tanpa `?confirm=1` → 409 `needs_confirm` + `StudioImpact`. Setelah konfirmasi: booking aktif dibatalkan, yang terbayar di-refund 100%, customer diberi email; sesi studionya ikut dihapus.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/confirm"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Studio dihapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Konflik, atau konfirmasi diperlukan (`needs_confirm` + `impact`; ulangi dengan `?confirm=1`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/NeedsConfirm"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/studios/{id}/sessions": {
+      "get": {
+        "tags": [
+          "Admin Sesi Studio"
+        ],
+        "operationId": "listStudioSessions",
+        "summary": "Sesi sebuah studio",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Date"
+            },
+            "description": "Satu hari (WIB)"
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+            },
+            "description": "Satu bulan `YYYY-MM` (dipakai bila `date` kosong)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Urut waktu mulai; termasuk yang terisi dan sudah lewat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StudioSession"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin Sesi Studio"
+        ],
+        "operationId": "createStudioSessions",
+        "summary": "Tambah sesi (bisa berulang harian)",
+        "description": "Sesi tidak boleh tumpang tindih [mulai, selesai) dengan sesi lain di studio yang sama. Semua tanggal bertabrakan → 409.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioSessionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesi yang dibuat dan tanggal yang dilewati",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioSessionCreateResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/sessions/{id}": {
+      "patch": {
+        "tags": [
+          "Admin Sesi Studio"
+        ],
+        "operationId": "updateStudioSession",
+        "summary": "Ubah waktu sesi",
+        "description": "Sesi yang sudah lewat → 400; sedang berlangsung atau bertabrakan → 409. Ada booking aktif tanpa `?confirm=1` → 409 `needs_confirm` + `SessionImpact`; setelah konfirmasi customer diberi email jadwal baru.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/confirm"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioSessionPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesi baru",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioSessionUpdateResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Konflik, atau konfirmasi diperlukan (`needs_confirm` + `impact`; ulangi dengan `?confirm=1`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/NeedsConfirm"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin Sesi Studio"
+        ],
+        "operationId": "deleteStudioSession",
+        "summary": "Hapus sesi (soft delete)",
+        "description": "Sesi berlangsung → 409. Ada booking aktif tanpa `?confirm=1` → 409 `needs_confirm`; setelah konfirmasi booking dibatalkan + refund 100% + email.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/confirm"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sesi dihapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Konflik, atau konfirmasi diperlukan (`needs_confirm` + `impact`; ulangi dengan `?confirm=1`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/NeedsConfirm"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/properties": {
+      "get": {
+        "tags": [
+          "Admin Properti"
+        ],
+        "operationId": "listProperties",
+        "summary": "Daftar properti",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Properti",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminProperty"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin Properti"
+        ],
+        "operationId": "createProperty",
+        "summary": "Tambah properti",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropertyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Id properti",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/properties/{id}": {
+      "patch": {
+        "tags": [
+          "Admin Properti"
+        ],
+        "operationId": "updateProperty",
+        "summary": "Ubah properti",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropertyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Admin Properti"
+        ],
+        "operationId": "deleteProperty",
+        "summary": "Hapus properti",
+        "description": "Id yang tidak ada tetap 200.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/poses": {
+      "get": {
+        "tags": [
+          "Admin Pose"
+        ],
+        "operationId": "listPoses",
+        "summary": "Daftar pose",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pose",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Pose"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin Pose"
+        ],
+        "operationId": "createPose",
+        "summary": "Tambah pose",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PoseInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Id pose",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/poses/{id}": {
+      "patch": {
+        "tags": [
+          "Admin Pose"
+        ],
+        "operationId": "updatePose",
+        "summary": "Ubah pose",
+        "description": "Kedua field wajib.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PoseInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Admin Pose"
+        ],
+        "operationId": "deletePose",
+        "summary": "Hapus pose",
+        "description": "Id yang tidak ada tetap 200.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/bookings": {
+      "get": {
+        "tags": [
+          "Admin Booking"
+        ],
+        "operationId": "listAdminBookings",
+        "summary": "Daftar booking",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/BookingStatus"
+            },
+            "description": "Filter status (kosong = semua)"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Cari nama/email customer atau nama studio"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Terbaru dulu, maks. 500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminBookingRow"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/bookings/{id}": {
+      "get": {
+        "tags": [
+          "Admin Booking"
+        ],
+        "operationId": "getAdminBooking",
+        "summary": "Detail booking",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Admin Booking"
+        ],
+        "operationId": "updateAdminBooking",
+        "summary": "Ubah paket dan/atau status booking",
+        "description": "Booking Dibatalkan tidak dapat diubah (409). Customer menerima satu email ringkasan.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminBookingPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detail baru + ringkasan email/refund",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminBookingUpdateResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Admin Booking"
+        ],
+        "operationId": "deleteAdminBooking",
+        "summary": "Hapus booking",
+        "description": "Selalu minta konfirmasi (`?confirm=1`). Booking Sesi Berjalan/Selesai atau yang refund-nya gagal tidak dapat dihapus (lihat `delete_block`). Booking terbayar di-refund dulu; bila refund gagal booking dipertahankan sebagai Dibatalkan.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/confirm"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dihapus, atau dipertahankan bila refund gagal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminBookingDeleteResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Konflik, atau konfirmasi diperlukan (`needs_confirm` + `impact`; ulangi dengan `?confirm=1`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/NeedsConfirm"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/bookings/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Admin Booking"
+        ],
+        "operationId": "adminCancelBooking",
+        "summary": "Batalkan booking (refund 100%)",
+        "description": "Untuk booking Menunggu Pembayaran atau Terbayar; yang terbayar selalu di-refund. Tidak mengirim email (berbeda dengan PATCH status Dibatalkan).\n\nPerlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCancelInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Booking dibatalkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/admin/transactions": {
+      "get": {
+        "tags": [
+          "Admin Transaksi"
+        ],
+        "operationId": "listTransactions",
+        "summary": "Transaksi pembayaran",
+        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "x-role": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pembayaran paid, refunded, refund_failed (maks. 500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token dari `/api/auth/login`, `/api/auth/register` atau `/api/admin/login`."
+      },
+      "tokenQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "t",
+        "description": "Token yang sama sebagai query; berlaku di semua endpoint yang perlu login bila header Authorization tidak ada."
+      },
+      "staffToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Staff-Token",
+        "description": "Token dari `/api/staff/login`."
+      }
+    },
+    "parameters": {
+      "id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "confirm": {
+        "name": "confirm",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "1"
+          ]
+        },
+        "description": "Jalankan aksi meskipun berdampak pada booking aktif"
+      },
+      "dl": {
+        "name": "dl",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Nilai apa pun = unduh sebagai lampiran"
+      },
+      "t": {
+        "name": "t",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Token login (pengganti header Authorization)"
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Data tidak valid",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Belum login, token kedaluwarsa, atau terbit sebelum password diganti",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Bukan haknya (mis. `Hanya admin`, `Ganti password bawaan terlebih dahulu`)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Tidak ditemukan",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Bentrok dengan status/data saat ini",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Gone": {
+        "description": "Sudah kedaluwarsa",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "TooLarge": {
+        "description": "Ukuran terlalu besar",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unprocessable": {
+        "description": "Melebihi batas paket",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "TooMany": {
+        "description": "Terlalu banyak percobaan",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "MailFailed": {
+        "description": "Email gagal dikirim",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Pesan galat (bahasa Indonesia)"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": true,
+        "example": {
+          "error": "Booking tidak ditemukan"
+        }
+      },
+      "NeedsConfirm": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "const": "Konfirmasi diperlukan"
+          },
+          "needs_confirm": {
+            "type": "boolean",
+            "const": true
+          },
+          "impact": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioImpact"
+              },
+              {
+                "$ref": "#/components/schemas/SessionImpact"
+              },
+              {
+                "$ref": "#/components/schemas/BookingDeleteImpact"
+              }
+            ]
+          }
+        },
+        "required": [
+          "error",
+          "needs_confirm",
+          "impact"
+        ],
+        "description": "Jawaban 409 untuk aksi admin yang berdampak pada booking. Panggil ulang dengan `?confirm=1` untuk menjalankannya."
+      },
+      "StudioImpact": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "integer",
+            "description": "Sesi studio (belum dihapus) yang ikut terhapus"
+          },
+          "active_bookings": {
+            "type": "integer"
+          },
+          "paid_bookings": {
+            "type": "integer"
+          },
+          "refund_total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          }
+        },
+        "required": [
+          "sessions",
+          "active_bookings",
+          "paid_bookings",
+          "refund_total"
+        ]
+      },
+      "SessionImpact": {
+        "type": "object",
+        "properties": {
+          "active_bookings": {
+            "type": "integer"
+          },
+          "paid_bookings": {
+            "type": "integer"
+          },
+          "refund_total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "customers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Nama customer (unik)"
+          }
+        },
+        "required": [
+          "active_bookings",
+          "paid_bookings",
+          "refund_total",
+          "customers"
+        ]
+      },
+      "BookingDeleteImpact": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "paid": {
+            "type": "boolean"
+          },
+          "refund_amount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          }
+        },
+        "required": [
+          "status",
+          "paid",
+          "refund_amount"
+        ]
+      },
+      "Ok": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "IdResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "MessageOk": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "message"
+        ]
+      },
+      "BookingStatus": {
+        "type": "string",
+        "enum": [
+          "Menunggu Pembayaran",
+          "Terbayar",
+          "Sesi Berjalan",
+          "Selesai",
+          "Dibatalkan"
+        ],
+        "description": "Status booking. Belum dibayar sampai batas waktu → `Dibatalkan`."
+      },
+      "PaymentStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "paid",
+          "batal",
+          "refunded",
+          "refund_failed"
+        ],
+        "description": "`batal` = booking batal sebelum dibayar; `refund_failed` = dana tidak dikembalikan (tetap dihitung sebagai pendapatan)."
+      },
+      "SessionStatus": {
+        "type": "string",
+        "enum": [
+          "Terjadwal",
+          "Aktif",
+          "Selesai",
+          "Dibatalkan"
+        ],
+        "description": "Status sesi foto (runtime) milik booking."
+      },
+      "StudioStatus": {
+        "type": "string",
+        "enum": [
+          "AVAILABLE",
+          "UNAVAILABLE"
+        ]
+      },
+      "PaymentMethod": {
+        "type": "string",
+        "enum": [
+          "QRIS",
+          "Transfer Bank"
+        ]
+      },
+      "CancelReason": {
+        "type": "string",
+        "enum": [
+          "Tidak ada waktu",
+          "Penggunaan dana lain",
+          "Pemesanan ganda",
+          "Pembatalan lainnya"
+        ]
+      },
+      "PropertyCategory": {
+        "type": "string",
+        "enum": [
+          "Background",
+          "Topi",
+          "Rompi",
+          "Kalung",
+          "Kacamata",
+          "Lainnya"
+        ]
+      },
+      "RefundState": {
+        "type": "string",
+        "enum": [
+          "none",
+          "refunded",
+          "failed"
+        ],
+        "description": "`none` = booking belum dibayar, tidak ada dana yang dikembalikan."
+      },
+      "DriveState": {
+        "type": "string",
+        "enum": [
+          "lokal",
+          "drive",
+          "gagal"
+        ]
+      },
+      "Slot": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{1,2}:00$",
+        "description": "Slot jam WIB `YYYY-MM-DD H:00`, jam 8-20, **tanpa nol di depan** (sesi 50 menit).",
+        "example": "2026-11-26 8:00"
+      },
+      "Date": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "example": "2026-11-26"
+      },
+      "TimeHM": {
+        "type": "string",
+        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+        "description": "Jam WIB HH:MM",
+        "example": "09:00"
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "phone"
+        ],
+        "example": {
+          "id": 1,
+          "name": "Ana",
+          "email": "ana@x.id",
+          "phone": "0811111111"
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT customer, berlaku 24 jam"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "token",
+          "user"
+        ]
+      },
+      "AdminMe": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "must_change": {
+            "type": "boolean",
+            "description": "true = password bawaan belum diganti; semua fitur admin lain diblokir"
+          }
+        },
+        "required": [
+          "username",
+          "must_change"
+        ]
+      },
+      "AdminAuthResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT admin, berlaku 8 jam"
+          },
+          "admin": {
+            "$ref": "#/components/schemas/AdminMe"
+          }
+        },
+        "required": [
+          "token",
+          "admin"
+        ]
+      },
+      "AdminAccountResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "username": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "description": "Token baru; token admin lama tidak berlaku bila password diganti"
+          }
+        },
+        "required": [
+          "ok",
+          "username",
+          "token"
+        ]
+      },
+      "StaffToken": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Token staf (role `staff`), berlaku 8 jam; kirim di header `X-Staff-Token`"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "Package": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Harga paket sebelum diskon utama"
+          },
+          "photo_count": {
+            "type": "integer",
+            "description": "Jumlah foto yang boleh dipilih (kuota ambil = 2×)"
+          },
+          "strip_size": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "strip_material": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dur": {
+            "type": "integer",
+            "description": "Durasi sesi (menit)"
+          },
+          "active": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "price",
+          "photo_count",
+          "strip_size",
+          "strip_material",
+          "dur",
+          "active"
+        ],
+        "example": {
+          "id": 2,
+          "name": "Standard",
+          "price": 90000,
+          "photo_count": 8,
+          "strip_size": "4x6",
+          "strip_material": "Glossy",
+          "dur": 15,
+          "active": 1
+        }
+      },
+      "PackageInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "price": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "photo_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "dur": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "strip_size": {
+            "type": "string"
+          },
+          "strip_material": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "price",
+          "photo_count",
+          "dur"
+        ]
+      },
+      "PackagePatch": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "price": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "photo_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "dur": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "strip_size": {
+            "type": "string"
+          },
+          "strip_material": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Minimal satu paket harus tetap aktif"
+          }
+        },
+        "description": "Field yang tidak dikirim memakai nilai lama. Harga baru hanya berlaku untuk booking berikutnya."
+      },
+      "PackageDeleteResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "deactivated": {
+            "type": "boolean",
+            "description": "true = paket sudah dipakai booking, jadi hanya dinonaktifkan"
+          }
+        },
+        "required": [
+          "ok",
+          "deactivated"
+        ]
+      },
+      "Discount": {
+        "type": "object",
+        "properties": {
+          "pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pct",
+          "label"
+        ]
+      },
+      "DiscountInput": {
+        "type": "object",
+        "properties": {
+          "pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 60
+          }
+        },
+        "required": [
+          "pct"
+        ]
+      },
+      "PeopleRange": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "range": {
+            "type": "string",
+            "example": "1-2"
+          }
+        },
+        "required": [
+          "id",
+          "range"
+        ]
+      },
+      "BudgetRange": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "budget": {
+            "type": "string",
+            "example": "< 100rb"
+          }
+        },
+        "required": [
+          "id",
+          "budget"
+        ]
+      },
+      "Studio": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "price": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Biaya studio, ditambahkan ke total booking"
+          },
+          "img": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Path `/img/...`, `/media/...` atau URL http(s)"
+          },
+          "people_range_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "budget_range_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/StudioStatus"
+          },
+          "deleted_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Waktu soft delete"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "address",
+          "price",
+          "img",
+          "people_range_id",
+          "budget_range_id",
+          "status",
+          "deleted_at"
+        ],
+        "example": {
+          "id": 1,
+          "name": "Studio Mawar",
+          "description": "Intim, cocok 1-2 orang",
+          "address": "Jl. Veteran No. 3",
+          "price": 0,
+          "img": "/img/studio-1.jpg",
+          "people_range_id": 1,
+          "budget_range_id": 1,
+          "status": "AVAILABLE",
+          "deleted_at": null
+        }
+      },
+      "AdminStudio": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Studio"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "active_bookings": {
+                "type": "integer",
+                "description": "Booking Menunggu Pembayaran/Terbayar"
+              },
+              "bookings": {
+                "type": "integer",
+                "description": "Riwayat booking yang tidak dibatalkan"
+              },
+              "sessions": {
+                "type": "integer"
+              },
+              "impact": {
+                "$ref": "#/components/schemas/StudioImpact"
+              }
+            },
+            "required": [
+              "active_bookings",
+              "bookings",
+              "sessions",
+              "impact"
+            ]
+          }
+        ]
+      },
+      "StudioInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unik di antara studio yang belum dihapus (tanpa beda huruf besar/kecil)"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "price": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "people_range_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "budget_range_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "img": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(\\/(img|media)\\/[\\w.\\-]+|https?:\\/\\/[^\\s'\"()<>\\\\]+)$",
+            "description": "Tanpa nilai: `/img/studio-2.jpg`"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StudioStatus"
+          }
+        },
+        "required": [
+          "name",
+          "people_range_id",
+          "budget_range_id"
+        ]
+      },
+      "StudioPatch": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "price": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "people_range_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "budget_range_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "img": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kosong/null = gambar lama dipertahankan"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StudioStatus"
+          }
+        },
+        "description": "Field yang tidak dikirim memakai nilai lama. `UNAVAILABLE` menyembunyikan studio dari customer; booking lama tidak diubah."
+      },
+      "DeleteResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "cancelled": {
+            "type": "integer",
+            "description": "Booking aktif yang dibatalkan"
+          },
+          "refunded": {
+            "type": "integer"
+          },
+          "refund_failed": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "cancelled",
+          "refunded",
+          "refund_failed"
+        ]
+      },
+      "MasterProperty": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "background",
+              "accessory"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PropertyCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "qty": {
+            "type": "integer"
+          },
+          "img": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bg": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Hanya untuk `background`: dua warna dipisah koma"
+          },
+          "e": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Hanya untuk `accessory`: emoji"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "name",
+          "category",
+          "qty",
+          "img"
+        ]
+      },
+      "AdminProperty": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "background",
+              "accessory"
+            ]
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PropertyCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "qty": {
+            "type": "integer"
+          },
+          "img": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "category",
+          "qty",
+          "img"
+        ]
+      },
+      "PropertyInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "$ref": "#/components/schemas/PropertyCategory"
+          },
+          "qty": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 1
+          },
+          "img": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "category"
+        ],
+        "description": "`type` diturunkan dari kategori (`Background` → background, lainnya accessory). Pada PATCH, field yang tidak dikirim memakai nilai lama."
+      },
+      "Pose": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nama": {
+            "type": "string"
+          },
+          "img_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "people_range_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "nama",
+          "img_url",
+          "people_range_id"
+        ]
+      },
+      "PoseInput": {
+        "type": "object",
+        "properties": {
+          "nama": {
+            "type": "string",
+            "minLength": 1
+          },
+          "people_range_id": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "nama",
+          "people_range_id"
+        ]
+      },
+      "Master": {
+        "type": "object",
+        "properties": {
+          "FAV_PKG": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Paket \"Paling Favorit\" (booking terbayar terbanyak); null bila seri/belum ada"
+          },
+          "PKG": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Package"
+            },
+            "description": "Paket aktif, urut harga"
+          },
+          "ALLPKG": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Package"
+            },
+            "description": "Semua paket (termasuk nonaktif), untuk riwayat"
+          },
+          "DISC": {
+            "$ref": "#/components/schemas/Discount"
+          },
+          "POLICY": {
+            "type": "object",
+            "properties": {
+              "refund_hours": {
+                "type": "number",
+                "description": "REFUND_MIN_HOURS"
+              }
+            },
+            "required": [
+              "refund_hours"
+            ]
+          },
+          "PEOPLE": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PeopleRange"
+            }
+          },
+          "BUDGET": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetRange"
+            }
+          },
+          "STUDIOS": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Studio"
+            },
+            "description": "Studio AVAILABLE dan belum dihapus"
+          },
+          "ALLSTUDIOS": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Studio"
+            },
+            "description": "Semua studio, termasuk yang dihapus"
+          },
+          "PROP": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MasterProperty"
+            }
+          },
+          "POSES": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Kunci = id rentang jumlah orang, nilai = daftar nama pose",
+            "example": {
+              "1": [
+                "Pose tertawa spontan"
+              ]
+            }
+          }
+        },
+        "required": [
+          "FAV_PKG",
+          "PKG",
+          "ALLPKG",
+          "DISC",
+          "POLICY",
+          "PEOPLE",
+          "BUDGET",
+          "STUDIOS",
+          "ALLSTUDIOS",
+          "PROP",
+          "POSES"
+        ]
+      },
+      "Availability": {
+        "type": "object",
+        "properties": {
+          "free": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 20
+            },
+            "description": "Jam mulai yang masih kosong dan belum lewat",
+            "example": [
+              10,
+              11,
+              14
+            ]
+          }
+        },
+        "required": [
+          "free"
+        ]
+      },
+      "QuoteInput": {
+        "type": "object",
+        "properties": {
+          "package_id": {
+            "type": "integer"
+          },
+          "studio_id": {
+            "type": "integer",
+            "description": "Opsional; tanpa studio biaya studio = 0"
+          }
+        },
+        "required": [
+          "package_id"
+        ]
+      },
+      "Quote": {
+        "type": "object",
+        "properties": {
+          "studio_fee": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "subtotal": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Paket + biaya studio"
+          },
+          "mainDisc": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Diskon utama (persen dari harga paket)"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Paket − diskon utama + biaya studio"
+          },
+          "pct": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "studio_fee",
+          "subtotal",
+          "mainDisc",
+          "total",
+          "pct"
+        ],
+        "example": {
+          "studio_fee": 20000,
+          "subtotal": 110000,
+          "mainDisc": 9000,
+          "total": 101000,
+          "pct": 10
+        }
+      },
+      "Booking": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "user_id": {
+            "type": "integer"
+          },
+          "package_id": {
+            "type": "integer"
+          },
+          "studio": {
+            "type": "integer",
+            "description": "Id studio"
+          },
+          "date": {
+            "$ref": "#/components/schemas/Slot"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total yang dibayar"
+          },
+          "subtotal": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "main_disc": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "expire_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Batas waktu pembayaran (15 menit sejak booking)"
+          },
+          "session_id": {
+            "type": "integer",
+            "description": "Id sesi foto (runtime)"
+          },
+          "paid": {
+            "type": "boolean"
+          },
+          "studio_fee": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "cancel_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pay_status": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paid_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Epoch milidetik"
+          },
+          "refunded_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Epoch milidetik"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "package_id",
+          "studio",
+          "date",
+          "amount",
+          "subtotal",
+          "main_disc",
+          "status",
+          "expire_at",
+          "session_id",
+          "paid",
+          "studio_fee",
+          "cancel_reason",
+          "pay_status",
+          "method",
+          "paid_at",
+          "refunded_at"
+        ],
+        "example": {
+          "id": 7,
+          "user_id": 1,
+          "package_id": 2,
+          "studio": 1,
+          "date": "2026-11-26 10:00",
+          "amount": 90000,
+          "subtotal": 90000,
+          "main_disc": 0,
+          "status": "Menunggu Pembayaran",
+          "expire_at": 1795600900000,
+          "session_id": 7,
+          "paid": false,
+          "studio_fee": 0,
+          "cancel_reason": null,
+          "pay_status": "pending",
+          "method": null,
+          "paid_at": null,
+          "refunded_at": null
+        }
+      },
+      "BookingInput": {
+        "type": "object",
+        "properties": {
+          "package_id": {
+            "type": "integer"
+          },
+          "studio_id": {
+            "type": "integer"
+          },
+          "date": {
+            "$ref": "#/components/schemas/Slot"
+          }
+        },
+        "required": [
+          "package_id",
+          "studio_id",
+          "date"
+        ]
+      },
+      "RescheduleInput": {
+        "type": "object",
+        "properties": {
+          "studio_id": {
+            "type": "integer",
+            "description": "Boleh studio lain"
+          },
+          "date": {
+            "$ref": "#/components/schemas/Slot"
+          }
+        },
+        "required": [
+          "studio_id",
+          "date"
+        ]
+      },
+      "PayInput": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/PaymentMethod"
+          }
+        },
+        "description": "Nilai lain atau kosong disimpan sebagai `QRIS`."
+      },
+      "CancelInput": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/CancelReason"
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Wajib bila alasan `Pembatalan lainnya`"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "Refund": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/RefundState"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Epoch milidetik"
+          },
+          "min_hours": {
+            "type": "number",
+            "description": "REFUND_MIN_HOURS"
+          }
+        },
+        "required": [
+          "state",
+          "amount",
+          "at",
+          "min_hours"
+        ]
+      },
+      "CancelResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "refund": {
+            "$ref": "#/components/schemas/Refund"
+          },
+          "booking": {
+            "$ref": "#/components/schemas/Booking"
+          }
+        },
+        "required": [
+          "ok",
+          "refund",
+          "booking"
+        ]
+      },
+      "InvoiceEmailResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "dev": {
+            "type": "boolean",
+            "description": "true = SMTP_HOST kosong, email ditulis ke backend/outbox/"
+          }
+        },
+        "required": [
+          "ok",
+          "dev"
+        ]
+      },
+      "ProfileInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "phone": {
+            "type": "string",
+            "pattern": "^\\d{8,15}$"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "Photo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "t": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Waktu foto diambil"
+          },
+          "fav": {
+            "type": "boolean"
+          },
+          "sel": {
+            "type": "boolean",
+            "description": "Dipilih untuk dicetak/diunduh"
+          },
+          "drive": {
+            "$ref": "#/components/schemas/DriveState"
+          }
+        },
+        "required": [
+          "id",
+          "t",
+          "fav",
+          "sel",
+          "drive"
+        ]
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "booking_id": {
+            "type": "integer"
+          },
+          "user_id": {
+            "type": "integer"
+          },
+          "pkg": {
+            "type": "integer",
+            "description": "Id paket"
+          },
+          "start_time": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Epoch milidetik"
+          },
+          "left": {
+            "type": "integer",
+            "description": "Sisa waktu (detik); 0 bila tidak aktif"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SessionStatus"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "Pilihan foto sudah dikonfirmasi"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Photo"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "booking_id",
+          "user_id",
+          "pkg",
+          "start_time",
+          "left",
+          "paused",
+          "status",
+          "confirmed",
+          "photos"
+        ]
+      },
+      "PhotoInput": {
+        "type": "object",
+        "properties": {
+          "img": {
+            "type": "string",
+            "pattern": "^data:image\\/jpeg;base64,",
+            "description": "JPEG data URL, maks. 4 MB"
+          }
+        },
+        "required": [
+          "img"
+        ]
+      },
+      "PhotoPatch": {
+        "type": "object",
+        "properties": {
+          "fav": {
+            "type": "boolean"
+          },
+          "sel": {
+            "type": "boolean",
+            "description": "Mengubah pilihan membatalkan konfirmasi sesi"
+          },
+          "drive": {
+            "$ref": "#/components/schemas/DriveState"
+          }
+        }
+      },
+      "BulkDeleteInput": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "BulkDeleteResult": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "integer"
+          },
+          "skipped_favorites": {
+            "type": "integer",
+            "description": "Foto favorit selalu dilewati"
+          }
+        },
+        "required": [
+          "deleted",
+          "skipped_favorites"
+        ]
+      },
+      "StaffLoginInput": {
+        "type": "object",
+        "properties": {
+          "pin": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin"
+        ]
+      },
+      "SessionControlInput": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "pause",
+              "resume",
+              "stop"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "RegisterInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "pattern": "^\\d{8,15}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "phone",
+          "password"
+        ]
+      },
+      "LoginInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "ForgotInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResetInput": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Token dari tautan email (`#reset=...`), berlaku 30 menit, sekali pakai"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ]
+      },
+      "ContactInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 120
+          },
+          "message": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "message"
+        ]
+      },
+      "AdminLoginInput": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "AdminAccountInput": {
+        "type": "object",
+        "properties": {
+          "current_password": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]{3,30}$",
+            "description": "Kosong = tidak diubah"
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 8,
+            "description": "Minimal 8 karakter, mengandung huruf dan angka, bukan password umum. Kosong = tidak diubah"
+          }
+        },
+        "required": [
+          "current_password"
+        ]
+      },
+      "RevenueBucket": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "n": {
+            "type": "integer",
+            "description": "Jumlah pembayaran"
+          }
+        },
+        "required": [
+          "total",
+          "n"
+        ]
+      },
+      "Revenue": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "$ref": "#/components/schemas/RevenueBucket"
+          },
+          "week": {
+            "$ref": "#/components/schemas/RevenueBucket"
+          },
+          "month": {
+            "$ref": "#/components/schemas/RevenueBucket"
+          },
+          "all": {
+            "$ref": "#/components/schemas/RevenueBucket"
+          },
+          "first_booking": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Epoch milidetik"
+          },
+          "first_date": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "$ref": "#/components/schemas/Date"
+                    }
+                  },
+                  "required": [
+                    "date"
+                  ]
+                },
+                {
+                  "$ref": "#/components/schemas/RevenueBucket"
+                }
+              ]
+            },
+            "minItems": 7,
+            "maxItems": 7,
+            "description": "7 hari terakhir, terlama dulu"
+          }
+        },
+        "required": [
+          "today",
+          "week",
+          "month",
+          "all",
+          "first_booking",
+          "first_date",
+          "daily"
+        ],
+        "description": "Pendapatan = pembayaran `paid` dan `refund_failed`; yang `refunded` tidak dihitung. week = 7 hari, month = 30 hari termasuk hari ini (WIB)."
+      },
+      "OpsItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "date": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "biaya",
+              "pemasukan"
+            ]
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "label",
+          "kind",
+          "amount",
+          "note"
+        ]
+      },
+      "OpsInput": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "biaya",
+              "pemasukan"
+            ]
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "date",
+          "label",
+          "kind",
+          "amount"
+        ]
+      },
+      "OpsSummary": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "all"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "description": "Tanggal awal periode; `0000-00-00` untuk all"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpsItem"
+            }
+          },
+          "booking_revenue": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "other_income": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "gross": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pendapatan booking + pemasukan lain"
+          },
+          "costs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "net": {
+            "type": "integer",
+            "description": "gross − costs"
+          }
+        },
+        "required": [
+          "period",
+          "from",
+          "items",
+          "booking_revenue",
+          "other_income",
+          "gross",
+          "costs",
+          "net"
+        ]
+      },
+      "CustomerRow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "bookings": {
+            "type": "integer"
+          },
+          "spent": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "photos": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "phone",
+          "bookings",
+          "spent",
+          "photos"
+        ]
+      },
+      "CustomerBookings": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/User"
+          },
+          "bookings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/BookingStatus"
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Rupiah (bilangan bulat)"
+                },
+                "subtotal": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "main_disc": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int64",
+                  "description": "Epoch milidetik"
+                },
+                "package": {
+                  "type": "string"
+                },
+                "studio": {
+                  "type": "string"
+                },
+                "slot": {
+                  "$ref": "#/components/schemas/Slot"
+                },
+                "pay_status": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PaymentStatus"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "method": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PaymentMethod"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "paid_at": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int64",
+                  "description": "Epoch milidetik"
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "amount",
+                "subtotal",
+                "main_disc",
+                "created_at",
+                "package",
+                "studio",
+                "slot",
+                "pay_status",
+                "method",
+                "paid_at"
+              ]
+            }
+          }
+        },
+        "required": [
+          "customer",
+          "bookings"
+        ]
+      },
+      "CustomerPhotos": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/User"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "taken_at": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int64",
+                  "description": "Epoch milidetik"
+                },
+                "fav": {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1
+                  ]
+                },
+                "sel": {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1
+                  ]
+                },
+                "session_id": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "taken_at",
+                "fav",
+                "sel",
+                "session_id"
+              ]
+            },
+            "maxItems": 500,
+            "description": "Terbaru dulu, maks. 500. `fav`/`sel` berupa 0/1 (bukan boolean)."
+          }
+        },
+        "required": [
+          "customer",
+          "photos"
+        ]
+      },
+      "CustomerDeleteResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "photos_deleted": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "photos_deleted"
+        ]
+      },
+      "MediaInput": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string",
+            "pattern": "^data:image\\/(jpeg|png|webp);base64,",
+            "description": "Data URL JPEG/PNG/WebP, maks. 3 MB"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "MediaResult": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Path `/media/<file>`, dilayani sebagai file statis",
+            "example": "/media/1795600000000-a1b2c3d4.jpg"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "StudioSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "studio_id": {
+            "type": "integer"
+          },
+          "start_time": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Epoch milidetik"
+          },
+          "end_time": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Epoch milidetik"
+          },
+          "date": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "start": {
+            "$ref": "#/components/schemas/TimeHM"
+          },
+          "end": {
+            "$ref": "#/components/schemas/TimeHM"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "UNAVAILABLE"
+            ],
+            "description": "UNAVAILABLE selama terisi booking aktif/berlangsung, atau sudah dihapus"
+          },
+          "past": {
+            "type": "boolean"
+          },
+          "booking": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "status": {
+                "$ref": "#/components/schemas/BookingStatus"
+              },
+              "customer": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "customer"
+            ]
+          },
+          "impact": {
+            "$ref": "#/components/schemas/SessionImpact"
+          }
+        },
+        "required": [
+          "id",
+          "studio_id",
+          "start_time",
+          "end_time",
+          "date",
+          "start",
+          "end",
+          "status",
+          "past",
+          "booking",
+          "impact"
+        ],
+        "description": "Sesi studio yang dibuat admin (tabel `studio_session`), terpisah dari slot jam yang dipesan customer."
+      },
+      "StudioSessionInput": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "start": {
+            "$ref": "#/components/schemas/TimeHM"
+          },
+          "end": {
+            "$ref": "#/components/schemas/TimeHM"
+          },
+          "repeat": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 1,
+            "description": "Buat juga untuk n−1 hari berikutnya dengan jam sama; hari yang bertabrakan dilewati"
+          }
+        },
+        "required": [
+          "date",
+          "start",
+          "end"
+        ]
+      },
+      "StudioSessionPatch": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "start": {
+            "$ref": "#/components/schemas/TimeHM"
+          },
+          "end": {
+            "$ref": "#/components/schemas/TimeHM"
+          }
+        },
+        "description": "Field yang tidak dikirim memakai nilai lama."
+      },
+      "StudioSessionCreateResult": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioSession"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Date"
+            },
+            "description": "Tanggal yang dilewati karena bertabrakan"
+          }
+        },
+        "required": [
+          "created",
+          "skipped"
+        ]
+      },
+      "StudioSessionUpdateResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StudioSession"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "notified": {
+                "type": "integer",
+                "description": "Jumlah booking yang diberi tahu lewat email"
+              }
+            },
+            "required": [
+              "notified"
+            ]
+          }
+        ]
+      },
+      "AdminBookingRow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "created_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Epoch milidetik"
+          },
+          "cancel_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "customer": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "package": {
+            "type": "string"
+          },
+          "studio": {
+            "type": "string"
+          },
+          "slot": {
+            "$ref": "#/components/schemas/Slot"
+          },
+          "pay_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "method": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "amount",
+          "created_at",
+          "cancel_reason",
+          "customer",
+          "email",
+          "package",
+          "studio",
+          "slot",
+          "pay_status",
+          "method"
+        ]
+      },
+      "BookingDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Booking"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "customer": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email",
+                  "phone"
+                ]
+              },
+              "studio_name": {
+                "type": "string"
+              },
+              "package_name": {
+                "type": "string"
+              },
+              "slot": {
+                "$ref": "#/components/schemas/Slot"
+              },
+              "created_at": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64",
+                "description": "Epoch milidetik"
+              },
+              "cancel_detail": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "studio_session_id": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "studio_session": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  },
+                  "date": {
+                    "$ref": "#/components/schemas/Date"
+                  },
+                  "start": {
+                    "$ref": "#/components/schemas/TimeHM"
+                  },
+                  "end": {
+                    "$ref": "#/components/schemas/TimeHM"
+                  },
+                  "deleted": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "date",
+                  "start",
+                  "end",
+                  "deleted"
+                ]
+              },
+              "payment": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "$ref": "#/components/schemas/PaymentStatus"
+                  },
+                  "method": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/PaymentMethod"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Rupiah (bilangan bulat)"
+                  },
+                  "paid_at": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "int64",
+                    "description": "Epoch milidetik"
+                  },
+                  "refunded_at": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "int64",
+                    "description": "Epoch milidetik"
+                  },
+                  "expire_at": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "Epoch milidetik"
+                  }
+                },
+                "required": [
+                  "status",
+                  "method",
+                  "amount",
+                  "paid_at",
+                  "refunded_at",
+                  "expire_at"
+                ]
+              },
+              "invoice": {
+                "type": "string",
+                "description": "Nomor invoice `INV-YYYYMMDD-NNNN`",
+                "example": "INV-20261125-0007"
+              },
+              "items_price": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Harga paket tersimpan saat booking, sebelum diskon utama"
+              },
+              "packages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "price": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Rupiah (bilangan bulat)"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "price"
+                  ]
+                },
+                "description": "Paket pilihan untuk ubah paket; hanya terisi bila belum dibayar"
+              },
+              "allowed": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/BookingStatus"
+                },
+                "description": "Status tujuan yang boleh dipilih admin (hanya maju)"
+              },
+              "delete_block": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Alasan booking tidak dapat dihapus"
+              },
+              "impact": {
+                "$ref": "#/components/schemas/BookingDeleteImpact"
+              }
+            },
+            "required": [
+              "customer",
+              "studio_name",
+              "package_name",
+              "slot",
+              "created_at",
+              "cancel_detail",
+              "studio_session_id",
+              "studio_session",
+              "payment",
+              "invoice",
+              "items_price",
+              "packages",
+              "allowed",
+              "delete_block",
+              "impact"
+            ]
+          }
+        ]
+      },
+      "AdminBookingPatch": {
+        "type": "object",
+        "properties": {
+          "package_id": {
+            "type": "integer",
+            "description": "Hanya untuk booking Menunggu Pembayaran; total dihitung ulang"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          }
+        },
+        "description": "Minimal satu field. Transisi status: Menunggu Pembayaran → Dibatalkan; Terbayar → Sesi Berjalan, Selesai, Dibatalkan; Sesi Berjalan → Selesai. Pembatalan selalu refund 100%."
+      },
+      "AdminBookingUpdateResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BookingDetail"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "notified": {
+                "type": "boolean",
+                "description": "Email ke customer dikirim"
+              },
+              "refund": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Refund"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "notified",
+              "refund"
+            ]
+          }
+        ]
+      },
+      "AdminCancelInput": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      },
+      "AdminBookingDeleteResult": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "const": true
+              },
+              "deleted": {
+                "type": "boolean",
+                "const": true
+              },
+              "refund": {
+                "$ref": "#/components/schemas/RefundState"
+              },
+              "refund_amount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Rupiah (bilangan bulat)"
+              }
+            },
+            "required": [
+              "ok",
+              "deleted",
+              "refund",
+              "refund_amount"
+            ],
+            "title": "Dihapus"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "const": false
+              },
+              "kept": {
+                "type": "boolean",
+                "const": true
+              },
+              "refund": {
+                "type": "string",
+                "const": "failed"
+              },
+              "refund_amount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Rupiah (bilangan bulat)"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ok",
+              "kept",
+              "refund",
+              "refund_amount",
+              "message"
+            ],
+            "title": "Dipertahankan (refund gagal)"
+          }
+        ]
+      },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "booking_id": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "refunded",
+              "refund_failed"
+            ]
+          },
+          "method": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paid_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Epoch milidetik"
+          },
+          "refunded_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Epoch milidetik"
+          },
+          "created_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Epoch milidetik"
+          },
+          "customer": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "invoice": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "booking_id",
+          "amount",
+          "status",
+          "method",
+          "paid_at",
+          "refunded_at",
+          "created_at",
+          "customer",
+          "email",
+          "invoice"
+        ]
+      },
+      "TransactionList": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            },
+            "maxItems": 500
+          },
+          "paid": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Jumlah paid + refund_failed"
+          },
+          "refunded": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rupiah (bilangan bulat)"
+          }
+        },
+        "required": [
+          "rows",
+          "paid",
+          "refunded"
+        ]
+      }
+    }
+  }
+}
