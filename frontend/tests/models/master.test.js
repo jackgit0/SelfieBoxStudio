@@ -13,7 +13,7 @@ const raw = (overrides = {}) => ({
   STUDIOS: [{ id: 7, name: "Melati", price: 0, people_range_id: 2 }],
   ALLSTUDIOS: [{ id: 7, name: "Melati", price: 0, people_range_id: 2 }, { id: 8, name: "Mawar", price: 0 }],
   PROP: [{ id: 4, name: "Topi" }],
-  POSES: { 1: ["Senyum"] },
+  POSES: { 1: ["/img/pose-placeholder.jpg"] },
   POLICY: { refund_hours: 2 },
   ...overrides,
 });
@@ -31,7 +31,7 @@ test("loadMaster memetakan /master ke nama lengkap, termasuk favouritePackageId"
   assert.deepEqual(master.studios.map(s => s.id), [7]);
   assert.deepEqual(master.allStudios.map(s => s.id), [7, 8]);
   assert.equal(master.properties[0].name, "Topi");
-  assert.deepEqual(master.poses, { 1: ["Senyum"] });
+  assert.deepEqual(master.poses, { 1: ["/img/pose-placeholder.jpg"] });
   assert.deepEqual(master.policy, { refund_hours: 2 });
   assert.equal(master.json, JSON.stringify(raw()));
 });

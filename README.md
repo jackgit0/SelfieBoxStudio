@@ -77,7 +77,8 @@ Admin: Dashboard, Pengguna, Studio (Detail Studio + Detail Sesi), Booking (dafta
 - Harga bisa dilihat tamu (`POST /api/quote` publik); membuat booking (`POST /api/bookings`) perlu login customer.
 - Pembatalan: refund otomatis bila >= `REFUND_MIN_HOURS` jam sebelum sesi; jika lebih dekat, refund gagal dan uang tetap dihitung sebagai pendapatan.
 - Pembatalan oleh admin (langsung, lewat ubah status, atau karena studio/sesi/booking dihapus) selalu refund 100%.
-- Properti dengan Qty 0 tampil "Habis". Gambar studio/properti diunggah admin (disimpan di `backend/media`, diperkecil di browser).
+- Properti dengan Qty 0 tampil "Habis". Gambar studio/properti/pose diunggah admin (disimpan di `backend/media`, diperkecil di browser).
+- **Pose** = foto contoh + jumlah orang (tanpa nama). Foto wajib saat menambah; saat mengubah, foto lama tetap bila tidak diganti. Data awal memakai satu foto placeholder warna datar (`frontend/img/pose-placeholder.jpg`) yang diganti admin lewat unggah. Layar Sesi Foto menampilkan fotonya di kartu Pose Rekomendasi.
 
 ## Fitur admin studio, sesi, dan booking
 - **Tambah studio** dua langkah: form "Detail Studio Baru" (nama dan gambar wajib di form; nama tidak boleh sama dengan studio lain) -> **Lihat Ringkasan** -> kartu **Ringkasan Studio** (semua isian + gambar) dengan **Ubah** atau **Simpan Studio**. Bila server menolak (misalnya nama dipakai studio yang baru ditambahkan admin lain), form terbuka lagi dengan isian utuh. Ubah studio tetap satu langkah. API tidak mewajibkan gambar (default `/img/studio-2.jpg`).

@@ -102,8 +102,12 @@ export function photoSessionView(state, match) {
       <div class="stack">
         <div class="card">
           <h3 class="h3">Pose Rekomendasi</h3>
-          <p id="pose" style="font-size:17px;margin:10px 0"></p>
-          <button class="btn sm ghost" data-action="photo:nextPose">Pose lain</button>
+          ${
+            (state.master.poses[1] || []).length
+              ? html`<img id="pose" class="pose-img" alt="" />
+                  <button class="btn sm ghost" data-action="photo:nextPose">Pose lain</button>`
+              : html`<p class="m sm" style="margin-top:8px">Belum ada contoh pose.</p>`
+          }
         </div>
         <div class="card">
           <h3 class="h3" style="margin-bottom:10px">Background & Properti</h3>

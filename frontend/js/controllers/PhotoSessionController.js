@@ -57,14 +57,16 @@ export function createPhotoSessionController({
     screen.update(sessionStatus(session, packageOf(state().master, session.pkg)), photoStrip(session));
   }
 
-  // step 0 = tampilkan pose sekarang, 1 = pose berikutnya
+  // step 0 = tampilkan pose sekarang, 1 = pose berikutnya; pose = foto contoh (url) untuk rentang jumlah orang pertama
   function showPose(step) {
-    const list = state().master.poses[1] || [];
+    const master = state().master;
+    const list = master.poses[1] || [];
     if (!list.length) {
       return;
     }
+    const range = (master.peopleRanges || []).find(item => item.id == 1);
     photo().poseIndex = (photo().poseIndex + step) % list.length;
-    screen.showPose("🧍 " + list[photo().poseIndex]);
+    screen.showPose(list[photo().poseIndex], range ? `Contoh pose untuk ${range.range} orang` : "Contoh pose");
   }
 
   function warn() {

@@ -1,5 +1,6 @@
 // Adaptor DOM layar Sesi Foto untuk PhotoSessionController (decisions.md 60; dulu bagian DOM dari V.session_after, upd, nextPose, shoot, beep di legacy/session.js).
 // Tidak menyentuh document saat diimpor; main.js memberikan document dan AudioContext.
+import { mediaSrc } from "./propertyVisual.js";
 
 export function createSessionScreen({ document }) {
   const $ = selector => document.querySelector(selector);
@@ -16,10 +17,12 @@ export function createSessionScreen({ document }) {
         video.outerHTML = '<div class="m">Kamera tidak tersedia — foto simulasi digunakan.</div>';
       }
     },
-    showPose(text) {
+    // url = foto pose dari data master (/img/... atau /media/... unggahan admin, dimuat dari origin API lewat mediaSrc)
+    showPose(url, alt) {
       const pose = $("#pose");
       if (pose) {
-        pose.textContent = text;
+        pose.src = mediaSrc(url);
+        pose.alt = alt;
       }
     },
     // status = sessionStatus(), strip = photoStrip() dari views/session/photoSession.js; strip hanya diganti bila daftar fotonya berubah

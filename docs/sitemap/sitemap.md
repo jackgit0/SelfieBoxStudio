@@ -60,7 +60,7 @@ Pembaruan 2026-11-25 (refactor MVC frontend, sudah digabung ke `main`; lihat `..
 | | | Session Management | Bagian "Detail Sesi" di Admin - Studio dan Admin - Studio Detail (Mobile), Konfirmasi Hapus Sesi (Desktop) | Kelola sesi per studio |
 | | Booking Management | | Admin - Booking, Admin - Booking (Mobile), Admin - Booking Detail (Mobile), Admin - Edit Booking (Mobile), Konfirmasi Batalkan (Mobile), Konfirmasi Hapus (Mobile), Konfirmasi Hapus Booking (Desktop) | Daftar, detail, ubah, hapus booking |
 | | Property Management | | Admin - Properti, Admin - Properti (Mobile), Admin - Properti Detail (Mobile), Konfirmasi Hapus Properti (Desktop) | Kelola properti/aksesoris studio |
-| | Pose Management | | Admin - Pose, Admin - Pose (Mobile) | Kelola rekomendasi pose per jumlah orang |
+| | Pose Management | | Admin - Pose, Admin - Pose (Mobile) | Kelola foto pose per jumlah orang (foto + jumlah orang, tanpa nama) |
 | | Payment Dashboard | | Admin - Transaksi, Admin - Transaksi (Mobile) | Total pembayaran masuk dan refund, daftar transaksi dengan status |
 | | Package Management | | Admin - Paket & Diskon, Admin - Paket & Diskon (Mobile) | Diskon utama, tambah / ubah / nonaktifkan / hapus paket |
 | | Admin Account | | Admin - Akun Admin, Admin - Akun Admin (Mobile) | Ganti username dan password admin |
