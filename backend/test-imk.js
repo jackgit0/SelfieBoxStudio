@@ -157,5 +157,45 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!/S\.pkg\s*&&\s*!PKG\.find\(p => p\.id == S\.pkg\)\)\s*S\.pkg = null/.test(boot), 'boot.js tidak diam-diam menghapus paket pilihan yang hilang (popup yang memberi tahu)'); }
   await down(srv);
 
+  // ===== Fase 4: popup galat Create Booking + akses tamu =====
+  srv = start('d'); await up();
+  { const U = (await call('POST', '/auth/register', { name: 'Dewi', email: 'dewi@x.id', phone: '0814444444', password: 'secret1' })).j.token;
+    const U2 = (await call('POST', '/auth/register', { name: 'Eko', email: 'eko@x.id', phone: '0815555555', password: 'secret1' })).j.token;
+    const AD = (await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token; ok(U && U2 && AD, 'fixture fase 4: dua customer dan admin masuk');
+    const slot = dayAhead(7) + ' 10:00', B = (o, t = U) => call('POST', '/bookings', { package_id: 1, studio_id: 1, date: slot, ...o }, t);
+    // 2. quote publik (keputusan 37), booking tetap wajib login
+    const qg = await call('POST', '/quote', { package_id: 1, studio_id: 1 }); ok(qg.s === 200 && qg.j.total > 0, 'POST /api/quote tanpa token: 200 dengan total (tamu melihat harga)');
+    const bg = await B({}, null); ok(bg.s === 401 && bg.j.error === 'Belum login', 'POST /api/bookings tanpa token: 401 "Belum login" (pemicu popup Belum Login)');
+    // 1. kontrak pesan galat yang dipetakan bookingErr
+    ok((await B({ package_id: 999 })).j.error === 'Paket/studio tidak valid', 'booking dengan paket tidak ada: "Paket/studio tidak valid"');
+    ok((await call('POST', '/quote', { package_id: 999, studio_id: 1 })).j.error === 'Paket tidak valid', 'quote dengan paket tidak ada: "Paket tidak valid"');
+    { const r = await B({ date: '' }); ok(r.s === 400 && r.j.error === 'Format/jam slot tidak valid', 'booking tanpa sesi: 400 "Format/jam slot tidak valid" (Input Tidak Valid)'); }
+    { const r = await B({ date: dayAhead(-2) + ' 10:00' }); ok(r.s === 400 && r.j.error === 'Jadwal sudah lewat', 'booking sesi yang sudah lewat: 400 "Jadwal sudah lewat" (Sesi Tidak Tersedia)'); }
+    ok((await B({})).s === 200, 'fixture: customer pertama membooking slot');
+    { const r = await B({}, U2); ok(r.s === 409 && r.j.error === 'Jadwal sudah tidak tersedia', 'slot yang sudah diambil: 409 "Jadwal sudah tidak tersedia" (Sesi Sudah Dibooking)'); }
+    ok((await call('PATCH', '/admin/studios/2', { status: 'UNAVAILABLE' }, AD)).s === 200, 'admin menandai studio 2 tidak tersedia');
+    { const r = await B({ studio_id: 2 }, U2); ok(r.s === 400 && r.j.error === 'Studio tidak tersedia', 'booking studio tidak tersedia: "Studio tidak tersedia" (Sesi Tidak Tersedia)'); }
+    ok((await call('POST', '/quote', { package_id: 1, studio_id: 2 })).j.error === 'Studio tidak tersedia', 'quote studio tidak tersedia: "Studio tidak tersedia"');
+    // 3. guard tamu di core.js
+    const core = await file('/js/core.js'), cj = await file('/js/customer.js'), lj = await file('/js/landing.js');
+    const gv = (core.match(/const GUEST_VIEWS = \[([^\]]*)\]/) || [])[1] || '';
+    for (const v of ['home', 'studio', 'packages', 'time', 'pay', 'auth', 'landing']) ok(gv.includes(`"${v}"`), `core.js: tamu boleh membuka "${v}"`);
+    for (const v of ['account', 'my', 'bdetail', 'gallery', 'session', 'success', 'cancel', 'refund']) ok(!gv.includes(`"${v}"`), `core.js: "${v}" tetap hanya untuk yang sudah login`);
+    ok(/if \(!S\.me && !GUEST_VIEWS\.includes\(S\.view\)\) S\.view = "landing"/.test(core), 'core.js: render() mengirim tamu ke landing hanya di luar GUEST_VIEWS');
+    ok(/\$\{S\.me \? acctMenu\(\) : /.test(core) && (core.match(/esc\(me\(\)\.name\)/g) || []).length === 1 && /const acctMenu = [^\n]*esc\(me\(\)\.name\)/.test(core), 'core.js: navbar membaca me().name hanya di menu akun (bukan untuk tamu)');
+    ok(core.includes("openAuth('login')") && core.includes("openAuth('register')"), 'core.js: navbar tamu punya tombol Masuk dan Daftar');
+    ok(/async function afterAuth[^\n]*S\.draft/.test(core), 'core.js: afterAuth melanjutkan draf booking (kembali ke Paket & Pembayaran)');
+    // 4. pemetaan galat dan lima popup (judul dan pesan dari Figma)
+    ok((cj.match(/function bookingErr\(/g) || []).length === 1, 'customer.js: satu fungsi pemetaan bookingErr()');
+    for (const s of ['Input Tidak Valid', 'Input booking tidak lengkap atau tidak valid. Pilih tanggal dan sesi terlebih dahulu.', 'Sesi Tidak Tersedia', 'tidak lagi tersedia. Silakan pilih sesi lain.',
+      'Paket Tidak Ditemukan', 'Paket tidak ditemukan. Silakan pilih paket lain.', 'Maaf, Sesi Sudah Dibooking', 'Sesi ini sudah memiliki booking aktif. Silakan pilih sesi lain.', 'Pilih Sesi Lain',
+      'Masuk untuk melanjutkan booking', 'Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.', 'Jadwal sudah tidak tersedia', 'Format/jam slot tidak valid', 'Jadwal sudah lewat', 'Studio tidak tersedia']) ok(cj.includes(s), `customer.js memuat "${s}"`);
+    ok(/async function confirmPay\(\) \{\s*if \(!S\.me\)/.test(cj), 'customer.js: tamu yang menekan Check Out mendapat popup Belum Login sebelum booking dibuat');
+    ok(!/\$\{B\.slot \? "" : "disabled"\} onclick="nextTime\(\)"/.test(cj), 'customer.js: tombol Lanjut ke Pembayaran tidak lagi dinonaktifkan (validasi lewat popup Input Tidak Valid)');
+    ok(!/catch \(e\) \{[^}]*err = e\.message; (AV = \{\}; )?(return )?render\(\)/.test(cj.slice(cj.indexOf('async function nextTime'), cj.indexOf('// ---------- halaman hasil'))), 'customer.js: galat langkah booking tidak lagi ditampilkan sebagai teks merah');
+    ok(lj.includes('Lihat Studio') && /go\('home'\)/.test(lj), 'landing.js: tautan "Lihat Studio" membuka Browse');
+    ok(!/gradient/i.test(cj) && !/gradient/i.test(core), 'customer.js dan core.js tetap tanpa gradient'); }
+  await down(srv);
+
   console.log(`\n${n} tes lulus`); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);
 })().catch(async e => { console.error('✘ GAGAL:', e.message); if (srv) await down(srv); process.exit(1); });
