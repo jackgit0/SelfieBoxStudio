@@ -1,10 +1,11 @@
 // ===== PANEL ADMIN: Dashboard, Pengguna, Studio, Booking, Properti, Pose, Transaksi, Paket & Diskon =====
-const AD = { loading: {}, imgs: {}, open: {}, q: "", opPeriod: "month", opEdit: null, cdet: null, bdet: null, bst: null, bstatus: "", scal: {}, sday: {}, sess: {}, sedit: null, sadd: null };
+const AD = { loading: {}, imgs: {}, open: {}, q: "", opPeriod: "month", opEdit: null, cdet: null, bdet: null, bst: null, bstatus: "", scal: {}, sday: {}, sess: {}, sedit: null, sadd: null, stnew: null, stsum: null, sterr: null, stdone: null };
 function adminReset() { Object.keys(AD).forEach(k => { if (!["loading", "imgs", "open"].includes(k) && !["q", "opPeriod", "bstatus"].includes(k)) AD[k] = null; }); AD.q = ""; AD.opPeriod = "month"; AD.bstatus = ""; AD.imgs = {}; AD.open = {}; AD.loading = {}; AD.scal = {}; AD.sday = {}; AD.sess = {}; }
 const AMENU = [["adash", "Dashboard", "dash"], ["acust", "Pengguna", "users"], ["astudio", "Studio", "studio"], ["abook", "Booking", "calendar"], ["aprop", "Properti", "glasses"], ["apose", "Pose", "run"], ["atrx", "Transaksi", "card"], ["apkg", "Paket & Diskon", "tag"], ["aacct", "Akun Admin", "settings"]];
 const ATITLE = { adash: "Administrasi Pendapatan", acust: "Daftar Pengguna", astudio: () => "Daftar Studio" + (AD.studios ? ` (${AD.studios.length})` : ""), abook: "Daftar Booking", aprop: "Daftar Properti", apose: "Daftar Pose", atrx: "Transaksi", apkg: "Paket & Diskon", aacct: "Akun Admin" };
 const SEARCHABLE = ["acust", "astudio", "abook", "aprop", "apose", "atrx"];
 function adminShell(inner) {
+  if (S.view != "astudio") AD.stdone = null;
   return `<div class="adm"><aside class="side"><h3>Admin</h3>${AMENU.map(m => `<button class="${S.view == m[0] ? "on" : ""}" onclick="go('${m[0]}')">${ic(m[2], 20)} ${m[1]}</button>`).join("")}<div class="foot"><div class="sm m" style="margin:0 6px 8px">${esc(BRAND)}</div><button onclick="logout()">${ic("logout", 20)} Keluar</button></div></aside>
 <main class="amain">${AD.me && AD.me.must_change ? `<div class="toast err">⚠ Anda masih memakai password bawaan. Ganti password sekarang — fitur admin lain terkunci sampai password diganti.</div>` : ""}<div class="ahead"><h1>${(typeof ATITLE[S.view] == "function" ? ATITLE[S.view]() : ATITLE[S.view]) || ""}</h1>${SEARCHABLE.includes(S.view) ? `<div class="search">${ic("search", 18)}<input placeholder="Search..." value="${esc(AD.q)}" onchange="AD.q=this.value;render()"></div>` : ""}</div>${toasts()}${inner}</main></div>`;
 }
@@ -13,7 +14,7 @@ async function aLoad(k, fn, def) {
   try { AD[k] = await fn(); } catch (e) { if (e.status == 403 && /Ganti password/.test(e.message)) { AD.loading[k] = 0; if (AD.me) AD.me.must_change = true; return go('aacct'); } if (e.status == 401 || e.status == 403) { AD.loading[k] = 0; return logout(); } err = e.message; AD[k] = def; }
   AD.loading[k] = 0; render();
 }
-async function aDo(fn, ok) { msg = err = ""; const sn = snap(); let failed = false; try { await fn(); if (ok) msg = ok; } catch (e) { if (e.status == 401 || e.status == 403) return logout(); err = e.message; failed = true; } render(); if (failed) restore(sn); }
+async function aDo(fn, ok, what) { msg = err = ""; AD.stdone = null; const sn = snap(); let failed = false; try { await fn(); if (ok) msg = ok; } catch (e) { if (e.status == 401 || e.status == 403) return logout(); err = e.message; failed = true; } render(); if (failed) restore(sn); }
 // simpan & pulihkan isian form agar tidak hilang saat tampilan dirender ulang (unggah gambar / error validasi)
 const snap = () => { const o = {}; document.querySelectorAll('.amain [id]').forEach(e => { if ('value' in e && e.type !== 'file') o[e.id] = e.value; }); return o; };
 const restore = o => Object.keys(o).forEach(id => { const e = document.getElementById(id); if (e && 'value' in e && e.type !== 'file') e.value = o[id]; });
@@ -39,7 +40,7 @@ async function upImg(key, input) {
   const f = input.files[0]; if (!f) return; msg = err = ""; const sn = snap();
   try {
     const url = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { const sc = Math.min(1, 1000 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * sc); c.height = Math.round(im.height * sc); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL("image/jpeg", .85)); }; im.onerror = () => no(new Error("File bukan gambar")); im.src = r.result; }; r.onerror = () => no(new Error("Gagal membaca file")); r.readAsDataURL(f); });
-    AD.imgs[key] = (await API.post("/admin/media", { data: url })).url; msg = "Gambar diunggah. Klik Simpan untuk menerapkan.";
+    AD.imgs[key] = (await API.post("/admin/media", { data: url })).url; if (key === "sN" && AD.sterr) delete AD.sterr.img; msg = key === "sN" ? "Gambar diunggah." : "Gambar diunggah. Klik Simpan untuk menerapkan.";
   } catch (e) { err = e.message; } render(); restore(sn);
 }
 
@@ -80,24 +81,56 @@ const openCust = id => aDo(async () => { const [b, p] = await Promise.all([API.g
 const delCust = (id, name) => confirm(`Hapus akun "${name}" beserta SELURUH booking, pembayaran, dan foto miliknya?\nTindakan ini tidak dapat dibatalkan.`) && aDo(async () => { const r = await API.del("/admin/customers/" + id); AD.cust = AD.cdet = AD.dash = AD.ops = AD.studios = AD.books = AD.trx = null; AD.sess = {}; msg = `Akun dihapus (${r.photos_deleted} foto ikut terhapus).`; });
 
 // ---------- Studio (accordion) ----------
+// galat isian Tambah Studio (Figma 592:5056 Input Tidak Valid, 592:5140 Nama Sudah Digunakan)
+const ST_BAD = "Input studio tidak valid. Periksa field yang ditandai.", ST_DUP = "Nama studio sudah digunakan oleh studio lain.", ST_DUPF = "Nama studio sudah digunakan. Gunakan nama lain.";
+const fErr = (e, f) => e && e[f] ? `<p class="ferr" id="ste_${f}">${esc(e[f])}</p>` : "", fInv = (e, f) => e && e[f] ? ` aria-invalid="true" aria-describedby="ste_${f}"` : "";
 function studioForm(s) {
-  const k = "s" + (s.id || "N"), img = AD.imgs[k] || s.img || "", id = s.id || "N";
-  return `<div class="body one"><div class="spanel"><h4>Detail Studio</h4><div class="sgrid"><div><label>Nama</label><input id="st${id}n" value="${esc(s.name || "")}"><label>Status</label>${sel("st" + id + "s", [["AVAILABLE", "Tersedia"], ["UNAVAILABLE", "Tidak tersedia"]], s.status || "AVAILABLE")}<label>Deskripsi</label><textarea id="st${id}d">${esc(s.description || "")}</textarea><label>Alamat / Lokasi</label><input id="st${id}a" value="${esc(s.address || "Jl. Veteran No. 3")}">
-<div class="row" style="flex-wrap:nowrap"><div class="grow"><label>Biaya sewa studio (Rp)</label><input id="st${id}p" type="number" min="0" value="${s.price || 0}"></div><div class="grow"><label>Kapasitas</label>${sel("st" + id + "r", PEOPLE.map(p => [p.id, p.range + " orang"]), s.people_range_id || 1)}</div><div class="grow"><label>Rentang budget</label>${sel("st" + id + "b", BUDGET.map(p => [p.id, p.budget]), s.budget_range_id || 1)}</div></div></div>
-<div><label>Gambar</label><div class="thumb" style="${bgi(img)}">${img ? "" : "Belum ada gambar"}</div><div class="row" style="margin-top:10px"><label class="btn sm soft" style="margin:0">${ic("upload", 16)} Unggah gambar<input type="file" accept="image/*" hidden onchange="upImg('${k}',this)"></label></div>
-<div class="row" style="margin-top:18px"><button class="btn" onclick="studioSave(${s.id || 0})">${s.id ? "Simpan" : "Tambah studio"}</button></div>${s.id ? `<p class="sm m" style="margin-top:8px">${s.active_bookings} booking aktif dari ${s.bookings} booking (tanpa yang batal) · status Tidak tersedia menyembunyikan studio dari customer tanpa mengubah booking yang sudah ada</p>` : ""}</div></div></div>${s.id ? sessPanel(s) : ""}</div>`;
+  const k = "s" + (s.id || "N"), img = AD.imgs[k] || s.img || "", id = s.id || "N", e = s.id ? null : AD.sterr;
+  return `<div class="body one"><div class="spanel"><h4>${s.id ? "Detail Studio" : "Detail Studio Baru"}</h4>${s.id ? "" : `<p class="sm m" style="margin-bottom:10px">Isi data studio. Nama dan gambar wajib diisi, dan nama tidak boleh sama dengan studio lain.</p>${e ? `<div class="ferr-top" role="alert">${ic("alert", 18)}<span>${esc(e.top)}${e.other ? ` (${esc(e.other)})` : ""}</span></div>` : ""}`}<div class="sgrid"><div><label for="st${id}n">Nama</label><input id="st${id}n" class="${e && e.name ? "inv" : ""}" placeholder="Contoh: Studio Kreatif" value="${esc(s.name || "")}"${fInv(e, "name")}>${fErr(e, "name")}<label>Status</label>${sel("st" + id + "s", [["AVAILABLE", "Tersedia"], ["UNAVAILABLE", "Tidak tersedia"]], s.status || "AVAILABLE")}<label>Deskripsi</label><textarea id="st${id}d">${esc(s.description || "")}</textarea><label>Alamat / Lokasi</label><input id="st${id}a" value="${esc(s.address || "Jl. Veteran No. 3")}">
+<div class="row" style="flex-wrap:nowrap"><div class="grow"><label for="st${id}p">Biaya sewa studio (Rp)</label><input id="st${id}p" type="number" min="0" step="1" class="${e && e.price ? "inv" : ""}" value="${s.price ?? 0}"${fInv(e, "price")}>${fErr(e, "price")}</div><div class="grow"><label>Kapasitas</label>${sel("st" + id + "r", PEOPLE.map(p => [p.id, p.range + " orang"]), s.people_range_id || 1)}</div><div class="grow"><label>Rentang budget</label>${sel("st" + id + "b", BUDGET.map(p => [p.id, p.budget]), s.budget_range_id || 1)}</div></div></div>
+<div><label>Gambar</label><div class="thumb ${e && e.img ? "inv" : ""}" style="${bgi(img)}">${img ? "" : "Belum ada gambar"}</div>${fErr(e, "img")}<div class="row" style="margin-top:10px"><label class="btn sm soft" style="margin:0">${ic("upload", 16)} ${img && !s.id ? "Ganti gambar" : "Unggah gambar"}<input type="file" accept="image/*" hidden onchange="upImg('${k}',this)"></label></div>
+<div class="row" style="margin-top:18px">${s.id ? `<button class="btn" onclick="studioSave(${s.id})">Simpan</button>` : `<button class="btn ghost" onclick="stCancel()">Batal</button><button class="btn" onclick="stReview()">Lihat Ringkasan</button>`}</div>${s.id ? `<p class="sm m" style="margin-top:8px">${s.active_bookings} booking aktif dari ${s.bookings} booking (tanpa yang batal) · status Tidak tersedia menyembunyikan studio dari customer tanpa mengubah booking yang sudah ada</p>` : ""}</div></div></div>${s.id ? sessPanel(s) : ""}</div>`;
 }
 V.astudio = () => {
   const L = AD.studios; if (!L) return loading;
   const tog = id => `AD.open[${id}]=!AD.open[${id}];render()`, on = s => s.status != "UNAVAILABLE";
-  return L.filter(s => match(s.name, s.description, s.address)).map(s => `<div class="acc"><div class="acc-h"><button class="acc-t" onclick="${tog(s.id)}" aria-expanded="${!!AD.open[s.id]}"><span>${esc(s.name)}</span><span class="tag ${on(s) ? "ok" : "off"}">${on(s) ? "Tersedia" : "Tidak tersedia"}</span><span class="meta">${rp(s.price || 0)} · ${s.sessions} sesi${s.address ? " · " + esc(s.address) : ""}</span></button>
+  return stDone() + L.filter(s => match(s.name, s.description, s.address)).map(s => `<div class="acc"><div class="acc-h"><button class="acc-t" onclick="${tog(s.id)}" aria-expanded="${!!AD.open[s.id]}"><span>${esc(s.name)}</span><span class="tag ${on(s) ? "ok" : "off"}">${on(s) ? "Tersedia" : "Tidak tersedia"}</span><span class="meta">${rp(s.price || 0)} · ${s.sessions} sesi${s.address ? " · " + esc(s.address) : ""}</span></button>
 <button class="ibtn del" onclick="studioDel(${s.id})" title="Hapus studio" aria-label="Hapus ${esc(s.name)}">${ic("trash", 18)}</button><button class="ibtn" onclick="${tog(s.id)}" aria-label="Buka/tutup detail" aria-expanded="${!!AD.open[s.id]}">${ic(AD.open[s.id] ? "up" : "down", 20)}</button></div>${AD.open[s.id] ? studioForm(s) : ""}</div>`).join("")
-    + `<div class="acc"><button onclick="AD.open.N=!AD.open.N;render()"><span>${ic("plus", 18)} Tambah studio</span>${ic(AD.open.N ? "up" : "down", 20)}</button>${AD.open.N ? studioForm({}) : ""}</div>`;
+    + `<div class="acc"><button onclick="AD.open.N=!AD.open.N;AD.stdone=null;render()" aria-expanded="${!!AD.open.N}"><span>${ic("plus", 18)} Tambah studio${AD.open.N && AD.stsum ? " · Ringkasan" : ""}</span>${ic(AD.open.N ? "up" : "down", 20)}</button>${AD.open.N ? (AD.stsum && AD.stnew ? stSummary() : studioForm(AD.stnew || {})) : ""}</div>`;
 };
+// toast Berhasil (Figma 592:4689): tampil di halaman Studio sampai aksi admin berikutnya
+const stDone = () => AD.stdone ? `<div class="toast okc" role="status">${ic("check", 20)}<div><b>${esc(AD.stdone.title)}</b><small>${esc(AD.stdone.text)}</small></div></div>` : "";
 V.astudio_after = () => { aLoad("studios", () => API.get("/admin/studios"), []); (AD.studios || []).forEach(s => { if (AD.open[s.id]) sessLoad(s.id); }); };
 const masterReload = async () => { const m = await API.get("/master"); STUDIOS = m.STUDIOS; ALLSTUDIOS = m.ALLSTUDIOS || m.STUDIOS; };
-const studioSave = id => aDo(async () => { const k = "s" + (id || "N"), n = id || "N", b = { name: val(`st${n}n`), status: val(`st${n}s`), description: val(`st${n}d`), address: val(`st${n}a`), price: +val(`st${n}p`) || 0, people_range_id: +val(`st${n}r`), budget_range_id: +val(`st${n}b`) }; if (AD.imgs[k]) b.img = AD.imgs[k];
-  if (id) await API.patch("/admin/studios/" + id, b); else await API.post("/admin/studios", b); delete AD.imgs[k]; AD.studios = null; await masterReload(); }, "Studio disimpan.");
+const stRead = n => { const p = val(`st${n}p`); return { name: val(`st${n}n`), status: val(`st${n}s`), description: val(`st${n}d`), address: val(`st${n}a`), price: p === "" ? 0 : +p, people_range_id: +val(`st${n}r`), budget_range_id: +val(`st${n}b`) }; };
+const studioSave = id => aDo(async () => { const k = "s" + id, b = stRead(id); b.price = b.price || 0; if (AD.imgs[k]) b.img = AD.imgs[k];
+  await API.patch("/admin/studios/" + id, b); delete AD.imgs[k]; AD.studios = null; await masterReload(); }, "Studio disimpan.", "mengubah studio"); // ubah studio: satu langkah
+// Tambah Studio: form -> Ringkasan Studio (Figma 592:4329) -> Berhasil (592:4689). Validasi lokal = aturan server + gambar wajib (Figma); server tetap penentu akhir
+function stReview() {
+  const b = stRead("N"), nm = String(b.name || "").trim(), e = {}; msg = err = ""; AD.stdone = null; AD.stnew = b;
+  if (!nm) e.name = "Nama studio wajib diisi."; else if ((AD.studios || []).some(s => String(s.name).trim().toLowerCase() === nm.toLowerCase())) e.name = ST_DUPF;
+  if (!Number.isInteger(b.price) || b.price < 0) e.price = "Biaya sewa harus bilangan bulat 0 atau lebih.";
+  if (!AD.imgs.sN) e.img = "Gambar studio wajib diunggah.";
+  if (Object.keys(e).length) AD.sterr = { top: e.name === ST_DUPF && Object.keys(e).length === 1 ? ST_DUP : ST_BAD, ...e }; else { AD.sterr = null; AD.stsum = true; }
+  render(); if (AD.sterr) { const f = $(".amain .inv"); if (f && f.focus) f.focus(); }
+}
+const stCancel = () => { AD.stnew = AD.stsum = AD.sterr = null; delete AD.imgs.sN; AD.open.N = false; msg = err = ""; render(); };
+const stEdit = () => { AD.stsum = null; render(); }; // kembali ke form, isian tetap (AD.stnew + gambar di AD.imgs.sN)
+function stSummary() {
+  const b = AD.stnew, img = AD.imgs.sN, pr = PEOPLE.find(p => p.id == b.people_range_id), bu = BUDGET.find(p => p.id == b.budget_range_id), row = (t, v) => `<dt>${t}</dt><dd>${v}</dd>`;
+  return `<div class="body one"><div class="spanel"><h4>Ringkasan Studio</h4><p class="sm m" style="margin-bottom:12px">Periksa data studio baru sebelum disimpan. Pilih Ubah untuk memperbaiki isian.</p><div class="sgrid"><dl class="sumdl">
+${row("Nama", esc(b.name.trim()))}${row("Deskripsi", esc(b.description) || "-")}${row("Status", b.status == "UNAVAILABLE" ? "Tidak tersedia" : "Tersedia")}${row("Alamat / Lokasi", esc(b.address) || "-")}${row("Biaya sewa studio", rp(b.price))}${row("Kapasitas", pr ? esc(pr.range) + " orang" : "-")}${row("Rentang budget", bu ? esc(bu.budget) : "-")}</dl>
+<div><div class="thumb" style="${bgi(img)}" role="img" aria-label="Gambar ${esc(b.name.trim())}"></div></div></div>
+<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" onclick="stEdit()">${ic("edit", 16)} Ubah</button><button class="btn" onclick="stSave()">Simpan Studio</button></div></div></div>`;
+}
+const stSave = () => aDo(async () => { const b = { ...AD.stnew, name: AD.stnew.name.trim(), img: AD.imgs.sN }; let r;
+  try { r = await API.post("/admin/studios", b); } catch (e) { // galat server: kembali ke form dengan pesannya
+    if (e.status == 409 && /sudah dipakai/.test(e.message)) AD.sterr = { top: ST_DUP, name: ST_DUPF };
+    else if (e.status == 400) AD.sterr = /Nama/.test(e.message) ? { top: ST_BAD, name: "Nama studio wajib diisi." } : /Angka/.test(e.message) ? { top: ST_BAD, price: "Biaya sewa harus bilangan bulat 0 atau lebih." } : { top: ST_BAD, other: e.message };
+    else throw e; AD.stsum = null; return; }
+  delete AD.imgs.sN; AD.open.N = false; AD.open[r.id] = true; AD.stnew = AD.stsum = AD.sterr = null;
+  AD.stdone = { title: "Studio berhasil ditambahkan", text: b.status == "UNAVAILABLE" ? `${b.name} disimpan dengan status Tidak tersedia, belum tampil di daftar studio pelanggan.` : `${b.name} tersedia dan tampil di daftar studio pelanggan.` };
+  AD.studios = null; await masterReload(); }, "", "menambahkan studio");
 const studioImpactText = i => `Studio ini memiliki ${i.sessions} sesi dan ${i.active_bookings} booking aktif${i.paid_bookings ? ` (${i.paid_bookings} sudah dibayar, total refund ${rp(i.refund_total)})` : ""}. ${i.active_bookings ? "Setelah dikonfirmasi, seluruh booking aktif dibatalkan dan dana yang sudah dibayar dikembalikan 100% kepada pelanggan. " : ""}Studio beserta sesinya tidak lagi tampil, tetapi riwayat booking tetap tersimpan.`;
 const studioDel = id => { const s = (AD.studios || []).find(x => x.id == id); if (!s) return;
   aDo(async () => { const r = await aConfirmDel("/admin/studios/" + id, `Hapus ${s.name}?`, studioImpactText, "Ya, Hapus Studio", s.impact); if (!r) return;

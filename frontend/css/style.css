@@ -184,6 +184,11 @@ video{display:block;width:100%;max-width:100%;max-height:70vh;border-radius:18px
 .sform{margin-top:14px;padding:14px 16px;border:1px solid var(--line-2);border-radius:var(--r-md);background:var(--bg)}.srow{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:6px}
 .spanel{border:1px solid var(--line);border-radius:var(--r-md);padding:16px 20px}.spanel>h4{font-size:17px;font-weight:500;margin-bottom:6px}.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:28px}
 .thumb{width:100%;aspect-ratio:16/9;border-radius:18px;background:var(--blue-100) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+/* Tambah Studio: galat isian (Figma 592:5056, 592:5140), Ringkasan Studio (592:4329), toast Berhasil (592:4689) */
+.ferr{color:#a73333;font-size:12px;margin-top:4px}.ferr-top{display:flex;align-items:center;gap:8px;background:#fdeeee;border:1px solid #e9a3a3;color:#a73333;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px;font-weight:500}
+input.inv{border-color:var(--red)}.thumb.inv{outline:2px dashed var(--red);outline-offset:-2px}
+.sumdl{display:grid;grid-template-columns:max-content 1fr;gap:8px 16px;align-content:start;margin:0}.sumdl dt{color:var(--muted-2);font-size:13px}.sumdl dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
+.toast.okc{display:flex;align-items:flex-start;gap:10px;background:var(--surface);border:1px solid var(--green);color:var(--ink)}.toast.okc .ic{color:var(--surface);background:var(--green);border-radius:50%;padding:3px;flex:none}.toast.okc b{display:block;font-weight:500}.toast.okc small{color:var(--muted-2)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}.stat{background:#fff;border:1px solid var(--line-2);border-radius:var(--r-md);padding:16px}.stat b{display:block;font-size:20px;font-weight:700}
 .tbl{overflow-x:auto}.tbl table{width:100%;border-collapse:collapse;font-size:13px}.tbl th{text-align:left;font-weight:600;color:var(--muted-2);padding:10px 8px;border-bottom:1px solid var(--line-2);white-space:nowrap}.tbl td{padding:9px 8px;border-bottom:1px solid var(--line-2);vertical-align:middle}
 .tbl td input,.tbl td select{min-height:36px;padding:5px 10px;border-radius:10px;min-width:70px}
