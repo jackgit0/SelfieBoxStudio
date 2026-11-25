@@ -88,7 +88,8 @@ route('GET', '/api/availability', 0, ({ query }) => { expireStale(); const { stu
   const used = q(`SELECT slot FROM session WHERE studio_id=? AND slot LIKE ? AND status!='Dibatalkan'`, studio_id, date + ' %').map(r => r.slot);
   return { free: HRS.filter(h => !used.includes(`${date} ${h}:00`) && slotMs(`${date} ${h}:00`) > now()) }; });
 route('GET', '/api/bookings', 1, ({ user }) => { expireStale(); return q('SELECT * FROM booking WHERE user_id=? ORDER BY id DESC', user.sub).map(bookOut); });
-route('POST', '/api/quote', 1, ({ body }) => { const pk = one('SELECT * FROM package WHERE id=? AND active!=0', body.package_id) || bad('Paket tidak valid'); const st = body.studio_id ? one('SELECT * FROM studio WHERE id=?', body.studio_id) : null; if (body.studio_id && !visible(st)) bad('Studio tidak tersedia'); return quote(pk, st); });
+// publik (tamu melihat total di langkah Paket & Pembayaran); hanya membaca
+route('POST', '/api/quote', 0, ({ body }) => { const pk = one('SELECT * FROM package WHERE id=? AND active!=0', body.package_id) || bad('Paket tidak valid'); const st = body.studio_id ? one('SELECT * FROM studio WHERE id=?', body.studio_id) : null; if (body.studio_id && !visible(st)) bad('Studio tidak tersedia'); return quote(pk, st); });
 route('POST', '/api/bookings', 1, ({ body, user }) => { const pk = one('SELECT * FROM package WHERE id=? AND active!=0', body.package_id), st = one('SELECT * FROM studio WHERE id=?', body.studio_id);
   if (!pk || !st) bad('Paket/studio tidak valid'); if (!visible(st)) bad('Studio tidak tersedia'); validSlot(body.date); expireStale(); const x = quote(pk, st);
   return tx(() => { let id; try { id = run('INSERT INTO booking(user_id,package_id,status,amount,created_at,subtotal,main_disc,studio_fee) VALUES(?,?,?,?,?,?,?,?)', user.sub, pk.id, 'Menunggu Pembayaran', x.total, now(), x.subtotal, x.mainDisc, x.studio_fee).lastInsertRowid;

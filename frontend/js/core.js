@@ -47,12 +47,15 @@ const IC = {
   pin: '<path d="M12 21s7-6 7-11a7 7 0 10-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>', studio: '<path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/>',
   glasses: '<circle cx="7" cy="14" r="4"/><circle cx="17" cy="14" r="4"/><path d="M11 14h2M3 14l2-8M21 14l-2-8"/>', run: '<circle cx="14" cy="4" r="2"/><path d="M7 21l3-6 3 2v4M10 15l1-5 4 2 3-1M9 10l-3 2"/>',
   card: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/>', upload: '<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>', dash: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
-  download: '<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>', refresh: '<path d="M20 11a8 8 0 00-14-4M4 4v4h4M4 13a8 8 0 0014 4M20 20v-4h-4"/>', box: '<path d="M3 7l9-4 9 4v10l-9 4-9-4V7zM3 7l9 4 9-4M12 11v10"/>', menu: '<path d="M4 7h16M4 12h16M4 17h16"/>'
+  download: '<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>', refresh: '<path d="M20 11a8 8 0 00-14-4M4 4v4h4M4 13a8 8 0 0014 4M20 20v-4h-4"/>', box: '<path d="M3 7l9-4 9 4v10l-9 4-9-4V7zM3 7l9 4 9-4M12 11v10"/>', menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>', alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16h.01"/>'
 };
 const ic = (n, s = 20) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[n] || ""}</svg>`;
 const icf = (n, s = 20) => ic(n, s).replace('fill="none"', 'fill="currentColor"');
 
 // ---------- navigasi ----------
+// tamu (belum login) boleh melihat studio, paket dan mengisi form booking; login diminta saat Check Out (keputusan 34–35)
+const GUEST_VIEWS = ["auth", "landing", "home", "packages", "studio", "time", "pay"];
 const ADMIN_VIEWS = ["adash", "acust", "astudio", "abook", "aprop", "apose", "atrx", "apkg", "aacct"];
 const TITLES = { home: "Browse", packages: "Pilihan Paket", studio: "Studio", time: "Pilih Waktu", pay: "Pembayaran", my: "Booking Saya", bdetail: "Detail Booking", cancel: "Pembatalan", refund: "Refund", success: "Booking", rescheduled: "Reschedule", gallery: "Galeri", session: "Sesi Foto", account: "Akun" };
 const TABGROUP = { home: ["home", "packages", "studio", "time", "pay", "success", "rescheduled"], my: ["my", "bdetail", "cancel", "refund"], gallery: ["gallery", "session"] };
@@ -78,22 +81,25 @@ function modal({ title, body = "", buttons = [{ label: "Tutup", value: null }], 
 }
 const toasts = () => (msg ? `<div class="toast">${esc(msg)}</div>` : "") + (err ? `<div class="toast err">${esc(err)}</div>` : "");
 
+const acctMenu = () => `<div class="usr">${S.staff ? '<span class="tag warn">Staf</span>' : ""}<span class="uname">${esc(me().name)}</span><button class="avatar" aria-label="Menu akun" onclick="toggleMenu(event)">${ic("user", 20)}</button>
+<div id="menu" class="menu" hidden><button onclick="openAcct('profile')">${ic("user", 18)} Pengaturan Akun</button><button onclick="openAcct('pay')">${ic("receipt", 18)} Riwayat Pembayaran</button>
+<button onclick="staffToggle()">${ic("settings", 18)} ${S.staff ? "Nonaktifkan Mode Staf" : "Mode Staf"}</button><button onclick="logout()">${ic("logout", 18)} Keluar</button></div></div>`;
+// tab Booking/Galeri untuk tamu membuka halaman Masuk
+const navGo = k => S.me || k === "home" ? `go('${k}')` : "openAuth('login')";
 function shell(inner) {
   const nav = [["home", "Beranda", "home"], ["my", "Booking", "calendar"], ["gallery", "Galeri", "images"]], on = k => (TABGROUP[k] || []).includes(S.view);
   return `<header class="top"><div class="brand">${esc(BRAND)}</div><div class="mtitle">${TITLES[S.view] || ""}</div>
-<nav class="tabs">${nav.map(n => `<button class="tab ${on(n[0]) ? "on" : ""}" onclick="go('${n[0]}')">${ic(n[2], 18)}<span>${n[1]}</span></button>`).join("")}</nav>
-<div class="usr">${S.staff ? '<span class="tag warn">Staf</span>' : ""}<span class="uname">${esc(me().name)}</span><button class="avatar" aria-label="Menu akun" onclick="toggleMenu(event)">${ic("user", 20)}</button>
-<div id="menu" class="menu" hidden><button onclick="openAcct('profile')">${ic("user", 18)} Pengaturan Akun</button><button onclick="openAcct('pay')">${ic("receipt", 18)} Riwayat Pembayaran</button>
-<button onclick="staffToggle()">${ic("settings", 18)} ${S.staff ? "Nonaktifkan Mode Staf" : "Mode Staf"}</button><button onclick="logout()">${ic("logout", 18)} Keluar</button></div></div></header>
+<nav class="tabs">${nav.map(n => `<button class="tab ${on(n[0]) ? "on" : ""}" onclick="${navGo(n[0])}">${ic(n[2], 18)}<span>${n[1]}</span></button>`).join("")}</nav>
+${S.me ? acctMenu() : `<div class="usr"><button class="btn ghost sm" onclick="openAuth('login')">Masuk</button><button class="btn sm" onclick="openAuth('register')">Daftar</button></div>`}</header>
 <main class="page">${toasts()}${inner}</main>
-<nav class="bottom">${nav.map(n => `<button class="${on(n[0]) ? "on" : ""}" onclick="go('${n[0]}')">${ic(n[2], 22)}<span>${n[1]}</span></button>`).join("")}</nav>`;
+<nav class="bottom">${nav.map(n => `<button class="${on(n[0]) ? "on" : ""}" onclick="${navGo(n[0])}">${ic(n[2], 22)}<span>${n[1]}</span></button>`).join("")}</nav>`;
 }
 // muat ulang data master (studio/properti/paket) bila admin mengubahnya; render ulang hanya jika berbeda
 let _mj = "";
 async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, FAV_PKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, PROP, POSES } = m); ALLSTUDIOS = ALLSTUDIOS || STUDIOS; if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
 V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
 function render() {
-  if (!S.me && !["auth", "landing"].includes(S.view)) S.view = "landing";
+  if (!S.me && !GUEST_VIEWS.includes(S.view)) S.view = "landing";
   if (S.view !== "landing") window.onscroll = null;
   if (S.admin && !ADMIN_VIEWS.includes(S.view)) S.view = "adash";
   if (S.admin && typeof AD !== "undefined" && AD.me && AD.me.must_change && S.view !== "aacct") S.view = "aacct"; // password bawaan: hanya halaman Akun Admin yang terbuka
@@ -114,7 +120,8 @@ async function prefetch() {
 let authMode = "login", resetTok = "";
 V.auth = () => {
   const tabs = `<div class="seg">${[["login", "Masuk"], ["register", "Daftar"]].map(t => `<button class="${authMode == t[0] ? "on" : ""}" onclick="authMode='${t[0]}';msg=err='';render()">${t[1]}</button>`).join("")}</div>`;
-  const wrap = h => `<div class="authcard"><button class="back" onclick="go('landing')">${ic("left", 16)} Beranda</button><div class="brand">${esc(BRAND)}</div><p class="sub center" style="margin-bottom:14px">Sesi foto self-service, tinggal pilih dan datang.</p>${toasts()}${h}</div>`;
+  const draft = S.draft && ["login", "register"].includes(authMode), back = draft && B.slot && Q; // datang dari popup Belum Login (Figma 585:4400)
+  const wrap = h => `<div class="authcard"><button class="back" onclick="${back ? "go('pay')" : "go('landing')"}">${ic("left", 16)} ${back ? "Kembali ke booking" : "Beranda"}</button><div class="brand">${esc(BRAND)}</div><p class="sub center" style="margin-bottom:14px">Sesi foto self-service, tinggal pilih dan datang.</p>${toasts()}${draft ? `<h2 class="h3">Masuk untuk melanjutkan booking</h2><div class="mnote" style="margin:8px 0 14px">${ic("info", 16)} Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.</div>` : ""}${h}</div>`;
   const key = 'onkeydown="if(event.key===\'Enter\')';
   if (authMode == "reset") return wrap(`<h2 class="h2">Buat Sandi Baru</h2><label>Password baru</label><input id="pw" type="password" autocomplete="new-password"><label>Ulangi password</label><input id="pw2" type="password" autocomplete="new-password" ${key}doReset()"><div style="margin-top:18px"><button class="btn block" onclick="doReset()">Simpan Sandi</button></div>`);
   if (authMode == "forgot") return wrap(`<h2 class="h2">Lupa Sandi</h2><p class="m sm">Masukkan email akun Anda. Tautan untuk membuat sandi baru akan dikirim ke email tersebut.</p><label>Email</label><input id="e" type="email" ${key}forgot()"><div class="row" style="margin-top:18px"><button class="btn grow" onclick="forgot()">Kirim Tautan</button><button class="btn ghost" onclick="authMode='login';msg=err='';render()">Kembali</button></div>`);
@@ -125,8 +132,8 @@ const fixS = s => { s.photos.forEach(p => p.img = p.img || API.imgUrl(p.id)); re
 async function refresh() {
   S.bookings = await API.get("/bookings"); S.sessions = (await API.get("/sessions")).map(fixS);
 }
-async function afterAuth(r) { API.token = r.token; localStorage.setItem("snapia_t", r.token); S.admin = false; S.user = r.user; S.me = r.user.id; await refresh(); go("home"); }
-function logout() { API.token = ""; API.staff = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; S.staff = false; S.admin = false; S.bookings = []; S.sessions = []; if (typeof adminReset === "function") adminReset(); authMode = "login"; go("landing"); }
+async function afterAuth(r) { API.token = r.token; localStorage.setItem("snapia_t", r.token); S.admin = false; S.user = r.user; S.me = r.user.id; await refresh(); if (S.draft) return resumeDraft(); go("home"); } // draf booking tamu: kembali ke Paket & Pembayaran
+function logout() { API.token = ""; API.staff = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; S.staff = false; S.admin = false; S.draft = null; S.bookings = []; S.sessions = []; if (typeof adminReset === "function") adminReset(); authMode = "login"; go("landing"); }
 async function staffToggle() { if (S.staff) { S.staff = false; API.staff = ""; } else { const pin = prompt("PIN staf:"); if (!pin) return; try { API.staff = (await API.post("/staff/login", { pin })).token; S.staff = true; } catch (e) { err = e.message; } } save(); render(); }
 async function reg() {
   const n = $("#n").value.trim(), e = $("#e").value.trim(), p = $("#p").value.trim(), pw = $("#pw").value;
@@ -148,7 +155,7 @@ async function doReset() {
   try { await API.post("/auth/reset", { token: resetTok, password: a }); resetTok = ""; authMode = "login"; msg = "Sandi berhasil diubah. Silakan masuk dengan sandi baru."; } catch (x) { err = x.message; } render();
 }
 async function adminLogin(username, password) {
-  const r = await API.post("/admin/login", { username, password }); API.token = r.token; localStorage.setItem("snapia_t", r.token); S.admin = true; S.user = { name: "Admin", id: 0 }; S.me = "admin"; AD.me = r.admin; go(r.admin.must_change ? "aacct" : "adash");
+  const r = await API.post("/admin/login", { username, password }); API.token = r.token; localStorage.setItem("snapia_t", r.token); S.admin = true; S.draft = null; S.user = { name: "Admin", id: 0 }; S.me = "admin"; AD.me = r.admin; go(r.admin.must_change ? "aacct" : "adash");
 }
 async function changePw() { try { await API.post("/auth/forgot", { email: me().email }); msg = "Tautan untuk mengubah sandi telah dikirim ke " + me().email; } catch (x) { err = x.message; } render(); }
 function csContact() { const wa = window.CS_WA, mail = window.CS_EMAIL; if (wa) window.open("https://wa.me/" + wa, "_blank"); else if (mail) location.href = "mailto:" + mail; else alert("Silakan hubungi staf di studio atau kontak Customer Service Anda. (Atur nomor di frontend/js/config.js)"); }
