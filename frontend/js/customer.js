@@ -138,7 +138,7 @@ async function sesiBooked() {
 // Belum Login: draf (studio, tanggal, sesi) disimpan agar setelah Masuk/Daftar alur kembali ke Paket & Pembayaran
 async function needLogin() {
   S.draft = { studio: B.studio, date: B.date, slot: B.slot }; save();
-  const v = await modal({ title: "Masuk untuk melanjutkan booking", cls: "center", kicker: mIcon("info", "info"), body: "<p>Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.</p>",
+  const v = await modal({ title: "Masuk untuk melanjutkan booking", cls: "center", kicker: mIcon("info", "blue"), body: "<p>Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.</p>",
     buttons: [{ label: "Masuk", value: "login", icon: "user" }, { label: "Daftar", value: "register", style: "ghost" }] });
   if (!v) return;
   if (S.me) { API.token = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; S.bookings = []; S.sessions = []; } // token kedaluwarsa (401 saat booking)

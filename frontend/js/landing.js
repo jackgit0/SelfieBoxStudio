@@ -35,7 +35,7 @@ V.landing = () => {
   const links = LSECS.map(l => `<button data-s="${l[0]}" onclick="toSec('${l[0]}')">${l[1]}</button>`).join("");
   const propImgs = PROP.filter(p => p.img).slice(0, 4);
   return `<div class="lp"><header class="lnav"><div class="lnav-in"><a class="brand" href="#" onclick="toSec('home');return false">${esc(BRAND)}</a><nav class="llinks">${links}</nav>
-<div class="lact"><button class="btn ghost sm lstudio" onclick="go('home')">Lihat Studio</button><button class="btn ghost sm" onclick="openAuth('login')">Masuk</button><button class="btn sm" onclick="openAuth('register')">Join Sekarang</button><button class="ib lburger" aria-label="Menu" onclick="lpMenu()">${ic("menu", 20)}</button></div></div>
+<div class="lact"><button class="btn ghost sm" onclick="openAuth('login')">Masuk</button><button class="btn sm" onclick="openAuth('register')">Join Sekarang</button><button class="ib lburger" aria-label="Menu" onclick="lpMenu()">${ic("menu", 20)}</button></div></div>
 <div id="lmenu" class="lmenu" hidden>${LSECS.map(l => `<button onclick="toSec('${l[0]}')">${l[1]}</button>`).join("")}<button onclick="go('home')">Lihat Studio</button><button onclick="openAuth('login')">Masuk</button></div></header>
 
 <section id="home" class="hero"><div class="lw hero-in"><div><span class="tag">Studio foto self-service</span><h1 class="hero-h">Abadikan momen terbaikmu, <span>tanpa ribet.</span></h1>
