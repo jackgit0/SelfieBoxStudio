@@ -25,7 +25,7 @@ test("booking baru: judul, langkah 1/2, Kembali ke Detail Studio, tombol Lanjut 
   assert.ok(markup instanceof Safe);
   const text = flat(markup);
   assert.match(text, /<button class="back" data-route="\/studios\/1"><svg[^]*?<\/svg> Kembali<\/button>/);
-  assert.match(text, /<h1 class="h1">Pilih Tanggal &amp; Waktu<\/h1><p class="sub">Melati · Jl. Veteran 3<\/p><\/div><span class="steps">1\/2<\/span>/);
+  assert.match(text, /<h1 class="h1">Pilih Tanggal &amp; Waktu<\/h1><p class="sub">Melati<\/p><\/div><span class="steps">1\/2<\/span>/);
   assert.match(text, /<button class="btn block" style="margin-top:22px" data-action="booking:next">Lanjut ke Pembayaran<\/button>/);
   assert.doesNotMatch(text, /disabled[^>]*data-action="booking:next"/);
   assert.doesNotMatch(text, /onclick=|onchange=/);

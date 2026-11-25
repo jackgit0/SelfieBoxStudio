@@ -3,7 +3,7 @@
 // options = { brand, wa, email, now } (default dari config.js; tes mengisinya sendiri).
 import { html } from "../core/html.js";
 import { SESSION_HOURS, padTwo, formatRupiahShort } from "../core/format.js";
-import { BRAND, CS_EMAIL, CS_WA } from "../config.js";
+import { BRAND, CS_EMAIL, CS_WA, STUDIO_ADDRESS } from "../config.js";
 import { capacityLabel, effectivePrice, priceRange } from "../models/master.js";
 import { icon } from "../components/icon.js";
 import { backgroundImage } from "../components/propertyVisual.js";
@@ -142,7 +142,6 @@ export function landingView(state, match, { brand = BRAND, wa = CS_WA, email = C
   const master = state.master;
   const contact = state.runtime.contact;
   const lowest = master.packages.length ? Math.min(...master.packages.map(item => effectivePrice(master, item))) : 0;
-  const address = (master.studios[0] || {}).address || "Jl. Veteran No. 3";
   const first = padTwo(SESSION_HOURS[0]);
   const last = padTwo(SESSION_HOURS[SESSION_HOURS.length - 1]);
   const heroImage = (master.studios[0] || {}).img || "/img/studio-1.jpg";
@@ -338,7 +337,7 @@ export function landingView(state, match, { brand = BRAND, wa = CS_WA, email = C
               ${icon("pin", 20)}
               <div>
                 <b>Alamat</b>
-                <p>${address}</p>
+                <p>${STUDIO_ADDRESS}</p>
               </div>
             </div>
             <div class="citem">

@@ -15,7 +15,7 @@ test("studioView: detail studio dengan Book Now (booking:start) dan bintang book
   assert.match(text, /<button class="back" data-route="\/browse"><svg[^]*?<\/svg> Kembali<\/button>/);
   assert.match(text, /<h1 class="h2">Melati<\/h1><button class="star on" aria-label="Favorit" data-action="studio:toggleBookmark" data-id="1">/);
   assert.match(text, /<button class="btn" data-action="booking:start" data-id="1">Book Now<\/button>/);
-  assert.match(text, /Jl. Veteran 3/);
+  assert.doesNotMatch(text, /Jl\. Veteran/); // studio tanpa alamat
   assert.doesNotMatch(text, /onclick=/);
 });
 

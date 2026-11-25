@@ -17,13 +17,13 @@ export function sampleMaster(overrides = {}) {
     peopleRanges: [{ id: 1, range: "1-2" }, { id: 2, range: "3-5" }],
     budgetRanges: [],
     studios: [
-      { id: 1, name: "Melati", description: "Studio terang", img: "/uploads/melati.jpg", address: "Jl. Veteran 3", price: 0, people_range_id: 2 },
-      { id: 2, name: "Mawar", description: "Studio gelap", img: "", address: "", price: 0, people_range_id: 1 },
+      { id: 1, name: "Melati", description: "Studio terang", img: "/uploads/melati.jpg", price: 0, people_range_id: 2 },
+      { id: 2, name: "Mawar", description: "Studio gelap", img: "", price: 0, people_range_id: 1 },
     ],
     allStudios: [
-      { id: 1, name: "Melati", description: "Studio terang", img: "/uploads/melati.jpg", address: "Jl. Veteran 3", price: 0, people_range_id: 2 },
-      { id: 2, name: "Mawar", description: "Studio gelap", img: "", address: "", price: 0, people_range_id: 1 },
-      { id: 9, name: "Anggrek", description: "Disembunyikan admin", img: "", address: "", price: 0, people_range_id: 1 },
+      { id: 1, name: "Melati", description: "Studio terang", img: "/uploads/melati.jpg", price: 0, people_range_id: 2 },
+      { id: 2, name: "Mawar", description: "Studio gelap", img: "", price: 0, people_range_id: 1 },
+      { id: 9, name: "Anggrek", description: "Disembunyikan admin", img: "", price: 0, people_range_id: 1 },
     ],
     properties: [
       { id: 1, name: "Latar Merah", category: "Background", qty: 2, img: "", bg: "#c33,#a22" },

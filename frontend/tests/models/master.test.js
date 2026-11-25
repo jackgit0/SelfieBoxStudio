@@ -68,7 +68,7 @@ test("effectivePrice menerapkan diskon utama dan membulatkan", () => {
 test("studioOf: studio yang sudah dihapus memberi placeholder (studio dihapus)", () => {
   const master = mapMaster(raw());
   assert.equal(studioOf(master, 8).name, "Mawar");
-  assert.deepEqual(studioOf(master, 99), { id: 99, name: "(studio dihapus)", img: "", address: "-", price: 0, description: "" });
+  assert.deepEqual(studioOf(master, 99), { id: 99, name: "(studio dihapus)", img: "", price: 0, description: "" });
 });
 
 test("priceRange: rentang harga paket (setelah diskon) dalam format singkat", () => {

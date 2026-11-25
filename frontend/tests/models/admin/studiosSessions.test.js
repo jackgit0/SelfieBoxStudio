@@ -5,11 +5,11 @@ import * as studios from "../../../js/models/admin/studios.js";
 import * as sessions from "../../../js/models/admin/sessions.js";
 import { createFakeApi } from "../../helpers/fakeApi.js";
 
-const form = overrides => ({ name: "Studio Senja", status: "AVAILABLE", description: "Cahaya alami", address: "Jl. Veteran No. 3", price: "0", people_range_id: "2", budget_range_id: "1", ...overrides });
+const form = overrides => ({ name: "Studio Senja", status: "AVAILABLE", description: "Cahaya alami", price: "0", people_range_id: "2", budget_range_id: "1", ...overrides });
 const apiError = (status, message) => Object.assign(new Error(message), { status, data: { error: message } });
 
 test("studioBody: angka dari teks, biaya kosong = 0, gambar hanya bila ada", () => {
-  assert.deepEqual(studios.studioBody(form({ price: "" })), { name: "Studio Senja", status: "AVAILABLE", description: "Cahaya alami", address: "Jl. Veteran No. 3", price: 0, people_range_id: 2, budget_range_id: 1 });
+  assert.deepEqual(studios.studioBody(form({ price: "" })), { name: "Studio Senja", status: "AVAILABLE", description: "Cahaya alami", price: 0, people_range_id: 2, budget_range_id: 1 });
   assert.equal(studios.studioBody(form({ price: "15000" }), "/media/a.jpg").img, "/media/a.jpg");
   assert.equal(studios.studioBody(form({ price: "12.5" })).price, 12.5);
 });

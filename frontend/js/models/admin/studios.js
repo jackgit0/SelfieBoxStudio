@@ -33,7 +33,6 @@ export function studioBody(values, image) {
     name: values.name,
     status: values.status,
     description: values.description,
-    address: values.address,
     price: values.price === "" || values.price === undefined ? 0 : Number(values.price),
     people_range_id: Number(values.people_range_id),
     budget_range_id: Number(values.budget_range_id),

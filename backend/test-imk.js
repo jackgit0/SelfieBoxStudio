@@ -204,7 +204,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     const AD = (await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token; ok(U && AD, 'fixture fase 5: customer dan admin masuk');
     // 1. kontrak API yang dipakai dialog dan langkah ringkasan
     for (const [m, p] of [['GET', '/admin/studios'], ['POST', '/admin/studios']]) { const r = await call(m, p, m === 'POST' ? { name: 'Studio Tamu' } : null, U); ok(r.s === 403 && r.j.error === 'Hanya admin', `${m} /api/admin/studios dengan token customer: 403 "Hanya admin" (pemicu Akses Ditolak)`); }
-    const nm = (await call('GET', '/admin/studios', null, AD)).j[0].name, SB = o => ({ status: 'AVAILABLE', description: '', address: '', price: 0, people_range_id: 1, budget_range_id: 1, ...o }); // isi seperti form admin
+    const nm = (await call('GET', '/admin/studios', null, AD)).j[0].name, SB = o => ({ status: 'AVAILABLE', description: '', price: 0, people_range_id: 1, budget_range_id: 1, ...o }); // isi seperti form admin
     { const r = await call('POST', '/admin/studios', SB({ name: ' ' + nm.toUpperCase() + ' ' }), AD); ok(r.s === 409 && r.j.error === 'Nama studio sudah dipakai', 'tambah studio dengan nama yang sudah ada: 409 "Nama studio sudah dipakai"'); }
     { const r = await call('POST', '/admin/studios', SB({ name: '  ' }), AD); ok(r.s === 400 && r.j.error === 'Nama studio wajib diisi', 'tambah studio tanpa nama: 400 "Nama studio wajib diisi"'); }
     { const r = await call('PATCH', '/admin/account', { current_password: 'salah' }, AD); ok(r.s === 403 && r.j.error === 'Password saat ini salah', '403 lain di admin ("Password saat ini salah") bukan Akses Ditolak'); }
@@ -265,6 +265,27 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!fs.existsSync(path.join(FRONT, 'css', 'style.css')), 'css/style.css sudah dipecah (tidak ada lagi)');
   }
 
+
+  // ===== Studio tanpa alamat (imk/dev/studio-fix-plan.md bagian 2) =====
+  srv = start('st'); await up();
+  { const cols = k => { const D = new DatabaseSync(DB(k)); const c = D.prepare('PRAGMA table_info(studio)').all().map(r => r.name); D.close(); return c; };
+    const AD = (await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token; ok(AD, 'fixture studio: admin masuk');
+    ok(!cols('st').includes('address'), 'database baru: tabel studio tanpa kolom address');
+    ok((await call('GET', '/master')).j.STUDIOS.every(s => !('address' in s)), 'GET /api/master: studio tanpa address');
+    ok((await call('GET', '/admin/studios', null, AD)).j.every(s => !('address' in s)), 'GET /api/admin/studios: studio tanpa address');
+    { const r = await call('POST', '/admin/studios', { name: 'Studio Alamat', address: 'Jl. Lama 1', price: 0, people_range_id: 1, budget_range_id: 1 }, AD); ok(r.s === 200 && r.j.id, 'tambah studio dengan address (klien lama): diterima, address diabaikan');
+      const s = (await call('GET', '/admin/studios', null, AD)).j.find(x => x.id === r.j.id); ok(s && !('address' in s), 'studio baru tersimpan tanpa address'); }
+    { const r = await call('PATCH', '/admin/studios/1', { address: 'Jl. Lama 2' }, AD); ok(r.s === 200, 'ubah studio dengan address (klien lama): diterima, address diabaikan'); }
+    await down(srv);
+    // database lama: kolom address dikembalikan + flag dihapus → server menyala menghapusnya sekali
+    { const D = new DatabaseSync(DB('st')); D.exec("ALTER TABLE studio ADD COLUMN address TEXT DEFAULT 'Jl. Veteran No. 3'"); D.exec("DELETE FROM setting WHERE key='drop_studio_address_v1'"); D.close(); }
+    srv = start('st'); await up(); await down(srv);
+    { const D = new DatabaseSync(DB('st')); const f = D.prepare("SELECT 1 FROM setting WHERE key='drop_studio_address_v1'").get(), n = D.prepare('SELECT COUNT(*) c FROM studio').get().c; D.close();
+      ok(!cols('st').includes('address') && f && n >= 4, 'database lama: kolom address dihapus, flag drop_studio_address_v1 tercatat, data studio tetap'); }
+    srv = start('st'); await up(); ok(!cols('st').includes('address'), 'menyala kedua kali: tetap tanpa address (migrasi sekali)');
+    { const JS = allJs(); for (const s of ['Alamat / Lokasi', 'name="address"', 'studio.address', '"Lokasi"']) ok(!JS.includes(s), `frontend tanpa "${s}"`); }
+  }
+  await down(srv);
 
   // ===== Fase refactor 3: fallback SPA (rute frontend dengan path history disajikan index.html) =====
   srv = start('spa'); await up();

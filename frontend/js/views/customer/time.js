@@ -48,7 +48,7 @@ export function timeView(state, match, now = new Date()) {
     <div class="row sp">
       <div>
         <h1 class="h1">${rescheduleId ? "Ubah Jadwal" : "Pilih Tanggal & Waktu"}</h1>
-        <p class="sub">${studio.name} · ${studio.address || ""}</p>
+        <p class="sub">${studio.name}</p>
       </div>
       ${rescheduleId ? "" : html`<span class="steps">1/2</span>`}
     </div>

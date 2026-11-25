@@ -72,9 +72,7 @@ function studioForm({ studio, values, image, errors, master }) {
         >${selectField({ id: `st${id}s`, name: "status", options: STATUS_OPTIONS, current: values.status || "AVAILABLE" })}<label
           for="st${id}d"
           >Deskripsi</label
-        ><textarea id="st${id}d" name="description">${values.description || ""}</textarea
-        ><label for="st${id}a">Alamat / Lokasi</label
-        ><input id="st${id}a" name="address" value="${values.address || "Jl. Veteran No. 3"}" />
+        ><textarea id="st${id}d" name="description">${values.description || ""}</textarea>
         <div class="row" style="flex-wrap:nowrap">
           <div class="grow">
             <label for="st${id}p">Biaya sewa studio (Rp)</label
@@ -137,7 +135,7 @@ function summaryCard(values, image, master) {
       </p>
       <div class="sgrid">
         <dl class="sumdl">
-          ${row("Nama", name)}${row("Deskripsi", values.description || "-")}${row("Status", isAvailable(values) ? "Tersedia" : "Tidak tersedia")}${row("Alamat / Lokasi", values.address || "-")}${row("Biaya sewa studio", formatRupiah(values.price))}${row("Kapasitas", capacity ? capacity.range + " orang" : "-")}${row("Rentang budget", budget ? budget.budget : "-")}
+          ${row("Nama", name)}${row("Deskripsi", values.description || "-")}${row("Status", isAvailable(values) ? "Tersedia" : "Tidak tersedia")}${row("Biaya sewa studio", formatRupiah(values.price))}${row("Kapasitas", capacity ? capacity.range + " orang" : "-")}${row("Rentang budget", budget ? budget.budget : "-")}
         </dl>
         <div><div class="thumb" style="${backgroundImage(image)}" role="img" aria-label="Gambar ${name}"></div></div>
       </div>
@@ -151,8 +149,7 @@ function summaryCard(values, image, master) {
 
 function studioRow(studio, admin, master, today) {
   const open = Boolean(admin.openStudios[studio.id]);
-  const meta =
-    formatRupiah(studio.price || 0) + ` · ${studio.sessions} sesi` + (studio.address ? " · " + studio.address : "");
+  const meta = formatRupiah(studio.price || 0) + ` · ${studio.sessions} sesi`;
   const body = open
     ? html`<div class="body one">
         ${studioForm({ studio, values: admin.drafts["studio-" + studio.id] || studio, image: admin.images[studio.id] || studio.img || "", errors: null, master })}${sessionPanel(admin, studio, today)}
@@ -225,7 +222,7 @@ export function studiosView(state, match, now = new Date()) {
   }
   const today = isoDate(now);
   const rows = admin.studios
-    .filter(studio => matchesQuery(admin.query, studio.name, studio.description, studio.address))
+    .filter(studio => matchesQuery(admin.query, studio.name, studio.description))
     .map(studio => studioRow(studio, admin, state.master, today));
   return html`${doneCard(admin.studioDone)}${rows} ${newStudioSection(admin, state.master)}`;
 }

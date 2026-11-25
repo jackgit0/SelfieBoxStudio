@@ -7,7 +7,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms)), pad = n => String(n).pad
 (async () => { await wait(1200); let n = 0; const ok = (c, m) => { assert(c, m); console.log('✔', m); n++; };
   const dayOf = k => { const d = new Date(); d.setDate(d.getDate() + k); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
   const U = (await call('POST', '/auth/register', { name: 'Ana', email: 'a@x.id', phone: '0811111111', password: 'secret1' })).j.token, AD = (await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token;
-  const m = (await call('GET', '/master')).j; ok(m.POLICY.refund_hours === 96 && m.STUDIOS[0].img && m.STUDIOS[0].address && m.PROP.some(p => p.img && p.category === 'Topi'), 'master memuat kebijakan refund, gambar/alamat studio, properti berfoto');
+  const m = (await call('GET', '/master')).j; ok(m.POLICY.refund_hours === 96 && m.STUDIOS[0].img && !('address' in m.STUDIOS[0]) && m.PROP.some(p => p.img && p.category === 'Topi'), 'master memuat kebijakan refund, gambar/alamat studio, properti berfoto');
   // profil
   ok((await call('PATCH', '/me', { name: 'Ana B', phone: '0899999999' }, U)).j.name === 'Ana B', 'customer mengubah profil'); ok((await call('PATCH', '/me', { name: '', phone: '1' }, U)).s === 400, 'validasi profil');
   // tarif studio + properti qty
@@ -31,7 +31,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms)), pad = n => String(n).pad
   const c2 = (await call('POST', `/bookings/${b3.id}/cancel`, { reason: 'Tidak ada waktu' }, U)).j; ok(c2.refund.state === 'failed' && c2.booking.pay_status === 'refund_failed', 'refund gagal bila kurang dari batas jam sebelum sesi');
   ok((await call('GET', '/admin/revenue', null, AD)).j.all.total === 50000, 'refund gagal: uang tetap dihitung sebagai pendapatan');
   // admin: studio / properti / pose / booking / transaksi / media
-  const sid = (await call('POST', '/admin/studios', { name: 'Studio Baru', description: 'x', address: 'Jl. Baru 1', price: 5000, people_range_id: 1, budget_range_id: 1 }, AD)).j.id; ok(sid, 'admin menambah studio'); ok((await call('GET', '/master')).j.STUDIOS.some(s => s.id === sid && s.img), 'studio baru memakai gambar bawaan');
+  const sid = (await call('POST', '/admin/studios', { name: 'Studio Baru', description: 'x', price: 5000, people_range_id: 1, budget_range_id: 1 }, AD)).j.id; ok(sid, 'admin menambah studio'); ok((await call('GET', '/master')).j.STUDIOS.some(s => s.id === sid && s.img), 'studio baru memakai gambar bawaan');
   ok((await call('PATCH', `/admin/studios/${sid}`, { name: 'Studio Baru 2', img: 'javascript:alert(1)' }, AD)).s === 400, 'URL gambar berbahaya ditolak');
   ok((await call('DELETE', '/admin/studios/1', null, AD)).s === 200 && !(await call('GET', '/master')).j.STUDIOS.some(s => s.id === 1) && (await call('GET', '/master')).j.ALLSTUDIOS.some(s => s.id === 1), 'studio yang hanya punya riwayat booking batal di-soft-delete (riwayat tetap ada)');
   const h1 = (await call('GET', '/bookings', null, U)).j.find(b => b.id === b1.id); ok(h1 && h1.status === 'Dibatalkan' && h1.cancel_reason === 'Tidak ada waktu' && h1.studio === 1, 'riwayat booking di studio terhapus tidak berubah'); ok((await call('DELETE', `/admin/studios/${sid}`, null, AD)).s === 200, 'studio tanpa riwayat dapat dihapus');

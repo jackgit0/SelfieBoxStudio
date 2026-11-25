@@ -19,5 +19,8 @@ export const CS_WA = "";
 // atau email Customer Service (ditampilkan di halaman Contact Us)
 export const CS_EMAIL = "";
 
+// alamat usaha (satu lokasi; studio tidak punya alamat sendiri), tampil di Contact Us landing
+export const STUDIO_ADDRESS = "Jl. Veteran No. 3";
+
 // nama yang tampil di navbar, landing, dan halaman masuk
 export const BRAND = "SelfieBox Studio";

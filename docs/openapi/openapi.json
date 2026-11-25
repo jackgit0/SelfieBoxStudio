@@ -4120,12 +4120,6 @@
               "null"
             ]
           },
-          "address": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "price": {
             "type": "integer",
             "minimum": 0,
@@ -4166,7 +4160,6 @@
           "id",
           "name",
           "description",
-          "address",
           "price",
           "img",
           "people_range_id",
@@ -4178,7 +4171,6 @@
           "id": 1,
           "name": "Studio Mawar",
           "description": "Intim, cocok 1-2 orang",
-          "address": "Jl. Veteran No. 3",
           "price": 0,
           "img": "/img/studio-1.jpg",
           "people_range_id": 1,
@@ -4231,10 +4223,6 @@
             "type": "string",
             "maxLength": 500
           },
-          "address": {
-            "type": "string",
-            "maxLength": 200
-          },
           "price": {
             "type": "integer",
             "minimum": 0
@@ -4275,10 +4263,6 @@
           "description": {
             "type": "string",
             "maxLength": 500
-          },
-          "address": {
-            "type": "string",
-            "maxLength": 200
           },
           "price": {
             "type": "integer",
