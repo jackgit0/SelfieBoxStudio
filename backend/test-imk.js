@@ -184,7 +184,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     { const r = await B({ studio_id: 2 }, U2); ok(r.s === 400 && r.j.error === 'Studio tidak tersedia', 'booking studio tidak tersedia: "Studio tidak tersedia" (Sesi Tidak Tersedia)'); }
     ok((await call('POST', '/quote', { package_id: 1, studio_id: 2 })).j.error === 'Studio tidak tersedia', 'quote studio tidak tersedia: "Studio tidak tersedia"');
     // 3. guard tamu: frontend/tests/core/router.test.js (tabel guard rute × tamu/customer/admin, refactor MVC fase 3)
-    const JS = allJs(), core = src('js/legacy/core.js'), cj = src('js/legacy/customer.js'), lj = src('js/legacy/landing.js');
+    const JS = allJs(), core = src('js/legacy/core.js'), lj = src('js/legacy/landing.js');
     // navbar: tamu tanpa nama user dengan Masuk (/login) dan Daftar (/register), nama customer di-escape sekali: frontend/tests/components/navbar.test.js (refactor MVC fase 4)
     ok(/async function afterAuth[^\n]*S\.draft/.test(core), 'core.js: afterAuth melanjutkan draf booking (kembali ke Paket & Pembayaran)'); // kode: diganti di fase 6 (test-map.md)
     // 4. pemetaan galat dan lima popup (judul dan pesan dari Figma)
@@ -192,7 +192,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     for (const s of ['Input Tidak Valid', 'Input booking tidak lengkap atau tidak valid. Pilih tanggal dan sesi terlebih dahulu.', 'Sesi Tidak Tersedia', 'tidak lagi tersedia. Silakan pilih sesi lain.',
       'Paket Tidak Ditemukan', 'Paket tidak ditemukan. Silakan pilih paket lain.', 'Maaf, Sesi Sudah Dibooking', 'Sesi ini sudah memiliki booking aktif. Silakan pilih sesi lain.', 'Pilih Sesi Lain',
       'Masuk untuk melanjutkan booking', 'Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.', 'Jadwal sudah tidak tersedia', 'Format/jam slot tidak valid', 'Jadwal sudah lewat', 'Studio tidak tersedia']) ok(JS.includes(s), `frontend memuat "${s}"`);
-    ok(/async function confirmPay\(\) \{\s*if \(!S\.me\)/.test(cj), 'customer.js: tamu yang menekan Check Out mendapat popup Belum Login sebelum booking dibuat'); // kode: diganti di fase 5b (test-map.md)
+    // tamu yang menekan Check Out mendapat popup Belum Login sebelum booking dibuat: frontend/tests/controllers/PaymentController.test.js (refactor MVC fase 5b)
     // tombol Lanjut ke Pembayaran tidak pernah disabled: frontend/tests/views/time.test.js; galat langkah booking ke popup, bukan teks merah: frontend/tests/controllers/BookingController.test.js (refactor MVC fase 5b)
     ok(lj.includes('Lihat Studio') && /go\('home'\)/.test(lj), 'landing.js: tautan "Lihat Studio" membuka Browse'); // kode: diganti di fase 7 (test-map.md)
     ok(!uiGradient(JS), 'frontend (JS) tetap tanpa gradient'); }

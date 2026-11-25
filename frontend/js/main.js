@@ -10,14 +10,19 @@ import { createApi } from "./models/api.js";
 import * as masterModel from "./models/master.js";
 import * as studioModel from "./models/studio.js";
 import * as bookingModel from "./models/booking.js";
+import * as paymentModel from "./models/payment.js";
 import { openModal } from "./components/modal.js";
 import { createStudioController } from "./controllers/StudioController.js";
 import { createPackageController } from "./controllers/PackageController.js";
 import { createBookingController } from "./controllers/BookingController.js";
+import { createPaymentController } from "./controllers/PaymentController.js";
 import { browseView } from "./views/customer/browse.js";
 import { studioView } from "./views/customer/studio.js";
 import { packagesView } from "./views/customer/packages.js";
 import { timeView } from "./views/customer/time.js";
+import { payView } from "./views/customer/pay.js";
+import { successView } from "./views/customer/success.js";
+import { rescheduledView } from "./views/customer/rescheduled.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
 import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell, refresh, logout } from "./legacy/core.js";
 import "./legacy/landing.js";
@@ -50,8 +55,9 @@ function createUi(store) {
   };
 }
 
-// halaman yang sudah MVC: view (state, match) → Safe dan kait after(match) per path rute; rute lain masih memakai V.<view> lama
-function pagesFor({ studio }) {
+// halaman yang sudah MVC: view (state, match) → Safe dan kait after(match) per path rute; rute lain masih memakai V.<view> lama.
+// links = { invoiceUrl } untuk view yang menautkan invoice (token tetap di models/api.js, decisions.md 50)
+function pagesFor({ studio, payment }, links) {
   const showAvailability = () => studio.prefetchAvailability();
   return {
     "/browse": {
@@ -66,12 +72,20 @@ function pagesFor({ studio }) {
     // langkah Pilih Waktu (booking baru dan ubah jadwal): jam kosong dari StudioController
     "/book/time": { view: timeView, after: showAvailability },
     "/bookings/:id/reschedule": { view: timeView, after: showAvailability },
+    "/book/pay": { view: payView, after: () => payment.loadMissingQuote() },
+    "/bookings/:id/success": { view: (state, match) => successView(state, match, links) },
+    "/bookings/:id/rescheduled": { view: rescheduledView },
   };
 }
 
 // aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
-function controllerActions({ studio, package: packages, booking }) {
+function controllerActions({ studio, package: packages, booking, payment }) {
   return {
+    "payment:selectPackage": payment.selectPackage,
+    "payment:setMethod": payment.setMethod,
+    "payment:confirm": payment.confirm,
+    "payment:togglePaymentDetail": payment.togglePaymentDetail,
+    "payment:emailInvoice": payment.emailInvoice,
     "booking:quickBook": booking.quickBook,
     "booking:start": booking.start,
     "booking:startReschedule": booking.startReschedule,
@@ -96,12 +110,13 @@ async function start() {
   const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: P, admin: AD }, { storage, persistKey: "snapia", session });
   const ui = createUi(store);
   const navigation = { navigate: path => goPath(path) };
-  const models = { master: masterModel, studio: studioModel, booking: bookingModel };
+  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel };
   const studio = createStudioController({ api, store, ui, router: navigation, models });
   const packages = createPackageController({ store, ui, router: navigation, config: { wa: CS_WA, email: CS_EMAIL }, refreshMaster: studio.refreshMaster });
   const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster, refresh });
-  const controllers = { studio, package: packages, booking };
-  const pages = pagesFor(controllers);
+  const payment = createPaymentController({ api, store, ui, router: navigation, models, booking, refresh });
+  const controllers = { studio, package: packages, booking, payment };
+  const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({
     routes,

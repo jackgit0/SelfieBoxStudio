@@ -1,86 +1,22 @@
 // ===== SISI CUSTOMER: Beranda (Browse), Studio, Booking, Booking Saya, Pembatalan/Refund, Akun =====
-import { API, BK, CONTROLLERS, D, M, R, S, V, save } from "./state.js";
-import { BRAND } from "../config.js";
-import { esc } from "../core/html.js";
-import { formatDayMonthYear as fmtDMY, formatDate as fmtDate, formatTime as fmtTime, parseSlot, formatRupiah as rp, slotRange } from "../core/format.js";
+import { API, D, M, R, S, V, save } from "./state.js";
+import { esc, raw } from "../core/html.js";
+import { formatDate as fmtDate, formatTime as fmtTime, parseSlot, formatRupiah as rp, slotRange } from "../core/format.js";
 import { isStudioShown } from "../models/master.js";
 import { $, go, ic, me, pkOf, refresh, render, studioOf } from "./core.js";
-import { priceTag } from "../components/packageCards.js";
-import { studioUnavailable } from "../views/customer/studio.js";
-const ptag = p => priceTag(M, p).markup; // components/packageCards.js
+import { PAYMENT_LABELS, bookingById } from "../models/booking.js";
+import { bookingRows, keyValueRows, paymentDetail } from "../components/keyValueRows.js";
+// studio yang tidak tersedia/dihapus tidak bisa dipesan lagi (riwayat booking tetap memakai studioOf); tombol Reschedule disembunyikan
+const shown = id => isStudioShown(M, id);
 
-// ---------- studio tidak tersedia (Detail Studio sendiri: views/customer/studio.js) ----------
-// studio yang tidak tersedia/dihapus tidak bisa dibuka untuk dipesan (riwayat booking tetap memakai studioOf)
-const shown = id => isStudioShown(M, id), noStudio = () => studioUnavailable().markup;
-
-// ---------- booking: langkah 1 (tanggal & waktu) dan popup galat: views/customer/time.js, controllers/BookingController.js ----------
-// sisa langkah 2 di bawah memakai BookingController lewat CONTROLLERS (fase 5b commit 2: PaymentController)
-async function loadQuote() { BK.quote = await API.post("/quote", { package_id: S.pkg, studio_id: BK.studio }); }
-const bookingErr = (e, next) => CONTROLLERS.booking.handleError(e, next);
-const needLogin = () => CONTROLLERS.booking.requireLogin();
-const nextTime = () => CONTROLLERS.booking.next();
-const clearBooking = () => CONTROLLERS.booking.clearBooking();
-
-// ---------- booking: langkah 2 (paket & pembayaran) ----------
-function qr() {
-  let h = 7, r = ""; for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++) { h = (h * 31 + x * 17 + y * 13 + (BK.studio || 1)) % 97; const fx = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
-    if (fx ? (x % 6 == 0 || y % 6 == 0 || x == 14 || x == 20 || y == 14 || y == 20 || (x % 6 > 1 && x % 6 < 5 && y % 6 > 1 && y % 6 < 5)) : h % 2) r += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }
-  return `<svg viewBox="0 0 21 21" width="160" fill="#1c2748" style="background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line-2)">${r}</svg>`;
-}
-async function selectPkg(id) { S.pkg = id; save(); R.toast.message = R.toast.error = ""; try { await loadQuote(); } catch (e) { return bookingErr(e, () => selectPkg(S.pkg)); } render(); }
-V.pay = () => {
-  if (BK.slot && !BK.quote && shown(BK.studio)) return `<div class="card">Memuat rincian pembayaran…</div>`; // dimuat ulang di tab yang sama: quote diambil lagi (V.pay_after)
-  if (!BK.slot || !BK.quote) return `<div class="card">Pilih jadwal terlebih dahulu.</div>`; if (!shown(BK.studio)) return noStudio();
-  if (!M.packages.find(x => x.id == S.pkg)) return `<div class="panel"><button class="back" onclick="go('time')">${ic("left", 16)} Kembali</button><div class="card"><h2 class="h2">Pilih Paket</h2><p class="sub">Paket sebelumnya tidak tersedia. Pilih paket lain untuk melanjutkan.</p><div class="pkpick" style="margin-top:12px">${M.packages.map(x => `<button class="pill" onclick="selectPkg(${x.id})">${esc(x.name)}</button>`).join("")}</div></div></div>`;
-  const s = studioOf(BK.studio), p = pkOf(S.pkg), col = f => M.packages.map(x => `<td class="${x.id == S.pkg ? "sel" : ""}">${f(x)}</td>`).join(""), method = S.method || "QRIS";
-  return `<div class="panel"><button class="back" onclick="go('time')">${ic("left", 16)} Kembali</button><div class="row sp"><h1 class="h1">Paket & Pembayaran</h1><span class="steps">2/2</span></div>
-<div class="card" style="margin-top:16px"><div class="bk"><div><h2 class="h2">Paket</h2><div style="overflow-x:auto;margin-top:8px"><table class="cmp"><tr><th>Fitur</th>${M.packages.map(x => `<th>${esc(x.name)}</th>`).join("")}</tr>
-<tr><td>Strip</td>${col(x => x.photo_count + " foto")}</tr><tr><td>Ukuran</td>${col(x => esc(x.strip_size || "-"))}</tr><tr><td>Bahan</td>${col(x => esc(x.strip_material || "-"))}</tr><tr><td>Durasi</td>${col(x => x.dur + " mnt")}</tr><tr><td>Cloud</td>${col(() => "30 hari")}</tr><tr><td>Harga</td>${col(x => ptag(x))}</tr></table></div>
-<p class="sm m" style="margin-top:14px">${ic("calendar", 14)} ${esc(s.name)} · ${fmtDate(parseSlot(BK.slot).date)} · ${slotRange(BK.slot)}</p></div>
-<div><h3 class="h3">Pilih Paket</h3><div class="pkpick">${M.packages.map(x => `<button class="pill ${x.id == S.pkg ? "on" : ""}" onclick="selectPkg(${x.id})">${esc(x.name)}</button>`).join("")}</div>
-<h3 class="h3">Rincian Pembayaran</h3><div style="margin-top:6px"><div class="kv"><span>Studio</span><b>${rp(BK.quote.studio_fee)}</b></div><div class="kv"><span>Paket ${esc(p.name)}</span><b>${rp(p.price)}</b></div>
-${BK.quote.mainDisc ? `<div class="kv disc"><span>Diskon utama (${BK.quote.pct}%)</span><b>-${rp(BK.quote.mainDisc)}</b></div>` : ""}<div class="kv total"><span>Total</span><b>${rp(BK.quote.total)}</b></div></div>
-<label>Metode pembayaran</label><select onchange="S.method=this.value;render()"><option ${method == "QRIS" ? "selected" : ""}>QRIS</option><option ${method == "Transfer Bank" ? "selected" : ""}>Transfer Bank</option></select>
-<div class="qr">${method == "QRIS" ? qr() : `<div class="sm m center" style="padding:14px">Transfer ke <b>BCA 123 456 7890</b><br>a.n. ${esc(BRAND)} (simulasi)</div>`}</div>
-<button class="btn block" onclick="confirmPay()">Check Out</button></div></div></div></div>`;
-};
-// booking berjalan bertahan saat dimuat ulang di tab yang sama (sessionStorage, decisions.md 26); quote tidak disimpan, jadi diambil lagi di sini
-let quoteLoading = false;
-V.pay_after = async () => {
-  if (!BK.slot || BK.quote || quoteLoading || !shown(BK.studio)) return;
-  quoteLoading = true;
-  try { await loadQuote(); } catch (e) { quoteLoading = false; go("time"); return bookingErr(e, nextTime); }
-  quoteLoading = false; render();
-};
-async function confirmPay() {
-  if (!S.me) return needLogin(); // tamu: login dulu sebelum booking dibuat (keputusan 35)
-  try { const b = await API.post("/bookings", { package_id: S.pkg, studio_id: BK.studio, date: BK.slot }); await API.post(`/bookings/${b.id}/pay`, { method: S.method || "QRIS" });
-    clearBooking(); await refresh(); S.payOpen = false; go("success", { id: b.id }); }
-  catch (e) { R.availability = {}; bookingErr(e, () => selectPkg(S.pkg)); }
-}
-
-// ---------- halaman hasil: sukses, reschedule ----------
-const PAYLBL = { paid: "Lunas", refunded: "Refunded", refund_failed: "Refund gagal", pending: "Menunggu pembayaran", batal: "Batal" };
-function payRows(b) {
-  const fee = b.studio_fee || 0, r = [["Studio", rp(fee)], ["Paket " + pkOf(b.package_id).name, rp(b.subtotal - fee)]];
-  if (b.main_disc) r.push(["Diskon utama", "-" + rp(b.main_disc), "disc"]); r.push(["Total", rp(b.amount), "total"]); return r;
-}
-const kvs = rows => rows.map(r => `<div class="kv ${r[2] || ""}"><span>${r[0]}</span><b>${r[1]}</b></div>`).join("");
-const bookRows = b => { const s = studioOf(b.studio), pt = parseSlot(b.date); return kvs([["Studio", esc(s.name)], ["Paket", esc(pkOf(b.package_id).name)], ["Tanggal", fmtDMY(pt.date)], ["Jam", slotRange(b.date)], ["Lokasi", esc(s.address || "-")]]); };
-const payDetail = b => kvs([["Waktu", fmtTime(b.paid_at)], ["Status", PAYLBL[b.pay_status] || b.pay_status], ["Metode", esc(b.method || "-")], ...payRows(b)]);
-const bookOf = () => D.bookings.find(x => x.id == R.route.params.id);
-V.success = () => {
-  const b = bookOf(); if (!b) return `<div class="card">Memuat…</div>`;
-  return `<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Studio Berhasil Direservasi</h1><img class="ill" src="/img/ill-booking.png" alt="">
-<div style="text-align:left;margin-top:8px"><h3 class="h3" style="margin-bottom:6px">Detail Transaksi</h3>${bookRows(b)}<button class="coll" onclick="S.payOpen=!S.payOpen;render()">Detail Pembayaran ${ic(S.payOpen ? "up" : "down", 16)}</button>${S.payOpen ? `<div style="padding-bottom:10px">${payDetail(b)}</div>` : ""}</div>
-<div class="row" style="margin-top:12px;flex-wrap:nowrap"><a class="btn ghost grow" href="${API.invoiceUrl(b.id, 1)}" download>${ic("download", 16)} Unduh invoice</a><button class="btn ghost" onclick="mailInv(${b.id})">${ic("mail", 16)}</button></div>
-<button class="btn block" style="margin-top:10px" onclick="go('home')">Kembali ke Beranda</button></div></div>`;
-};
-V.rescheduled = () => {
-  const b = bookOf(); if (!b) return `<div class="card">Memuat…</div>`;
-  return `<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Reschedule Berhasil</h1><img class="ill" src="/img/ill-reschedule.png" alt=""><div style="text-align:left">${bookRows(b)}</div><button class="btn block" style="margin-top:18px" onclick="go('home')">Kembali ke Beranda</button></div></div>`;
-};
-async function mailInv(id) { R.toast.message = R.toast.error = ""; try { const r = await API.post(`/bookings/${id}/invoice/email`); R.toast.message = r.dev ? "Mode pengembangan: SMTP belum diatur, email disimpan di folder backend/outbox." : "Invoice dikirim ke email Anda."; } catch (e) { R.toast.error = e.message; } render(); }
+// ---------- booking: langkah Pilih Waktu, Paket & Pembayaran, halaman hasil ----------
+// views/customer/time.js, pay.js, success.js, rescheduled.js; controllers/BookingController.js dan PaymentController.js
+// baris rincian untuk halaman lama di bawah dan admin.js: components/keyValueRows.js (nilai dari kode lama sudah berupa HTML), models/booking.js
+const PAYLBL = PAYMENT_LABELS;
+const kvs = rows => keyValueRows(rows.map(([label, value, cls]) => [raw(String(label)), raw(String(value)), cls])).markup;
+const bookRows = b => bookingRows(M, b).markup;
+const payDetail = b => paymentDetail(M, b).markup;
+const bookOf = () => bookingById(D.bookings, R.route.params.id);
 
 // ---------- Booking Saya ----------
 const UPCOMING = ["Menunggu Pembayaran", "Terbayar", "Sesi Berjalan"];
@@ -102,7 +38,7 @@ V.bdetail = () => {
 <div class="row" style="margin:16px 0">${canChange(b) ? `${shown(b.studio) ? `<button class="btn sm" data-action="booking:startReschedule" data-id="${b.id}">Reschedule</button>` : ""}<button class="btn sm ghost" onclick="openCancel(${b.id})">Batalkan</button>` : ""}${pending ? `<button class="btn sm" onclick="payNow(${b.id})">Bayar</button>` : ""}${b.status == "Terbayar" ? `<button class="btn sm soft" onclick="startSession(${b.id})">${ic("camera", 16)} Check-in & Mulai Sesi</button>` : ""}${b.status == "Sesi Berjalan" ? `<button class="btn sm soft" onclick="go('session')">Buka Sesi</button>` : ""}</div>
 <div class="card"><h3 class="h3" style="margin-bottom:6px">Detail Booking</h3>${bookRows(b)}<hr><h3 class="h3" style="margin-bottom:6px">Detail Pembayaran</h3>${payDetail(b)}
 ${b.cancel_reason ? `<hr><div class="kv"><span>Alasan pembatalan</span><b>${esc(b.cancel_reason)}</b></div>` : ""}
-${b.paid && b.status != "Dibatalkan" ? `<div class="row" style="margin-top:12px"><a class="btn sm ghost" href="${API.invoiceUrl(b.id, 1)}" download>${ic("download", 16)} Unduh invoice</a><button class="btn sm ghost" onclick="mailInv(${b.id})">${ic("mail", 16)} Kirim ke email</button></div>` : ""}</div></div>`;
+${b.paid && b.status != "Dibatalkan" ? `<div class="row" style="margin-top:12px"><a class="btn sm ghost" href="${API.invoiceUrl(b.id, 1)}" download>${ic("download", 16)} Unduh invoice</a><button class="btn sm ghost" data-action="payment:emailInvoice" data-id="${b.id}">${ic("mail", 16)} Kirim ke email</button></div>` : ""}</div></div>`;
 };
 
 // ---------- pembatalan & refund ----------
@@ -140,4 +76,4 @@ V.account = () => {
   return `<div class="panel"><h1 class="h1">Pengaturan Akun</h1><div class="seg">${tabs.map(t => `<button class="${t[0] == tab ? "on" : ""}" onclick="go('account',{tab:'${t[0]}'})">${t[1]}</button>`).join("")}</div>${body}<div style="margin-top:18px"><button class="btn ghost" onclick="logout()">${ic("logout", 16)} Keluar</button></div></div>`;
 };
 async function saveProfile() { R.toast.message = R.toast.error = ""; try { const r = await API.patch("/me", { name: $("#pn").value, phone: $("#pp").value }); S.user = { ...S.user, ...r }; save(); R.toast.message = "Profil disimpan."; } catch (e) { R.toast.error = e.message; } render(); }
-export { PAYLBL, confirmPay, doCancel, kvs, mailInv, openCancel, payNow, qr, saveProfile, selectPkg };
+export { PAYLBL, doCancel, kvs, openCancel, payNow, saveProfile };
