@@ -299,6 +299,7 @@ test("end (Akhiri Sesi): password admin; Batal → tidak ada panggilan; salah �
   await right.controller.end();
   assert.deepEqual(right.api.calls, [{ method: "POST", path: "/admin/photo-sessions/41/end", body: { password: "rahasia" } }]);
   assert.deepEqual(live(right.store).ended, { customer: "Ana" });
+  assert.deepEqual(right.store.get().runtime.toast, { message: "Sesi diakhiri.", error: "" });
 });
 
 test("exit (Keluar): password admin dicek di server; benar → ke Admin → Studio, kamera berhenti; salah → tetap di tablet", async () => {

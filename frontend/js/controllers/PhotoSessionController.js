@@ -417,6 +417,7 @@ export function createPhotoSessionController({
       }
       try {
         await liveModel.endSession(api, session.id, password);
+        showToast({ message: "Sesi diakhiri." }, { silent: true }); // galat password sebelumnya tidak tertinggal
         finish(session);
       } catch (error) {
         failWith(error);

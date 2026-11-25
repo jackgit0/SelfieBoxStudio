@@ -32,4 +32,4 @@ input.inv{border-color:var(--red)}.thumb.inv{outline:2px dashed var(--red);outli
   .acc .body,.sgrid,.ssgrid{grid-template-columns:1fr}.bgrid.open{grid-template-columns:minmax(0,1fr)}.bgrid.open .bx{display:table-cell}.search{width:100%}.bdet{position:static}
 }
 /* Check-in di panel Detail Booking (pelanggan sudah datang; sesi dimulai dari tablet studio) */
-.cibox{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:10px 0 4px;padding:10px 12px;border-radius:12px;background:var(--blue-50)}.cibox.ok{color:var(--green)}.cibox .btn:disabled{opacity:.5;cursor:not-allowed}
+.cibox{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:10px 0 4px;padding:10px 12px;border-radius:12px;background:var(--blue-50)}.cibox.ok{flex-wrap:nowrap;align-items:flex-start;color:var(--green)}.cibox.ok svg{flex:none;margin-top:2px}.cibox .btn:disabled{opacity:.5;cursor:not-allowed}

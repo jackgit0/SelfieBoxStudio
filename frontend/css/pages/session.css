@@ -11,25 +11,27 @@
 
 /* ---- layar tablet (layout kiosk: tanpa sidebar admin) ---- */
 .kiosk{min-height:100vh;background:var(--bg);padding:16px 20px 24px}
+/* toast melayang di atas layar tablet agar tata letak kamera tidak bergeser */
+.kiosk>.toast{position:fixed;z-index:50;top:12px;left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 32px));margin:0;box-shadow:var(--shadow);pointer-events:none}
 .kio-page{max-width:1440px;margin:0 auto}
 .kio-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
 .kio-brand{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:var(--blue-dd)}
 .kio{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:20px;align-items:start}
 .kio-main{min-width:0}
-.kio-view{position:relative;border-radius:48px;overflow:hidden;background:#000;aspect-ratio:3/2;max-height:calc(100vh - 170px);width:100%}
+.kio-view{position:relative;border-radius:48px;overflow:hidden;background:#000;aspect-ratio:3/2;max-height:calc(100vh - 210px);width:100%}
 .kio-view video,.kio-view .kio-nocam{display:block;width:100%;height:100%;object-fit:cover;border-radius:0;max-height:none}
 .kio-nocam{display:flex !important;align-items:center;justify-content:center;color:#cbd5e1;background:#1c2748;padding:24px;text-align:center}
-.kio-pill{position:absolute;top:32px;display:inline-flex;align-items:center;gap:12px;height:47px;padding:0 22px;border-radius:38px;background:var(--blue);color:#fff}
+.kio-pill{position:absolute;z-index:2;top:32px;display:inline-flex;align-items:center;gap:12px;height:47px;padding:0 22px;border-radius:38px;background:var(--blue);color:#fff}
 .kio-live{left:40px;font-size:14px;letter-spacing:.02em;max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kio-dot{flex:none;width:21px;height:21px;border-radius:50%;background:#fff}
 .kio-timer{right:40px;min-width:185px;justify-content:center;font-size:36px;font-weight:600;letter-spacing:-.015em;font-variant-numeric:tabular-nums}
 .kio-timer.warn{background:var(--red);animation:kio-blink .8s infinite}@keyframes kio-blink{50%{opacity:.55}}
-.kio-chip{position:absolute;left:40px;bottom:28px;padding:6px 14px;border-radius:20px;background:rgba(0,0,0,.55);color:#fff;font-size:13px}
+.kio-chip{position:absolute;z-index:2;left:40px;bottom:28px;padding:6px 14px;border-radius:20px;background:rgba(0,0,0,.55);color:#fff;font-size:13px}
 .kio-count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(96px,18vw,220px);font-weight:700;color:#fff;background:rgba(0,0,0,.35);font-variant-numeric:tabular-nums}
 .kio-count[hidden]{display:none}
 .kio-under{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:10px}
 .kio-who{font-weight:500;color:var(--blue-dd)}.kio-note{color:var(--red)}
-.kio-rail{display:flex;flex-direction:column;gap:12px}
+.kio-rail{display:flex;flex-direction:column;gap:10px}
 .kio-rail>.btn{width:100%;justify-content:center}
 .kio-timercard{display:flex;flex-direction:column;align-items:center;gap:11px;padding:20px 18px 24px;border-radius:38px;background:var(--rail)}
 .kio-timercard h2{font-size:28px;font-weight:600;letter-spacing:-.015em;color:#fff;line-height:1.2}
@@ -39,7 +41,7 @@
 .kio-shot{height:56px;font-size:17px}
 .kio-shot:disabled{opacity:.55;cursor:not-allowed}
 .kio-pose{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-md);padding:14px}
-.kio-pose .pose-img{max-width:100%}
+.kio-pose .pose-img{max-width:100%;aspect-ratio:auto;height:clamp(80px,16vh,150px);margin:8px 0}
 .kio-wait-card{max-width:620px;margin:8vh auto 0;padding:40px 32px}
 .kio-kicker{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--blue)}
 .kio-h{font-size:32px;font-weight:600;color:var(--blue-dd);margin:6px 0 8px}
@@ -53,12 +55,13 @@
 .bggrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
 .bgsw{position:relative;display:flex;flex-direction:column;gap:6px;cursor:pointer;font-size:12px;color:var(--ink-2);text-align:center}
 .bgsw input{position:absolute;opacity:0;pointer-events:none}
-.bgsw .pimg{height:auto;aspect-ratio:3/4;border-radius:18px;border:3px solid transparent;font-size:32px}
+.bgsw .pimg{height:clamp(80px,19vh,170px);border-radius:18px;border:3px solid transparent;font-size:32px}
 .bgsw input:checked+.pimg{border-color:var(--blue)}
 .mbox.bgmodal .mbtn{justify-content:center}
 .btn.bgpick{min-width:200px;height:56px;border-radius:93px;font-size:22px;font-weight:600;letter-spacing:.04em}
 
 @media (max-width:1000px){
+  .kio-pose .pose-img{height:auto;aspect-ratio:4/5;max-width:200px}
   .kio{grid-template-columns:minmax(0,1fr)}
   .kio-rail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
   .kio-timercard,.kio-pose{grid-column:1/-1}
