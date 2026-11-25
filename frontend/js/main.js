@@ -14,10 +14,10 @@ import { P } from "./legacy/session.js";
 import { AD, aDenied } from "./legacy/admin.js";
 import { installLegacyBridge } from "./legacy-bridge.js";
 
-// localStorage bisa melempar galat bila diblokir browser; aplikasi tetap jalan tanpa penyimpanan
-function browserStorage() {
+// localStorage/sessionStorage bisa melempar galat bila diblokir browser; aplikasi tetap jalan tanpa penyimpanan
+function browserStorage(name = "localStorage") {
   try {
-    return window.localStorage;
+    return window[name];
   } catch (error) {
     return null;
   }
@@ -26,7 +26,9 @@ function browserStorage() {
 async function start() {
   const storage = browserStorage();
   const api = createApi({ base: API_BASE, storage });
-  const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: P, admin: AD }, { storage, persistKey: "snapia" });
+  // booking berjalan (studio, tanggal, sesi, id reschedule; tanpa quote) bertahan saat dimuat ulang, hanya di tab ini (decisions.md 26)
+  const session = { storage: browserStorage("sessionStorage"), key: "snapia_booking", slices: { booking: ["studio", "date", "slot", "rescheduleId"] } };
+  const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: P, admin: AD }, { storage, persistKey: "snapia", session });
   const router = createRouter({
     history: window.history,
     location: window.location,

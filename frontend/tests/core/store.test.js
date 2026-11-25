@@ -111,3 +111,56 @@ test("view dan p dari state lama dibuang saat dimuat (halaman aktif kini dari UR
   store.persist();
   assert.equal(JSON.parse(storage.getItem("snapia")).view, undefined);
 });
+
+// ---------- booking berjalan per tab di sessionStorage (decisions.md 26, refactor fase 3) ----------
+
+const bookingInitial = () => ({ persisted: { pkg: null }, booking: { studio: null, date: null, slot: null, quote: null, rescheduleId: null }, runtime: {} });
+const sessionOption = storage => ({ session: { storage, key: "snapia_booking", slices: { booking: ["studio", "date", "slot", "rescheduleId"] } } });
+
+test("slice booking ditulis ke session storage tanpa quote", () => {
+  const session = createFakeStorage();
+  const store = createStore(bookingInitial(), sessionOption(session));
+  store.update("booking", { studio: 2, date: "2026-12-01", slot: "2026-12-01 10:00", quote: { total: 90000 } });
+  assert.deepEqual(JSON.parse(session.getItem("snapia_booking")), { booking: { studio: 2, date: "2026-12-01", slot: "2026-12-01 10:00" } });
+});
+
+test("store baru memulihkan booking dari session storage ke objek slice yang sama; quote tidak ikut", () => {
+  const session = createFakeStorage({ snapia_booking: JSON.stringify({ booking: { studio: 3, date: "2026-12-02", slot: "2026-12-02 09:00", rescheduleId: 7, quote: { total: 1 } } }) });
+  const start = bookingInitial();
+  const booking = start.booking;
+  const store = createStore(start, sessionOption(session));
+  assert.equal(store.get().booking, booking);
+  assert.deepEqual(booking, { studio: 3, date: "2026-12-02", slot: "2026-12-02 09:00", quote: null, rescheduleId: 7 });
+});
+
+test("booking yang dikosongkan menghapus kuncinya dari session storage", () => {
+  const session = createFakeStorage();
+  const store = createStore(bookingInitial(), sessionOption(session));
+  store.update("booking", { studio: 2, date: "2026-12-01" });
+  assert.notEqual(session.getItem("snapia_booking"), null);
+  store.update("booking", { studio: null, date: null, slot: null, rescheduleId: null });
+  assert.equal(session.getItem("snapia_booking"), null);
+});
+
+test("persist() dan persistSession() juga menyimpan booking yang diubah langsung oleh kode lama", () => {
+  const session = createFakeStorage();
+  const local = createFakeStorage();
+  const start = bookingInitial();
+  const store = createStore(start, { storage: local, persistKey: "snapia", ...sessionOption(session) });
+  start.booking.studio = 4; // kode lama: BK.studio = 4 tanpa store.update
+  store.persistSession();
+  assert.equal(JSON.parse(session.getItem("snapia_booking")).booking.studio, 4);
+  start.booking.studio = null;
+  store.persist();
+  assert.equal(session.getItem("snapia_booking"), null);
+  assert.equal(local.getItem("snapia_booking"), null); // booking tidak pernah masuk localStorage
+});
+
+test("isi session storage rusak atau storage yang melempar galat diabaikan", () => {
+  const broken = createStore(bookingInitial(), sessionOption(createFakeStorage({ snapia_booking: "{rusak" })));
+  assert.equal(broken.get().booking.studio, null);
+  const throwing = { getItem() { throw new Error("diblokir"); }, setItem() { throw new Error("penuh"); }, removeItem() { throw new Error("diblokir"); } };
+  const store = createStore(bookingInitial(), sessionOption(throwing));
+  store.update("booking", { studio: 1 });
+  assert.equal(store.get().booking.studio, 1);
+});

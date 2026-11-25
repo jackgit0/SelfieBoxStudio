@@ -1,8 +1,8 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
-import { API, BK, D, M, R, ROUTER, S, V, save } from "./state.js";
+import { API, BK, D, M, R, ROUTER, S, V, save, saveBooking } from "./state.js";
 import { BRAND, CS_EMAIL, CS_WA } from "../config.js";
 import { esc } from "../core/html.js";
-import { SESSION_HOURS as HRS, formatRupiah as rp, todayIso as todayS } from "../core/format.js";
+import { SESSION_HOURS as HRS, formatRupiah as rp, parseSlot, todayIso as todayS } from "../core/format.js";
 import * as masterModel from "../models/master.js";
 import { legacyPath } from "../core/router.js";
 import { resumeDraft } from "./customer.js";
@@ -57,6 +57,14 @@ function syncRoute() {
   if (r.name === "auth") R.auth.mode = r.params.mode;
   if (r.name === "my") S.myTab = m.query.tab === "history" ? "hist" : "up";
   if (r.name === "account") S.acct = r.params.tab;
+  if (r.name === "time") syncReschedule(R.route.params.id);
+}
+// /bookings/:id/reschedule dibuka langsung (tab baru, tautan): mulai ubah jadwal booking itu bila masih bisa diubah; /book/time bukan reschedule
+function syncReschedule(id) {
+  if (!id) { BK.rescheduleId = null; return; }
+  if (BK.rescheduleId == id) return;
+  const b = D.bookings.find(x => x.id == id);
+  if (b && ["Menunggu Pembayaran", "Terbayar"].includes(b.status)) Object.assign(BK, { rescheduleId: id, studio: b.studio, date: parseSlot(b.date).date, slot: null, quote: null });
 }
 document.addEventListener("click", () => { const m = $("#menu"); if (m) m.hidden = true; });
 const toggleMenu = e => { e.stopPropagation(); const m = $("#menu"); m.hidden = !m.hidden; };
@@ -91,7 +99,7 @@ ${S.me ? acctMenu() : `<div class="usr"><button class="btn ghost sm" onclick="op
 async function refreshMaster() { try { const m = await masterModel.loadMaster(API); if (m.json === M.json) return; Object.assign(M, m); render(); } catch (e) {} }
 V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
 function render() {
-  syncRoute(); const view = R.route.name;
+  syncRoute(); saveBooking(); const view = R.route.name;
   if (view !== "landing") window.onscroll = null;
   if (view !== "session" && typeof stopSessionTimers === "function") stopSessionTimers();
   const f = V[view] || V.auth, inner = f();

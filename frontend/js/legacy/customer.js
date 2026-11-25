@@ -103,7 +103,7 @@ const slotGone = sl => { const { date, h } = parseSlot(sl); return !free(BK.stud
 async function nextTime() {
   if (!BK.date || !BK.slot) return inputInvalid(); if (slotGone(BK.slot)) return sesiGone();
   if (BK.rescheduleId) {
-    try { await API.patch("/bookings/" + BK.rescheduleId, { studio_id: BK.studio, date: BK.slot }); const id = BK.rescheduleId; BK.rescheduleId = null; await refresh(); return go("rescheduled", { id }); }
+    try { await API.patch("/bookings/" + BK.rescheduleId, { studio_id: BK.studio, date: BK.slot }); const id = BK.rescheduleId; clearBooking(); await refresh(); return go("rescheduled", { id }); }
     catch (e) { return bookingErr(e, nextTime); }
   }
   BK.quote = null; try { await loadQuote(); } catch (e) { return bookingErr(e, nextTime); } go("pay");
@@ -160,6 +160,7 @@ function qr() {
 }
 async function selectPkg(id) { S.pkg = id; save(); R.toast.message = R.toast.error = ""; try { await loadQuote(); } catch (e) { return bookingErr(e, () => selectPkg(S.pkg)); } render(); }
 V.pay = () => {
+  if (BK.slot && !BK.quote && shown(BK.studio)) return `<div class="card">Memuat rincian pembayaran…</div>`; // dimuat ulang di tab yang sama: quote diambil lagi (V.pay_after)
   if (!BK.slot || !BK.quote) return `<div class="card">Pilih jadwal terlebih dahulu.</div>`; if (!shown(BK.studio)) return noStudio();
   if (!M.packages.find(x => x.id == S.pkg)) return `<div class="panel"><button class="back" onclick="go('time')">${ic("left", 16)} Kembali</button><div class="card"><h2 class="h2">Pilih Paket</h2><p class="sub">Paket sebelumnya tidak tersedia. Pilih paket lain untuk melanjutkan.</p><div class="pkpick" style="margin-top:12px">${M.packages.map(x => `<button class="pill" onclick="selectPkg(${x.id})">${esc(x.name)}</button>`).join("")}</div></div></div>`;
   const s = studioOf(BK.studio), p = pkOf(S.pkg), col = f => M.packages.map(x => `<td class="${x.id == S.pkg ? "sel" : ""}">${f(x)}</td>`).join(""), method = S.method || "QRIS";
@@ -174,10 +175,20 @@ ${BK.quote.mainDisc ? `<div class="kv disc"><span>Diskon utama (${BK.quote.pct}%
 <div class="qr">${method == "QRIS" ? qr() : `<div class="sm m center" style="padding:14px">Transfer ke <b>BCA 123 456 7890</b><br>a.n. ${esc(BRAND)} (simulasi)</div>`}</div>
 <button class="btn block" onclick="confirmPay()">Check Out</button></div></div></div></div>`;
 };
+// booking berjalan bertahan saat dimuat ulang di tab yang sama (sessionStorage, decisions.md 26); quote tidak disimpan, jadi diambil lagi di sini
+let quoteLoading = false;
+V.pay_after = async () => {
+  if (!BK.slot || BK.quote || quoteLoading || !shown(BK.studio)) return;
+  quoteLoading = true;
+  try { await loadQuote(); } catch (e) { quoteLoading = false; go("time"); return bookingErr(e, nextTime); }
+  quoteLoading = false; render();
+};
+// setelah Check Out / reschedule berhasil: booking berjalan dikosongkan (juga dari sessionStorage)
+function clearBooking() { Object.assign(BK, { studio: null, date: null, slot: null, quote: null, rescheduleId: null }); save(); }
 async function confirmPay() {
   if (!S.me) return needLogin(); // tamu: login dulu sebelum booking dibuat (keputusan 35)
   try { const b = await API.post("/bookings", { package_id: S.pkg, studio_id: BK.studio, date: BK.slot }); await API.post(`/bookings/${b.id}/pay`, { method: S.method || "QRIS" });
-    BK.slot = null; BK.quote = null; await refresh(); S.payOpen = false; go("success", { id: b.id }); }
+    clearBooking(); await refresh(); S.payOpen = false; go("success", { id: b.id }); }
   catch (e) { R.availability = {}; bookingErr(e, () => selectPkg(S.pkg)); }
 }
 

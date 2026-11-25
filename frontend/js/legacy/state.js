@@ -25,7 +25,11 @@ export function connectLegacy({ api, store: appStore, router }) {
   ROUTER = router;
   store = appStore;
 }
-// simpan S (state tersimpan) lewat store
+// simpan S (state tersimpan) dan booking berjalan (BK, per tab) lewat store
 export const save = () => {
   if (store) store.persist();
+};
+// simpan hanya booking berjalan ke sessionStorage (dipanggil setiap render: kode lama mengubah BK langsung)
+export const saveBooking = () => {
+  if (store) store.persistSession();
 };
