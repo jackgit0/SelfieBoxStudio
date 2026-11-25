@@ -65,6 +65,17 @@ window.addEventListener("popstate", e => { const st = e.state; if (st && st.v) {
 document.addEventListener("click", () => { const m = $("#menu"); if (m) m.hidden = true; });
 const toggleMenu = e => { e.stopPropagation(); const m = $("#menu"); m.hidden = !m.hidden; };
 const openAcct = tab => { S.acct = tab; go("account"); };
+// dialog bersama (Figma "Konfirmasi …" dan popup error): resolve dengan value tombol yang ditekan, null bila ditutup (Escape / klik di luar).
+// body = HTML yang sudah di-escape pemanggil; buttons = [{ label, value, style ("ghost"/"soft"/"danger"), icon }]; kicker = HTML di atas judul; cls = kelas tambahan .mbox;
+// tombol di dalam body dengan atribut data-v="…" juga menutup dialog dan resolve dengan string itu
+function modal({ title, body = "", buttons = [{ label: "Tutup", value: null }], kicker = "", cls = "" }) {
+  return new Promise(res => { const d = document.createElement("div"), back = document.activeElement; d.className = "mdl";
+    d.innerHTML = `<div class="mbox ${cls}" role="dialog" aria-modal="true" aria-labelledby="mdl-t">${kicker}<h3 id="mdl-t">${esc(title)}</h3><div class="mtx">${body}</div><div class="row mbtn">${buttons.map((b, i) => `<button class="btn sm ${b.style || ""}" data-i="${i}">${b.icon ? ic(b.icon, 16) : ""}${esc(b.label)}</button>`).join("")}</div></div>`;
+    const key = e => { if (e.key === "Escape") done(null); else if (e.key === "Tab") { e.preventDefault(); const bs = [...d.querySelectorAll("button")], i = bs.indexOf(document.activeElement); bs[(i + (e.shiftKey ? bs.length - 1 : 1)) % bs.length].focus(); } },
+      done = v => { d.remove(); document.removeEventListener("keydown", key); if (back && back.focus && document.contains(back)) back.focus(); res(v); };
+    d.onclick = e => { const b = e.target.closest("button[data-i], button[data-v]"); if (b) done(b.dataset.i !== undefined ? buttons[b.dataset.i].value : b.dataset.v); else if (e.target === d) done(null); };
+    document.addEventListener("keydown", key); document.body.appendChild(d); d.querySelector("button").focus(); });
+}
 const toasts = () => (msg ? `<div class="toast">${esc(msg)}</div>` : "") + (err ? `<div class="toast err">${esc(err)}</div>` : "");
 
 function shell(inner) {
