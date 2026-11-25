@@ -14,7 +14,7 @@
 .schip small{font-size:11px;color:var(--muted-2);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.schip:hover{background:var(--blue-50)}.schip.full{background:var(--blue-100);border-color:var(--blue-200);color:var(--blue-d)}.schip.past{opacity:.55}
 .schip.on{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-100)}.schip.add{flex-direction:row;gap:6px;border-style:dashed;color:var(--blue);font-weight:600}
 .sform{margin-top:14px;padding:14px 16px;border:1px solid var(--line-2);border-radius:var(--r-md);background:var(--bg)}.srow{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:6px}
-.spanel{border:1px solid var(--line);border-radius:var(--r-md);padding:16px 20px}.spanel>h4{font-size:17px;font-weight:500;margin-bottom:6px}.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.spanel{border:1px solid var(--line);border-radius:var(--r-md);padding:16px 20px}.spanel>h4,.spanel>.row>h4{font-size:17px;font-weight:500;margin-bottom:6px}.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:28px}
 .thumb{width:100%;aspect-ratio:16/9;border-radius:18px;background:var(--blue-100) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted)}
 /* Tambah Studio: galat isian (Figma 592:5056, 592:5140), Ringkasan Studio (592:4329), toast Berhasil (592:4689) */
 .ferr{color:#a73333;font-size:12px;margin-top:4px}.ferr-top{display:flex;align-items:center;gap:8px;background:#fdeeee;border:1px solid #e9a3a3;color:#a73333;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px;font-weight:500}

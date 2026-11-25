@@ -340,6 +340,7 @@ async function start() {
     run: (...args) => admin.run(...args),
     load: (...args) => admin.load(...args),
     handleAccessError: (...args) => admin.handleAccessError(...args),
+    stopEditing: (...args) => admin.stopEditing(...args),
   };
   const files = { readImage: file => shrinkImage(file, window) };
   const studio = createStudioController({ api, store, ui, router: navigation, models, admin: adminCore, files });
