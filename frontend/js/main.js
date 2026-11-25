@@ -38,7 +38,7 @@ import { photoSessionView } from "./views/session/photoSession.js";
 import { galleryView } from "./views/session/gallery.js";
 import { dashboardView } from "./views/admin/dashboard.js";
 import { studiosView } from "./views/admin/studios.js";
-import { bookingsView } from "./views/admin/bookings.js";
+import { bookingsView as adminBookingsView } from "./views/admin/bookings.js";
 import { propertiesView } from "./views/admin/properties.js";
 import { posesView } from "./views/admin/poses.js";
 import { usersView } from "./views/admin/users.js";
@@ -162,7 +162,7 @@ function pagesFor({ studio, payment, landing, photo, gallery, admin, adminBookin
     // panel admin (AdminController; Studio + Detail Sesi = StudioController; Booking = AdminBookingController)
     "/admin": { view: dashboardView, after: () => admin.loadDashboard() },
     "/admin/studios": { view: studiosView, after: () => studio.loadStudios() },
-    "/admin/bookings": { view: bookingsView, after: () => adminBooking.load() },
+    "/admin/bookings": { view: adminBookingsView, after: () => adminBooking.load() },
     "/admin/props": { view: propertiesView, after: () => admin.loadProperties() },
     "/admin/poses": { view: posesView, after: () => admin.loadPoses() },
     "/admin/users": { view: (state, match) => usersView(state, match, links), after: () => admin.loadUsers() },
