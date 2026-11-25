@@ -5,7 +5,7 @@
 // logout = AuthController.logout (main.js). Halaman Studio, Booking, Properti dan Pose masih kode lama (fase 8b) dan memakai inti ini lewat CONTROLLERS.admin.
 import { DEFAULT_DENIED, accessDeniedModal, confirmModal, deleteCustomerBody, deleteOperationBody, deletePackageBody } from "../views/admin/dialogs.js";
 
-// isi awal slice admin (dulu objek AD dan adminReset); kunci tanpa nama lengkap masih milik kode lama fase 8b
+// isi awal slice admin (dulu objek AD dan adminReset)
 export function createAdminState() {
   return {
     me: null,
@@ -21,25 +21,27 @@ export function createAdminState() {
     transactions: null,
     packages: null,
     discount: null,
-    // kode lama fase 8b (studio + sesi, booking, properti, pose)
-    imgs: {},
-    open: {},
+    // Studio + Detail Sesi (StudioController): daftar, accordion terbuka (id / "new"), gambar yang baru diunggah (id / "new" / "property-<id>"),
+    // isian Tambah Studio, langkah Ringkasan, galat isian, kartu Berhasil; sesi per "<studio>|<bulan>", bulan dan hari per studio, form sesi terbuka
     studios: null,
-    books: null,
-    props: null,
+    openStudios: {},
+    images: {},
+    newStudio: null,
+    studioSummary: false,
+    studioErrors: null,
+    studioDone: null,
+    sessions: {},
+    sessionMonths: {},
+    sessionDays: {},
+    editingSession: null,
+    addingSessionFor: null,
+    // Booking (AdminBookingController): daftar, saringan status, panel detail
+    bookings: null,
+    bookingFilter: "",
+    bookingDetail: null,
+    // Properti dan Pose
+    properties: null,
     poses: null,
-    bdet: null,
-    bst: null,
-    bstatus: "",
-    scal: {},
-    sday: {},
-    sess: {},
-    sedit: null,
-    sadd: null,
-    stnew: null,
-    stsum: null,
-    sterr: null,
-    stdone: null,
   };
 }
 
@@ -135,7 +137,7 @@ export function createAdminController({ api, store, ui, router, models, logout }
     // aksi: toast lama dihapus; okMessage menggantikan toast yang diisi aksi sendiri. true = berhasil
     async run(action, okMessage = "", what, { draft } = {}) {
       setToast({});
-      store.update("admin", { stdone: null }, { silent: true });
+      store.update("admin", { studioDone: null }, { silent: true });
       try {
         await action();
       } catch (error) {
@@ -228,7 +230,7 @@ export function createAdminController({ api, store, ui, router, models, logout }
         if (!answer) {
           return;
         }
-        store.update("admin", { customers: null, customerDetail: null, revenue: null, operations: null, studios: null, books: null, transactions: null, sess: {} }, { silent: true });
+        store.update("admin", { customers: null, customerDetail: null, revenue: null, operations: null, studios: null, bookings: null, transactions: null, sessions: {} }, { silent: true });
         setToast({ message: `Akun dihapus (${answer.photos_deleted} foto ikut terhapus).` });
       });
     },

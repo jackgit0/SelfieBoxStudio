@@ -6,3 +6,5 @@ export * as users from "./users.js";
 export * as transactions from "./transactions.js";
 export * as packages from "./packages.js";
 export * as account from "./account.js";
+export * as studios from "./studios.js";
+export * as sessions from "./sessions.js";

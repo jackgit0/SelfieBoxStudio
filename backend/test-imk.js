@@ -153,7 +153,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     const dl = await call('DELETE', '/admin/packages/4', null, AD); ok(dl.s === 200 && !(await call('GET', '/master')).j.PKG.some(p => p.id === 4), 'paket yang dihapus admin tidak ada di PKG');
     ok((await call('POST', '/quote', { package_id: 2, studio_id: 1 }, U)).j.error === 'Paket tidak valid', 'quote dengan paket nonaktif: "Paket tidak valid" (pemicu popup)');
     // 1–2. frontend
-    const JS = allJs(), aj = src('js/legacy/admin.js'); // fase 2: berkas lama di js/legacy
+    const JS = allJs();
     // dialog bersama (aria-modal, Escape, fokus awal di tombol aksi): frontend/tests/components/modal.test.js + smoke walk K2 (refactor MVC fase 4)
     // admin.js: konfirmasi admin memakai modal bersama → frontend/tests/controllers/AdminController.test.js "confirm: memakai ui.modal tepat sekali" (fase 8a, test-map.md baris 153)
     for (const s of ['Pilihan Paket', 'Temukan Paket Sesuai Kebutuhanmu', 'Pilih Paket Ini', 'Lihat semua paket', 'Paling Favorit', '/ sesi', 'Paket Foto Tidak Ditemukan', 'Lihat & Pilih Paket Lain', 'Hubungi Customer Service', 'Pilih studio untuk melanjutkan']) ok(JS.includes(s), `frontend memuat "${s}"`);
@@ -210,19 +210,19 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     { const r = await call('PATCH', '/admin/account', { current_password: 'salah' }, AD); ok(r.s === 403 && r.j.error === 'Password saat ini salah', '403 lain di admin ("Password saat ini salah") bukan Akses Ditolak'); }
     { const r = await call('POST', '/admin/studios', SB({ name: 'Studio Senja', description: 'Cahaya alami' }), AD); ok(r.s === 200 && r.j.id, 'fixture: admin menambah Studio Senja'); }
     // 2. frontend admin.js: teks Figma
-    const JS = allJs(), aj = src('js/legacy/admin.js');
+    const JS = allJs();
     for (const s of ['Ringkasan Studio', 'Detail Studio Baru', 'Isi data studio. Nama dan gambar wajib diisi, dan nama tidak boleh sama dengan studio lain.', 'Simpan Studio', 'Ubah',
       'Input studio tidak valid. Periksa field yang ditandai.', 'Nama studio wajib diisi.', 'Gambar studio wajib diunggah.', 'Nama studio sudah digunakan oleh studio lain.', 'Nama studio sudah digunakan. Gunakan nama lain.',
       'Studio berhasil ditambahkan', 'tersedia dan tampil di daftar studio pelanggan.',
       'Akses ditolak', 'Hanya admin yang dapat menambahkan studio.', 'Akun yang sedang masuk adalah akun pelanggan. Masuk dengan akun admin untuk melanjutkan.', 'Kembali ke Beranda', 'Masuk sebagai Admin']) ok(JS.includes(s), `frontend memuat "${s}"`);
     // satu dialog Akses ditolak dipicu 403 "Hanya admin" → AdminController.test.js "handleError: 403 \"Hanya admin\"" (fase 8a, test-map.md baris 217)
     // 403 lain tidak logout diam-diam → AdminController.test.js "handleError: 403 lain" (fase 8a, test-map.md baris 218)
-    for (const f of ['async function sessLoad']) ok(/aAuthErr\(/.test(aj.slice(aj.indexOf(f), aj.indexOf('\n', aj.indexOf(f) + f.length + 200))), `admin.js: ${f.split(' ').pop()} memakai aAuthErr`); // kode: diganti di fase 8b (test-map.md); aLoad/aDo → AdminController.test.js "load"/"run" (fase 8a)
+    // muat sesi studio lewat penanganan galat admin → frontend/tests/controllers/StudioController.test.js "admin loadSessions" (fase 8b, test-map.md baris 219); aLoad/aDo → AdminController.test.js "load"/"run" (fase 8a)
     // 403 "Ganti password" → Akun Admin → AdminController.test.js "handleError: 403 \"Ganti password\"" dan "load: 403 Ganti password" (fase 8a, test-map.md baris 220)
-    ok(/studioSave = id =>/.test(aj) && /stSummary|AD\.stsum/.test(aj), 'admin.js: tambah studio lewat langkah ringkasan'); // kode: diganti di fase 8b (test-map.md)
+    // tambah studio lewat langkah Ringkasan Studio → StudioController.test.js "admin review: isian valid" dan "admin save: tanpa Ringkasan Studio" (fase 8b, test-map.md baris 221)
     // sesi admin dengan token bukan admin memunculkan Akses Ditolak saat dibuka (restoreSession): frontend/tests/controllers/AuthController.test.js (refactor MVC fase 6)
-    ok(/if \(key === "sN"\) AD\.sterr = null;/.test(aj), 'admin.js: unggah gambar studio baru menghapus tanda galat lama (dicek ulang di Lihat Ringkasan)'); // kode: diganti di fase 8b (test-map.md)
-    ok(/sudah dipakai\/\.test\(e\.message\)\) \{ AD\.sterr = \{ top: ST_DUP, name: ST_DUPF \}; AD\.studios = null;/.test(aj), 'admin.js: nama ganda dari server memuat ulang daftar studio'); // kode: diganti di fase 8b (test-map.md)
+    // unggah gambar studio baru menghapus tanda galat lama → StudioController.test.js "admin uploadImage studio baru" (fase 8b, test-map.md baris 224)
+    // nama ganda dari server memuat ulang daftar studio → StudioController.test.js "admin save: 409" (fase 8b, test-map.md baris 225)
     ok(!uiGradient(JS), 'frontend (JS) tanpa gradient (admin)'); }
   await down(srv);
 

@@ -37,7 +37,7 @@ test("createAdminState: semua kunci kosong, query kosong, periode 30 hari", () =
   assert.equal(state.operationsPeriod, "month");
   assert.deepEqual(state.loading, {});
   assert.deepEqual(state.drafts, {});
-  for (const key of ["revenue", "operations", "customers", "customerDetail", "transactions", "packages", "discount", "editingOperation", "studios", "books", "props", "poses"]) {
+  for (const key of ["revenue", "operations", "customers", "customerDetail", "transactions", "packages", "discount", "editingOperation", "studios", "bookings", "bookingDetail", "properties", "poses", "newStudio", "studioErrors", "studioDone"]) {
     assert.equal(state[key], null, key);
   }
 });
@@ -123,11 +123,11 @@ test("load: 403 Ganti password → /admin/account", async () => {
 });
 
 test("run: toast lama dihapus, aksi berhasil → toast pesan, satu render, true", async () => {
-  const { controller, store, log } = setupAdmin({ runtime: { toast: { message: "lama", error: "lama" } }, admin: { stdone: { title: "x" } } });
+  const { controller, store, log } = setupAdmin({ runtime: { toast: { message: "lama", error: "lama" } }, admin: { studioDone: { title: "x" } } });
   const done = await controller.run(async () => {}, "Disimpan.");
   assert.equal(done, true);
   assert.deepEqual(store.get().runtime.toast, { message: "Disimpan.", error: "" });
-  assert.equal(store.get().admin.stdone, null);
+  assert.equal(store.get().admin.studioDone, null);
   assert.deepEqual(log, ["render"]);
 });
 
@@ -265,7 +265,7 @@ test("openCustomer: detail (booking + foto) masuk slice, render lalu gulir; clos
 });
 
 test("deleteCustomer: modal Konfirmasi Hapus Akun dengan nama (di-escape) sekali; ya → DELETE, daftar terkait dikosongkan, toast jumlah foto", async () => {
-  const { controller, api, store, ui } = setupAdmin({ modalAnswers: [true], admin: { customers: [{ id: 3 }], customerDetail: { customer: { id: 3 } }, revenue: {}, operations: {}, studios: [], books: [], transactions: {}, sess: { "1|2026-11": [] } }, responses: { "DELETE /admin/customers/3": { body: { ok: true, photos_deleted: 2 } } } });
+  const { controller, api, store, ui } = setupAdmin({ modalAnswers: [true], admin: { customers: [{ id: 3 }], customerDetail: { customer: { id: 3 } }, revenue: {}, operations: {}, studios: [], bookings: [], transactions: {}, sessions: { "1|2026-11": [] } }, responses: { "DELETE /admin/customers/3": { body: { ok: true, photos_deleted: 2 } } } });
   await controller.deleteCustomer({ id: "3", name: "Dewi <i>" });
   assert.equal(ui.modals.length, 1);
   assert.equal(ui.modals[0].title, "Konfirmasi Hapus Akun");
@@ -273,8 +273,8 @@ test("deleteCustomer: modal Konfirmasi Hapus Akun dengan nama (di-escape) sekali
   assert.deepEqual(ui.modals[0].buttons.map(button => button.label), ["Kembali", "Ya, Hapus Akun"]);
   assert.deepEqual(api.calls.map(call => `${call.method} ${call.path}`), ["DELETE /admin/customers/3"]);
   const admin = store.get().admin;
-  assert.deepEqual([admin.customers, admin.customerDetail, admin.revenue, admin.operations, admin.studios, admin.books, admin.transactions], [null, null, null, null, null, null, null]);
-  assert.deepEqual(admin.sess, {});
+  assert.deepEqual([admin.customers, admin.customerDetail, admin.revenue, admin.operations, admin.studios, admin.bookings, admin.transactions], [null, null, null, null, null, null, null]);
+  assert.deepEqual(admin.sessions, {});
   assert.equal(store.get().runtime.toast.message, "Akun dihapus (2 foto ikut terhapus).");
 });
 

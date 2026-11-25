@@ -52,7 +52,7 @@ const render = () => RENDERER.render();
 const layoutNow = () => layoutOf(R.route.name, { admin: S.admin });
 function renderBefore(m) {
   syncRoute(m); saveBooking(); const view = R.route.name;
-  if (layoutNow() === "admin" && view !== "astudio") AD.stdone = null; // notifikasi "Studio berhasil ditambahkan" hanya di halaman Studio
+  if (layoutNow() === "admin" && view !== "astudio") AD.studioDone = null; // notifikasi "Studio berhasil ditambahkan" hanya di halaman Studio
 }
 const renderShell = m => shellMarkup({ layout: layoutNow(), route: m.route, session: { user: S.me ? me() : null, staff: S.staff } });
 // content = isi dari view baru (route.view, main.js); tanpa itu V.<view>() lama

@@ -19,6 +19,7 @@ import * as driveModel from "./models/drive.js";
 import * as galleryModel from "./models/gallery.js";
 import { openModal } from "./components/modal.js";
 import { createLandingPage } from "./components/landingPage.js";
+import { shrinkImage } from "./components/imageFile.js";
 import { createBeeper, createSessionScreen } from "./components/sessionScreen.js";
 import { createStudioController } from "./controllers/StudioController.js";
 import { createPackageController } from "./controllers/PackageController.js";
@@ -35,6 +36,7 @@ import * as adminModels from "./models/admin/index.js";
 import { photoSessionView } from "./views/session/photoSession.js";
 import { galleryView } from "./views/session/gallery.js";
 import { dashboardView } from "./views/admin/dashboard.js";
+import { studiosView } from "./views/admin/studios.js";
 import { usersView } from "./views/admin/users.js";
 import { transactionsView } from "./views/admin/transactions.js";
 import { packagesView as adminPackagesView } from "./views/admin/packages.js";
@@ -87,6 +89,13 @@ function createUi(store) {
     toast: message => store.update("runtime", { toast: { message, error: "" } }),
     // gulir ke bawah halaman (form Ubah item rekap, detail pelanggan di panel admin)
     scrollToEnd: () => window.scrollTo(0, document.body.scrollHeight),
+    // fokus ke elemen pertama yang cocok (field bertanda galat di Tambah Studio)
+    focus: selector => {
+      const element = document.querySelector(selector);
+      if (element && element.focus) {
+        element.focus();
+      }
+    },
     openUrl: (url, { newTab = false } = {}) => {
       if (newTab) {
         window.open(url, "_blank");
@@ -136,8 +145,9 @@ function pagesFor({ studio, payment, landing, photo, gallery, admin }, links) {
     "/sessions/:id": { view: photoSessionView, after: match => photo.enter(match), leave: () => photo.stopTimers() },
     // Galeri (GalleryController)
     "/gallery": { view: galleryView },
-    // panel admin yang sudah MVC (AdminController); Studio, Booking, Properti, Pose masih V.<view> lama (fase 8b)
+    // panel admin (AdminController; Studio + Detail Sesi = StudioController); Booking, Properti, Pose masih V.<view> lama (fase 8b)
     "/admin": { view: dashboardView, after: () => admin.loadDashboard() },
+    "/admin/studios": { view: studiosView, after: () => studio.loadStudios() },
     "/admin/users": { view: (state, match) => usersView(state, match, links), after: () => admin.loadUsers() },
     "/admin/transactions": { view: transactionsView, after: () => admin.loadTransactions() },
     "/admin/packages": { view: adminPackagesView, after: () => admin.loadPackagesPage() },
@@ -163,6 +173,23 @@ function controllerActions({ studio, package: packages, booking, payment, accoun
     "admin:deletePackage": admin.deletePackage,
     "admin:saveDiscount": (dataset, event) => admin.saveDiscount(formValues(event.target)),
     "admin:saveAccount": (dataset, event) => admin.saveAccount(formValues(event.target)),
+    "studio:toggleStudio": studio.toggleStudio,
+    "studio:openNew": studio.openNew,
+    "studio:cancelNew": studio.cancelNew,
+    "studio:uploadImage": (dataset, event) => studio.uploadImage(dataset, event.target.files[0], formValues(event.target.form)),
+    "studio:review": (dataset, event) => studio.review(formValues(event.target)),
+    "studio:backToForm": studio.backToForm,
+    "studio:save": studio.save,
+    "studio:edit": (dataset, event) => studio.edit(dataset, formValues(event.target)),
+    "studio:delete": studio.delete,
+    "studio:moveSessionMonth": studio.moveSessionMonth,
+    "studio:pickSessionDay": studio.pickSessionDay,
+    "studio:toggleSession": studio.toggleSession,
+    "studio:toggleAddSession": studio.toggleAddSession,
+    "studio:closeSessionForm": studio.closeSessionForm,
+    "studio:addSession": (dataset, event) => studio.addSession(dataset, formValues(event.target)),
+    "studio:saveSession": (dataset, event) => studio.saveSession(dataset, formValues(event.target)),
+    "studio:deleteSession": studio.deleteSession,
     "gallery:showSession": gallery.showSession,
     "gallery:select": gallery.select,
     "gallery:toggleFavourite": gallery.toggleFavourite,
@@ -225,13 +252,16 @@ async function start() {
   const ui = createUi(store);
   const navigation = { navigate: path => goPath(path) };
   const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel, contact: contactModel, drive: driveModel, gallery: galleryModel, admin: adminModels };
-  const studio = createStudioController({ api, store, ui, router: navigation, models });
+  // AdminController dibuat setelah AuthController (saling memakai); controller yang lebih dulu dibuat memanggilnya lewat adminCore
+  let admin = null;
+  const adminCore = { run: (...args) => admin.run(...args), load: (...args) => admin.load(...args), handleAccessError: (...args) => admin.handleAccessError(...args) };
+  const files = { readImage: file => shrinkImage(file, window) };
+  const studio = createStudioController({ api, store, ui, router: navigation, models, admin: adminCore, files });
   const packages = createPackageController({ store, ui, router: navigation, config: { wa: CS_WA, email: CS_EMAIL }, refreshMaster: studio.refreshMaster });
   const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster });
   const payment = createPaymentController({ api, store, ui, router: navigation, models, booking, refresh: booking.refreshData });
   const account = createAccountController({ api, store, models });
   // AuthController dan AdminController saling memakai: keluar (auth.logout) dan dialog Akses ditolak (admin.showAccessDenied)
-  let admin = null;
   const auth = createAuthController({ api, store, ui, router: navigation, models, booking, accessDenied: () => admin.showAccessDenied() });
   admin = createAdminController({ api, store, ui, router: navigation, models, logout: () => auth.logout() });
   const landing = createLandingController({ api, store, router: navigation, models, page: createLandingPage({ document, window }), timers: { setTimeout: (callback, delay) => window.setTimeout(callback, delay) } });

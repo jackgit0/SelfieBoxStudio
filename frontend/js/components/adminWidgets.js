@@ -10,3 +10,8 @@ export function loadingCard() {
 export function statCard(title, revenue, extra = "") {
   return html`<div class="stat"><small class="m">${title}</small><b>${formatRupiah(revenue.total)}</b><small class="m">${revenue.n} transaksi${extra}</small></div>`;
 }
+
+// <select> panel admin (dulu sel() di admin.js): options = [[nilai, label]]; current dibandingkan longgar (angka dari server, teks dari form)
+export function selectField({ id, name, options, current, attributes = "" }) {
+  return html`<select id="${id}" name="${name}" ${attributes}>${options.map(([value, label]) => html`<option value="${value}" ${value == current ? "selected" : ""}>${label}</option>`)}</select>`;
+}
