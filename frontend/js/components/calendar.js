@@ -19,3 +19,13 @@ export function calendar({ context, selected, month, today }) {
   return html`<div class="cal"><div class="calh"><button class="ib" aria-label="Bulan sebelumnya" data-action="calendar:month" data-context="${context}" data-step="-1">${icon("left", 16)}</button><b>${title}</b><button class="ib" aria-label="Bulan berikutnya" data-action="calendar:month" data-context="${context}" data-step="1">${icon("right", 16)}</button></div>
 <div class="calg">${WEEKDAYS.map(day => html`<small>${day}</small>`)}${blanks}${days}</div></div>`;
 }
+
+// bulan tujuan panah kalender: shown = bulan yang tampil, step = -1 / 1, current = bulan sekarang (batas mundur);
+// null bila tujuannya sebelum bulan sekarang
+export function shiftMonth(shown, step, current) {
+  const target = shown.year * 12 + shown.month + Number(step);
+  if (target < current.year * 12 + current.month) {
+    return null;
+  }
+  return { year: Math.floor(target / 12), month: target % 12 };
+}

@@ -2,6 +2,7 @@
 // ketersediaan sesi (prefetch setelah render Browse dan Pilih Waktu) dan muat ulang data master. Sisi admin menyusul di fase 8b.
 // Metode yang dipanggil dari atribut data-* menerima (dataset, event) dari core/events.js.
 import { isoDate } from "../core/format.js";
+import { shiftMonth } from "../components/calendar.js";
 
 // rute yang menampilkan jam kosong (Browse dan langkah Pilih Waktu, juga saat reschedule)
 const AVAILABILITY_ROUTES = ["home", "time"];
@@ -34,13 +35,10 @@ export function createStudioController({ api, store, router, models, now = () =>
     // panah bulan kalender Filter Jadwal; tidak bisa mundur melewati bulan sekarang
     moveMonth(dataset) {
       const calendars = store.get().runtime.calendar;
-      const shown = calendars.home || currentMonth();
-      const target = shown.year * 12 + shown.month + Number(dataset.step);
-      const limit = currentMonth();
-      if (target < limit.year * 12 + limit.month) {
+      const next = shiftMonth(calendars.home || currentMonth(), dataset.step, currentMonth());
+      if (!next) {
         return;
       }
-      const next = { year: Math.floor(target / 12), month: target % 12 };
       store.update("runtime", { calendar: { ...calendars, home: next } });
     },
 

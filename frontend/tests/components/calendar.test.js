@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Safe } from "../../js/core/html.js";
-import { calendar } from "../../js/components/calendar.js";
+import { calendar, shiftMonth } from "../../js/components/calendar.js";
 
 // November 2026: tanggal 1 jatuh pada hari Minggu → enam sel kosong bila Senin hari pertama
 const november = { context: "book", selected: "2026-11-27", month: { year: 2026, month: 10 }, today: "2026-11-25" };
@@ -40,4 +40,12 @@ test("navigasi bulan memakai data-action dengan konteks dan arah", () => {
   assert.match(text, /<button class="ib" aria-label="Bulan sebelumnya" data-action="calendar:month" data-context="home" data-step="-1">/);
   assert.match(text, /<button class="ib" aria-label="Bulan berikutnya" data-action="calendar:month" data-context="home" data-step="1">/);
   assert.doesNotMatch(text, /onclick=/);
+});
+
+test("shiftMonth: maju/mundur antartahun, null bila sebelum bulan sekarang", () => {
+  const current = { year: 2026, month: 10 };
+  assert.deepEqual(shiftMonth(current, 1, current), { year: 2026, month: 11 });
+  assert.deepEqual(shiftMonth({ year: 2026, month: 11 }, 1, current), { year: 2027, month: 0 });
+  assert.deepEqual(shiftMonth({ year: 2027, month: 0 }, -1, current), { year: 2026, month: 11 });
+  assert.equal(shiftMonth(current, -1, current), null);
 });

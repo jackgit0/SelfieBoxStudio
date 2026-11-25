@@ -188,13 +188,12 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     // navbar: tamu tanpa nama user dengan Masuk (/login) dan Daftar (/register), nama customer di-escape sekali: frontend/tests/components/navbar.test.js (refactor MVC fase 4)
     ok(/async function afterAuth[^\n]*S\.draft/.test(core), 'core.js: afterAuth melanjutkan draf booking (kembali ke Paket & Pembayaran)'); // kode: diganti di fase 6 (test-map.md)
     // 4. pemetaan galat dan lima popup (judul dan pesan dari Figma)
-    ok((cj.match(/function bookingErr\(/g) || []).length === 1, 'customer.js: satu fungsi pemetaan bookingErr()'); // kode: diganti di fase 5b (test-map.md)
+    // satu tabel pemetaan galat → popup (BOOKING_ERRORS di BookingController.handleError): frontend/tests/controllers/BookingController.test.js (refactor MVC fase 5b)
     for (const s of ['Input Tidak Valid', 'Input booking tidak lengkap atau tidak valid. Pilih tanggal dan sesi terlebih dahulu.', 'Sesi Tidak Tersedia', 'tidak lagi tersedia. Silakan pilih sesi lain.',
       'Paket Tidak Ditemukan', 'Paket tidak ditemukan. Silakan pilih paket lain.', 'Maaf, Sesi Sudah Dibooking', 'Sesi ini sudah memiliki booking aktif. Silakan pilih sesi lain.', 'Pilih Sesi Lain',
       'Masuk untuk melanjutkan booking', 'Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.', 'Jadwal sudah tidak tersedia', 'Format/jam slot tidak valid', 'Jadwal sudah lewat', 'Studio tidak tersedia']) ok(JS.includes(s), `frontend memuat "${s}"`);
     ok(/async function confirmPay\(\) \{\s*if \(!S\.me\)/.test(cj), 'customer.js: tamu yang menekan Check Out mendapat popup Belum Login sebelum booking dibuat'); // kode: diganti di fase 5b (test-map.md)
-    ok(!/\$\{BK\.slot \? "" : "disabled"\} onclick="nextTime\(\)"/.test(cj), 'customer.js: tombol Lanjut ke Pembayaran tidak lagi dinonaktifkan (validasi lewat popup Input Tidak Valid)'); // kode: diganti di fase 5b (test-map.md)
-    ok(!/catch \(e\) \{[^}]*R\.toast\.error = e\.message; (R\.availability = \{\}; )?(return )?render\(\)/.test(cj.slice(cj.indexOf('async function nextTime'), cj.indexOf('// ---------- halaman hasil'))), 'customer.js: galat langkah booking tidak lagi ditampilkan sebagai teks merah'); // kode: diganti di fase 5b (test-map.md)
+    // tombol Lanjut ke Pembayaran tidak pernah disabled: frontend/tests/views/time.test.js; galat langkah booking ke popup, bukan teks merah: frontend/tests/controllers/BookingController.test.js (refactor MVC fase 5b)
     ok(lj.includes('Lihat Studio') && /go\('home'\)/.test(lj), 'landing.js: tautan "Lihat Studio" membuka Browse'); // kode: diganti di fase 7 (test-map.md)
     ok(!uiGradient(JS), 'frontend (JS) tetap tanpa gradient'); }
   await down(srv);

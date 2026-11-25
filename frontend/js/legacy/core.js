@@ -1,5 +1,5 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
-import { API, BK, D, M, R, RENDERER, ROUTER, S, V, save, saveBooking } from "./state.js";
+import { API, BK, CONTROLLERS, D, M, R, RENDERER, ROUTER, S, V, save, saveBooking } from "./state.js";
 import { BRAND } from "../config.js";
 import { esc, raw } from "../core/html.js";
 import { icon, iconFilled } from "../components/icon.js";
@@ -8,7 +8,6 @@ import { renderToasts } from "../components/toast.js";
 import { parseSlot } from "../core/format.js";
 import * as masterModel from "../models/master.js";
 import { legacyPath } from "../core/router.js";
-import { resumeDraft } from "./customer.js";
 import { P, stopSessionTimers } from "./session.js";
 import { AD, adminReset } from "./admin.js";
 import { composeOutlet, layoutOf, shellMarkup } from "../core/render.js";
@@ -99,7 +98,7 @@ const fixS = s => { s.photos.forEach(p => p.img = p.img || API.imageUrl(p.id)); 
 async function refresh() {
   D.bookings = await API.get("/bookings"); D.sessions = (await API.get("/sessions")).map(fixS);
 }
-async function afterAuth(r) { API.token = r.token; S.admin = false; S.user = r.user; S.me = r.user.id; await refresh(); if (S.draft) return resumeDraft(); go("home"); } // draf booking tamu: kembali ke Paket & Pembayaran
+async function afterAuth(r) { API.token = r.token; S.admin = false; S.user = r.user; S.me = r.user.id; await refresh(); if (S.draft) return CONTROLLERS.booking.resumeDraft(); go("home"); } // draf booking tamu: kembali ke Paket & Pembayaran (BookingController)
 function logout() { API.token = ""; API.staffToken = ""; S.user = S.me = null; S.staff = false; S.admin = false; S.draft = null; D.bookings = []; D.sessions = []; if (typeof adminReset === "function") adminReset(); R.auth.mode = "login"; go("landing"); }
 // Mode Staf: PIN lewat modal "Masuk Mode Staf" (dulu dialog bawaan browser, decisions.md 4, 27, 41); fokus awal di isian PIN, Enter = Masuk,
 // setelah ditutup fokus ke tombol avatar (item menu yang membukanya sudah tersembunyi)

@@ -9,15 +9,17 @@ import { createRenderer, installShellActions } from "./core/render.js";
 import { createApi } from "./models/api.js";
 import * as masterModel from "./models/master.js";
 import * as studioModel from "./models/studio.js";
+import * as bookingModel from "./models/booking.js";
 import { openModal } from "./components/modal.js";
 import { createStudioController } from "./controllers/StudioController.js";
 import { createPackageController } from "./controllers/PackageController.js";
+import { createBookingController } from "./controllers/BookingController.js";
 import { browseView } from "./views/customer/browse.js";
 import { studioView } from "./views/customer/studio.js";
 import { packagesView } from "./views/customer/packages.js";
+import { timeView } from "./views/customer/time.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
 import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell, refresh, logout } from "./legacy/core.js";
-import { calNav, calPick } from "./legacy/customer.js";
 import "./legacy/landing.js";
 import { P } from "./legacy/session.js";
 import { AD, aDenied } from "./legacy/admin.js";
@@ -61,23 +63,28 @@ function pagesFor({ studio }) {
     },
     "/studios/:id": { view: studioView, after: () => studio.refreshMaster() },
     "/packages": { view: packagesView },
-    // langkah Pilih Waktu masih kode lama sampai fase 5b, jam kosongnya sudah dari StudioController
-    "/book/time": { after: showAvailability },
-    "/bookings/:id/reschedule": { after: showAvailability },
+    // langkah Pilih Waktu (booking baru dan ubah jadwal): jam kosong dari StudioController
+    "/book/time": { view: timeView, after: showAvailability },
+    "/bookings/:id/reschedule": { view: timeView, after: showAvailability },
   };
 }
 
-// aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu, fase 5b)
-function controllerActions({ studio, package: packages }) {
+// aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
+function controllerActions({ studio, package: packages, booking }) {
   return {
+    "booking:quickBook": booking.quickBook,
+    "booking:start": booking.start,
+    "booking:startReschedule": booking.startReschedule,
+    "booking:pickSlot": booking.pickSlot,
+    "booking:next": booking.next,
     "package:choose": packages.choose,
     "package:contactCs": packages.contactCs,
     "studio:toggleBookmark": studio.toggleBookmark,
     "studio:setHourFrom": studio.setHourFrom,
     "studio:setHourTo": studio.setHourTo,
     "studio:setPropertyCategory": studio.setPropertyCategory,
-    "calendar:month": dataset => (dataset.context === "home" ? studio.moveMonth(dataset) : calNav(dataset.context, Number(dataset.step))),
-    "calendar:pick": dataset => (dataset.context === "home" ? studio.pickDate(dataset) : calPick(dataset.context, dataset.date)),
+    "calendar:month": dataset => (dataset.context === "home" ? studio.moveMonth(dataset) : booking.moveMonth(dataset)),
+    "calendar:pick": dataset => (dataset.context === "home" ? studio.pickDate(dataset) : booking.pickDate(dataset)),
   };
 }
 
@@ -89,10 +96,11 @@ async function start() {
   const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: P, admin: AD }, { storage, persistKey: "snapia", session });
   const ui = createUi(store);
   const navigation = { navigate: path => goPath(path) };
-  const models = { master: masterModel, studio: studioModel };
+  const models = { master: masterModel, studio: studioModel, booking: bookingModel };
   const studio = createStudioController({ api, store, ui, router: navigation, models });
   const packages = createPackageController({ store, ui, router: navigation, config: { wa: CS_WA, email: CS_EMAIL }, refreshMaster: studio.refreshMaster });
-  const controllers = { studio, package: packages };
+  const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster, refresh });
+  const controllers = { studio, package: packages, booking };
   const pages = pagesFor(controllers);
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({
