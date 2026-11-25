@@ -16,13 +16,16 @@ export const R = { route: { name: "landing", path: "/", params: {}, query: {}, t
 // booking yang sedang diisi: studio, tanggal, sesi; quote = rincian harga dari /api/quote; rescheduleId = id booking yang sedang diubah jadwalnya
 export const BK = { studio: null, date: null, slot: null, quote: null, rescheduleId: null };
 
-// klien API (models/api.js), store dan router (core/router.js), diisi main.js lewat connectLegacy() sebelum render pertama
+// klien API (models/api.js), store, router (core/router.js) dan renderer (core/render.js), diisi main.js lewat connectLegacy() sebelum render pertama
 export let API = null;
 export let ROUTER = null;
+// renderer (core/render.js) yang dipakai render() lama
+export let RENDERER = null;
 let store = null;
-export function connectLegacy({ api, store: appStore, router }) {
+export function connectLegacy({ api, store: appStore, router, renderer }) {
   API = api;
   ROUTER = router;
+  RENDERER = renderer;
   store = appStore;
 }
 // simpan S (state tersimpan) dan booking berjalan (BK, per tab) lewat store

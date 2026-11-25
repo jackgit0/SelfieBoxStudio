@@ -1,21 +1,14 @@
 // ===== PANEL ADMIN: Dashboard, Pengguna, Studio, Booking, Properti, Pose, Transaksi, Paket & Diskon =====
 import { API, M, R, S, V } from "./state.js";
-import { API_BASE, BRAND } from "../config.js";
+import { API_BASE } from "../config.js";
 import { esc } from "../core/html.js";
 import { formatDate as fmtDate, formatTime as fmtTime, padTwo as pad, formatRupiah as rp, todayIso as todayS } from "../core/format.js";
-import { $, go, ic, logout, modal, render, toasts } from "./core.js";
+import { $, go, ic, logout, modal, render } from "./core.js";
 import { PAYLBL, bgi, kvs } from "./customer.js";
 import { openAuth } from "./landing.js";
 const AD = { loading: {}, imgs: {}, open: {}, q: "", opPeriod: "month", opEdit: null, cdet: null, bdet: null, bst: null, bstatus: "", scal: {}, sday: {}, sess: {}, sedit: null, sadd: null, stnew: null, stsum: null, sterr: null, stdone: null };
 function adminReset() { Object.keys(AD).forEach(k => { if (!["loading", "imgs", "open"].includes(k) && !["q", "opPeriod", "bstatus"].includes(k)) AD[k] = null; }); AD.q = ""; AD.opPeriod = "month"; AD.bstatus = ""; AD.imgs = {}; AD.open = {}; AD.loading = {}; AD.scal = {}; AD.sday = {}; AD.sess = {}; }
-const AMENU = [["adash", "Dashboard", "dash"], ["acust", "Pengguna", "users"], ["astudio", "Studio", "studio"], ["abook", "Booking", "calendar"], ["aprop", "Properti", "glasses"], ["apose", "Pose", "run"], ["atrx", "Transaksi", "card"], ["apkg", "Paket & Diskon", "tag"], ["aacct", "Akun Admin", "settings"]];
-const ATITLE = { adash: "Administrasi Pendapatan", acust: "Daftar Pengguna", astudio: () => "Daftar Studio" + (AD.studios ? ` (${AD.studios.length})` : ""), abook: "Daftar Booking", aprop: "Daftar Properti", apose: "Daftar Pose", atrx: "Transaksi", apkg: "Paket & Diskon", aacct: "Akun Admin" };
-const SEARCHABLE = ["acust", "astudio", "abook", "aprop", "apose", "atrx"];
-function adminShell(inner) {
-  if (R.route.name != "astudio") AD.stdone = null;
-  return `<div class="adm"><aside class="side"><h3>Admin</h3>${AMENU.map(m => `<button class="${R.route.name == m[0] ? "on" : ""}" onclick="go('${m[0]}')">${ic(m[2], 20)} ${m[1]}</button>`).join("")}<div class="foot"><div class="sm m" style="margin:0 6px 8px">${esc(BRAND)}</div><button onclick="logout()">${ic("logout", 20)} Keluar</button></div></aside>
-<main class="amain">${AD.me && AD.me.must_change ? `<div class="toast err">⚠ Anda masih memakai password bawaan. Ganti password sekarang — fitur admin lain terkunci sampai password diganti.</div>` : ""}<div class="ahead"><h1>${(typeof ATITLE[R.route.name] == "function" ? ATITLE[R.route.name]() : ATITLE[R.route.name]) || ""}</h1>${SEARCHABLE.includes(R.route.name) ? `<div class="search">${ic("search", 18)}<input placeholder="Search..." value="${esc(AD.q)}" onchange="AD.q=this.value;render()"></div>` : ""}</div>${toasts()}${inner}</main></div>`;
-}
+// menu sidebar, judul halaman dan kotak cari: tabel rute (core/router.js) dan components/adminSidebar.js (refactor MVC fase 4)
 // galat otorisasi admin: 401 = sesi habis -> keluar seperti biasa; 403 "Hanya admin" (token bukan akun admin) -> dialog Akses Ditolak (Figma 593:4971, keputusan 38).
 // 403 lain (mis. "Password saat ini salah") bukan urusan akses: ditampilkan sebagai galat biasa. true bila sudah ditangani
 const aAuthErr = (e, what) => { if (e.status == 401) { logout(); return true; } if (e.status == 403 && /Hanya admin/.test(e.message)) { aDenied(what); return true; } return false; };
@@ -302,4 +295,4 @@ const acctSave = () => {
   if (AD.me && AD.me.must_change && !n) { R.toast.error = "Password baru wajib diisi."; R.toast.message = ""; return render(); }
   return aDo(async () => { const r = await API.patch("/admin/account", { current_password: val("ac_c"), username: val("ac_u"), new_password: n || undefined }); API.token = r.token; localStorage.setItem("snapia_t", r.token); AD.me = { username: r.username, must_change: false }; }, "Akun admin diperbarui.");
 };
-export { AD, aDenied, acctSave, adminReset, adminShell, bookDel, bookSave, delCust, discSave, loading, opDel, opEdit, opSave, openBook, openCust, pkActive, pkAdd, pkDel, pkSave, poseDel, poseSave, propDel, propSave, pthumb, sAdd, sDay, sDel, sNav, sSave, sel, stCancel, stEdit, stReview, stSave, stat, studioDel, studioSave, upImg };
+export { AD, aDenied, acctSave, adminReset, bookDel, bookSave, delCust, discSave, loading, opDel, opEdit, opSave, openBook, openCust, pkActive, pkAdd, pkDel, pkSave, poseDel, poseSave, propDel, propSave, pthumb, sAdd, sDay, sDel, sNav, sSave, sel, stCancel, stEdit, stReview, stSave, stat, studioDel, studioSave, upImg };

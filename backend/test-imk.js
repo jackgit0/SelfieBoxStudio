@@ -184,8 +184,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok((await call('POST', '/quote', { package_id: 1, studio_id: 2 })).j.error === 'Studio tidak tersedia', 'quote studio tidak tersedia: "Studio tidak tersedia"');
     // 3. guard tamu: frontend/tests/core/router.test.js (tabel guard rute × tamu/customer/admin, refactor MVC fase 3)
     const JS = allJs(), core = src('js/legacy/core.js'), cj = src('js/legacy/customer.js'), lj = src('js/legacy/landing.js');
-    ok(/\$\{S\.me \? acctMenu\(\) : /.test(core) && (core.match(/esc\(me\(\)\.name\)/g) || []).length === 1 && /const acctMenu = [^\n]*esc\(me\(\)\.name\)/.test(core), 'core.js: navbar membaca me().name hanya di menu akun (bukan untuk tamu)'); // kode: diganti di fase 4 (test-map.md)
-    ok(core.includes("openAuth('login')") && core.includes("openAuth('register')"), 'core.js: navbar tamu punya tombol Masuk dan Daftar'); // kode: diganti di fase 4 (test-map.md)
+    // navbar: tamu tanpa nama user dengan Masuk (/login) dan Daftar (/register), nama customer di-escape sekali: frontend/tests/components/navbar.test.js (refactor MVC fase 4)
     ok(/async function afterAuth[^\n]*S\.draft/.test(core), 'core.js: afterAuth melanjutkan draf booking (kembali ke Paket & Pembayaran)'); // kode: diganti di fase 6 (test-map.md)
     // 4. pemetaan galat dan lima popup (judul dan pesan dari Figma)
     ok((cj.match(/function bookingErr\(/g) || []).length === 1, 'customer.js: satu fungsi pemetaan bookingErr()'); // kode: diganti di fase 5b (test-map.md)

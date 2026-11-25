@@ -5,18 +5,17 @@ import { esc } from "../core/html.js";
 import { SESSION_HOURS as HRS, formatDayMonthYear as fmtDMY, formatDate as fmtDate, formatTime as fmtTime, isoDate as iso, padTwo as pad, parseSlot, formatRupiah as rp, slotLabel, slotRange, todayIso as todayS } from "../core/format.js";
 import { isStudioShown } from "../models/master.js";
 import { modalIcon } from "../components/modal.js";
+import { calendar } from "../components/calendar.js";
 import { $, capLabel, csContact, eff, free, go, ic, icf, me, modal, pkOf, prefetch, priceRange, ptag, refresh, refreshMaster, render, studioOf } from "./core.js";
 import { openAuth } from "./landing.js";
 const bgi = u => u ? `background-image:url('${esc(u)}')` : "";
 const propVisual = p => p.img ? `<div class="pimg" style="${bgi(p.img)}"></div>` : `<div class="pimg" ${p.bg ? `style="background:${esc(p.bg.split(",")[0])}"` : ""}>${p.bg ? "" : esc(p.e || "🎁")}</div>`;
 
 // ---------- kalender ----------
+// components/calendar.js; bulan yang ditampilkan per konteks di R.calendar[ctx] = { y, m }
 function calHTML(ctx, sel) {
-  const t = new Date(), c = R.calendar[ctx] || (R.calendar[ctx] = { y: t.getFullYear(), m: t.getMonth() }), first = (new Date(c.y, c.m, 1).getDay() + 6) % 7, dim = new Date(c.y, c.m + 1, 0).getDate(), today = todayS();
-  let cells = "<i></i>".repeat(first);
-  for (let d = 1; d <= dim; d++) { const ds = iso(new Date(c.y, c.m, d)); cells += `<button class="cd ${ds == sel ? "on" : ""}" ${ds < today ? "disabled" : ""} onclick="calPick('${ctx}','${ds}')">${d}</button>`; }
-  return `<div class="cal"><div class="calh"><button class="ib" aria-label="Bulan sebelumnya" onclick="calNav('${ctx}',-1)">${ic("left", 16)}</button><b>${new Date(c.y, c.m, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" })}</b><button class="ib" aria-label="Bulan berikutnya" onclick="calNav('${ctx}',1)">${ic("right", 16)}</button></div>
-<div class="calg">${["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"].map(x => `<small>${x}</small>`).join("")}${cells}</div></div>`;
+  const t = new Date(), c = R.calendar[ctx] || (R.calendar[ctx] = { y: t.getFullYear(), m: t.getMonth() });
+  return calendar({ context: ctx, selected: sel, month: { year: c.y, month: c.m }, today: todayS() }).markup;
 }
 function calNav(ctx, dir) { const t = new Date(), c = R.calendar[ctx] || (R.calendar[ctx] = { y: t.getFullYear(), m: t.getMonth() }); let m = c.m + dir, y = c.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } if (y * 12 + m < t.getFullYear() * 12 + t.getMonth()) return; c.y = y; c.m = m; render(); }
 function calPick(ctx, ds) { if (ctx === "home") S.hDate = ds; else { BK.date = ds; BK.slot = null; } render(); }

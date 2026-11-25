@@ -1,18 +1,21 @@
 // Titik masuk aplikasi (satu-satunya <script type="module"> di index.html).
-// Menyiapkan API, store dan router, membungkus objek state kode lama (js/legacy) dengan store, memasang jembatan window
+// Menyiapkan API, store, router, renderer dan event data-*, membungkus objek state kode lama (js/legacy) dengan store, memasang jembatan window
 // untuk atribut onclick lama, lalu menjalankan isi boot.js lama: muat data master, tautan #reset= (router), pulihkan login, render pertama.
 import { API_BASE } from "./config.js";
 import { createStore } from "./core/store.js";
 import { createRouter } from "./core/router.js";
+import { createEvents } from "./core/events.js";
+import { createRenderer, installShellActions } from "./core/render.js";
 import { createApi } from "./models/api.js";
 import { loadMaster } from "./models/master.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
-import { $, render, refresh, logout } from "./legacy/core.js";
+import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell, refresh, logout } from "./legacy/core.js";
 import "./legacy/customer.js";
 import "./legacy/landing.js";
 import { P } from "./legacy/session.js";
 import { AD, aDenied } from "./legacy/admin.js";
 import { installLegacyBridge } from "./legacy-bridge.js";
+import { registerLegacyActions } from "./legacy-actions.js";
 
 // localStorage/sessionStorage bisa melempar galat bila diblokir browser; aplikasi tetap jalan tanpa penyimpanan
 function browserStorage(name = "localStorage") {
@@ -51,8 +54,17 @@ async function start() {
       D.sessions = [];
     },
   });
-  connectLegacy({ api, store, router });
+  // shell sekali per rute, outlet setiap render (core/render.js); kait-kaitnya masih kode lama (V.<view>, toast, header admin)
+  const renderer = createRenderer({ root: document.getElementById("app"), resolve: () => router.resolve(), before: renderBefore, shell: renderShell, outlet: renderContent, after: renderAfter });
+  connectLegacy({ api, store, router, renderer });
   installLegacyBridge();
+  renderer.start(store);
+
+  // atribut data-* (core/events.js) di seluruh dokumen; data-route pindah halaman seperti go() lama (decisions.md 42)
+  const events = createEvents({ navigate: path => goPath(path) });
+  installShellActions({ registerActions: events.registerActions, document });
+  registerLegacyActions(events.registerActions);
+  events.startEvents(document);
 
   try {
     store.update("master", await loadMaster(api), { silent: true });

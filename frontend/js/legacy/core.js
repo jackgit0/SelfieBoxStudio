@@ -1,5 +1,5 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
-import { API, BK, D, M, R, ROUTER, S, V, save, saveBooking } from "./state.js";
+import { API, BK, D, M, R, RENDERER, ROUTER, S, V, save, saveBooking } from "./state.js";
 import { BRAND, CS_EMAIL, CS_WA } from "../config.js";
 import { esc, raw } from "../core/html.js";
 import { icon, iconFilled } from "../components/icon.js";
@@ -10,7 +10,9 @@ import * as masterModel from "../models/master.js";
 import { legacyPath } from "../core/router.js";
 import { resumeDraft } from "./customer.js";
 import { P, stopSessionTimers } from "./session.js";
-import { AD, adminReset, adminShell } from "./admin.js";
+import { AD, adminReset } from "./admin.js";
+import { composeOutlet, layoutOf, shellMarkup } from "../core/render.js";
+import { adminHeader, adminTitle } from "../components/adminSidebar.js";
 const $ = s => document.querySelector(s);
 const me = () => S.user;
 
@@ -33,15 +35,16 @@ const icf = (n, s = 20) => iconFilled(n, s).markup;
 // halaman = rute di core/router.js (path history); tamu boleh melihat studio, paket dan mengisi form booking, login diminta saat Check Out (keputusan 34–35).
 // go(view, params) lama tetap dipakai atribut onclick (lewat jembatan window): kunci view lama → path lewat legacyPath(); fase 4–8b menggantinya dengan data-route / router.navigate
 const activeSessionId = () => P.session || (D.sessions.filter(x => x.user_id == S.me && x.status == "Aktif").pop() || {}).id;
-function go(v, p = {}) {
+// goPath(path) = pindah halaman seperti go() lama (toast dan cache slot dibersihkan, state disimpan, gulir ke atas); dipakai juga oleh data-route (main.js)
+function goPath(path) {
   R.toast.message = R.toast.error = ""; R.availability = {}; save();
-  const path = legacyPath(v, p, { rescheduleId: BK.rescheduleId, loginMode: R.auth.mode, sessionId: v === "session" ? activeSessionId() : null });
   window.scrollTo({ top: 0, behavior: "instant" }); ROUTER.navigate(path);
 }
+function go(v, p = {}) { goPath(legacyPath(v, p, { rescheduleId: BK.rescheduleId, loginMode: R.auth.mode, sessionId: v === "session" ? activeSessionId() : null })); }
 // rute aktif setelah guard → R.route (id angka seperti S.p.id lama); mode form masuk, tab Booking Saya dan tab Akun mengikuti URL
 const numeric = params => Object.fromEntries(Object.entries(params).map(([k, v]) => [k, /^\d+$/.test(v) ? +v : v]));
-function syncRoute() {
-  const m = ROUTER.resolve(), r = m.route;
+function syncRoute(m) {
+  const r = m.route;
   R.route = { name: r.name, path: m.path, params: numeric(m.params), query: m.query, title: r.title, tab: r.tab };
   if (r.name === "auth") R.auth.mode = r.params.mode;
   if (r.name === "my") S.myTab = m.query.tab === "history" ? "hist" : "up";
@@ -55,35 +58,31 @@ function syncReschedule(id) {
   const b = D.bookings.find(x => x.id == id);
   if (b && ["Menunggu Pembayaran", "Terbayar"].includes(b.status)) Object.assign(BK, { rescheduleId: id, studio: b.studio, date: parseSlot(b.date).date, slot: null, quote: null });
 }
-document.addEventListener("click", () => { const m = $("#menu"); if (m) m.hidden = true; });
-const toggleMenu = e => { e.stopPropagation(); const m = $("#menu"); m.hidden = !m.hidden; };
-const openAcct = tab => go("account", { tab });
 // dialog bersama: components/modal.js openModal(); body dan kicker kode lama berupa HTML yang sudah di-escape pemanggil, cls = kelas tambahan .mbox
 const modal = ({ body = "", kicker = "", cls = "", ...options }) => openModal({ ...options, body: raw(body), kicker: raw(kicker), className: cls });
 const toasts = () => renderToasts(R.toast).markup;
 
-const acctMenu = () => `<div class="usr">${S.staff ? '<span class="tag warn">Staf</span>' : ""}<span class="uname">${esc(me().name)}</span><button class="avatar" aria-label="Menu akun" onclick="toggleMenu(event)">${ic("user", 20)}</button>
-<div id="menu" class="menu" hidden><button onclick="openAcct('profile')">${ic("user", 18)} Pengaturan Akun</button><button onclick="openAcct('pay')">${ic("receipt", 18)} Riwayat Pembayaran</button>
-<button onclick="staffToggle()">${ic("settings", 18)} ${S.staff ? "Nonaktifkan Mode Staf" : "Mode Staf"}</button><button onclick="logout()">${ic("logout", 18)} Keluar</button></div></div>`;
-// tab Booking/Galeri untuk tamu membuka halaman Masuk
-const navGo = k => S.me || k === "home" ? `go('${k}')` : "openAuth('login')";
-function shell(inner) {
-  const nav = [["home", "Beranda", "home"], ["my", "Booking", "calendar"], ["gallery", "Galeri", "images"]], on = k => R.route.tab === k;
-  return `<header class="top"><div class="brand">${esc(BRAND)}</div><div class="mtitle">${R.route.title}</div>
-<nav class="tabs">${nav.map(n => `<button class="tab ${on(n[0]) ? "on" : ""}" onclick="${navGo(n[0])}">${ic(n[2], 18)}<span>${n[1]}</span></button>`).join("")}</nav>
-${S.me ? acctMenu() : `<div class="usr"><button class="btn ghost sm" onclick="openAuth('login')">Masuk</button><button class="btn sm" onclick="openAuth('register')">Daftar</button></div>`}</header>
-<main class="page">${toasts()}${inner}</main>
-<nav class="bottom">${nav.map(n => `<button class="${on(n[0]) ? "on" : ""}" onclick="${navGo(n[0])}">${ic(n[2], 22)}<span>${n[1]}</span></button>`).join("")}</nav>`;
-}
 // muat ulang data master (studio/properti/paket) bila admin mengubahnya; render ulang hanya jika berbeda
 async function refreshMaster() { try { const m = await masterModel.loadMaster(API); if (m.json === M.json) return; Object.assign(M, m); render(); } catch (e) {} }
 V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
-function render() {
-  syncRoute(); saveBooking(); const view = R.route.name;
+// ---------- render (core/render.js; main.js membuat renderer dengan keempat kait di bawah) ----------
+// render() lama = render ulang lewat renderer: shell dipasang ulang hanya bila rute atau isinya berubah, selain itu hanya outlet
+const render = () => RENDERER.render();
+const layoutNow = () => layoutOf(R.route.name, { admin: S.admin });
+function renderBefore(m) {
+  syncRoute(m); saveBooking(); const view = R.route.name;
   if (view !== "landing") window.onscroll = null;
   if (view !== "session" && typeof stopSessionTimers === "function") stopSessionTimers();
-  const f = V[view] || V.auth, inner = f();
-  $("#app").innerHTML = view === "landing" ? inner : view === "auth" ? `<div class="authwrap">${inner}</div>` : S.admin ? adminShell(inner) : shell(inner);
+  if (layoutNow() === "admin" && view !== "astudio") AD.stdone = null; // notifikasi "Studio berhasil ditambahkan" hanya di halaman Studio
+}
+const renderShell = m => shellMarkup({ layout: layoutNow(), route: m.route, session: { user: S.me ? me() : null, staff: S.staff } });
+function renderContent(m) {
+  const layout = layoutNow(), content = raw((V[R.route.name] || V.auth)());
+  const header = layout === "admin" ? adminHeader({ route: m.route, title: adminTitle(m.route, AD), mustChange: Boolean(AD.me && AD.me.must_change), query: AD.q }) : "";
+  return composeOutlet({ layout, content, toast: R.toast, header });
+}
+function renderAfter() {
+  const view = R.route.name;
   if (V[view + "_after"]) V[view + "_after"]();
   if (["home", "time"].includes(view)) prefetch();
 }
@@ -135,4 +134,4 @@ async function adminLogin(username, password) {
 }
 async function changePw() { try { await API.post("/auth/forgot", { email: me().email }); R.toast.message = "Tautan untuk mengubah sandi telah dikirim ke " + me().email; } catch (x) { R.toast.error = x.message; } render(); }
 function csContact() { const wa = CS_WA, mail = CS_EMAIL; if (wa) window.open("https://wa.me/" + wa, "_blank"); else if (mail) location.href = "mailto:" + mail; else alert("Silakan hubungi staf di studio atau kontak Customer Service Anda. (Atur nomor di frontend/js/config.js)"); }
-export { $, capLabel, changePw, csContact, doReset, eff, forgot, free, go, ic, icf, login, logout, me, modal, openAcct, pkOf, prefetch, priceRange, ptag, refresh, refreshMaster, reg, render, staffToggle, studioOf, toasts, toggleMenu };
+export { $, capLabel, changePw, csContact, doReset, eff, forgot, free, go, goPath, ic, icf, login, logout, me, modal, pkOf, prefetch, priceRange, ptag, refresh, refreshMaster, reg, render, renderAfter, renderBefore, renderContent, renderShell, staffToggle, studioOf, toasts };
