@@ -470,3 +470,12 @@ test("pose: muat, simpan (PATCH), tambah (POST), gagal → draf, hapus lewat mod
   assert.deepEqual(requests(), ["GET /admin/poses", "PATCH /admin/poses/6", "POST /admin/poses", "DELETE /admin/poses/6"]);
   assert.equal(toast().message, "Pose dihapus.");
 });
+
+test("run: aksi yang dibatalkan (CANCELLED) → tanpa render dan tanpa toast, fokus tetap di tombol pembuka dialog", async () => {
+  const { CANCELLED } = await import("../../js/controllers/AdminController.js");
+  const { controller, log, store } = setupAdmin({ runtime: { toast: { message: "lama", error: "" } } });
+  const result = await controller.run(async () => CANCELLED, "Tidak tampil");
+  assert.equal(result, false);
+  assert.ok(!log.includes("render"));
+  assert.notEqual(store.get().runtime.toast.message, "Tidak tampil");
+});

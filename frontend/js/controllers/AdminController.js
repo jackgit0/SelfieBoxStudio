@@ -6,6 +6,10 @@
 // Properti dan Pose di sini (fase 8b). files.readImage(file) → data URL yang sudah diperkecil (components/imageFile.js)
 import { DEFAULT_DENIED, accessDeniedModal, confirmModal, deleteCustomerBody, deleteOperationBody, deletePackageBody, deletePoseBody, deletePropertyBody } from "../views/admin/dialogs.js";
 
+// nilai kembali aksi run() yang dibatalkan admin di dialog konfirmasi: tidak ada yang berubah, jadi halaman tidak dirender ulang
+// (fokus kembali ke tombol yang membuka dialog) dan toast tidak diubah
+export const CANCELLED = Symbol("dibatalkan");
+
 // isi awal slice admin (dulu objek AD dan adminReset)
 export function createAdminState() {
   return {
@@ -137,10 +141,14 @@ export function createAdminController({ api, store, ui, router, models, logout, 
 
     // aksi: toast lama dihapus; okMessage menggantikan toast yang diisi aksi sendiri. true = berhasil
     async run(action, okMessage = "", what, { draft } = {}) {
+      const previousToast = state().runtime.toast;
       setToast({});
       store.update("admin", { studioDone: null }, { silent: true });
       try {
-        await action();
+        if ((await action()) === CANCELLED) {
+          setToast(previousToast);
+          return false;
+        }
       } catch (error) {
         if (controller.handleAccessError(error, what)) {
           await denial;
@@ -229,7 +237,7 @@ export function createAdminController({ api, store, ui, router, models, logout, 
       return controller.run(async () => {
         const answer = await pages.confirmable.withConfirm(confirmed => pages.users.deleteCustomer(api, id, confirmed), { ui, title: "Konfirmasi Hapus Akun", okLabel: "Ya, Hapus Akun", describeImpact: () => deleteCustomerBody(name), known: null });
         if (!answer) {
-          return;
+          return CANCELLED;
         }
         store.update("admin", { customers: null, customerDetail: null, revenue: null, operations: null, studios: null, bookings: null, transactions: null, sessions: {} }, { silent: true });
         setToast({ message: `Akun dihapus (${answer.photos_deleted} foto ikut terhapus).` });

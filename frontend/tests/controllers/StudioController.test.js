@@ -444,3 +444,13 @@ test("admin deleteSession: dialog dampak lewat withConfirm lebih dulu, lalu DELE
   assert.match(String(free.ui.modals[0].body), /Sesi ini belum memiliki booking aktif dan akan dihapus dari daftar sesi\./);
   assert.deepEqual(free.requests(), []);
 });
+
+test("admin dialog dibatalkan (hapus studio/sesi, ubah sesi) → tanpa render ulang, jadi fokus kembali ke tombol pembuka", async () => {
+  const { controller, store } = setupStudioAdmin({ modalAnswers: [false, false, false], admin: { studios: [studioRow()], sessions: { "3|2026-11": [session] } }, responses: { "PATCH /admin/sessions/7": apiFailure(409, "Perlu konfirmasi", { needs_confirm: true, impact: session.impact }) } });
+  let renders = 0;
+  store.subscribe(() => renders++);
+  await controller.delete({ id: "3" });
+  await controller.deleteSession({ studio: "3", id: "7" });
+  await controller.saveSession({ studio: "3", id: "7" }, { date: "2026-11-27", start: "10:00", end: "10:50" });
+  assert.equal(renders, 0);
+});

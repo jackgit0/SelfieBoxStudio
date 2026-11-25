@@ -2,6 +2,7 @@
 // (dulu V.abook_after, openBook, bookSave, bookFail, bookAfter, bookDel di admin.js). Aksi lewat AdminController (admin.run / admin.load).
 import { cancelBookingBody, deleteBookingBody, statusChangeBody } from "../views/admin/dialogs.js";
 import { formatRupiah } from "../core/format.js";
+import { CANCELLED } from "./AdminController.js";
 
 // admin = AdminController (run, load, confirm); ui.revealBookingDetail() = gulir ke panel detail di layar sempit
 export function createAdminBookingController({ api, store, ui, models, admin: adminCore }) {
@@ -97,7 +98,7 @@ export function createAdminBookingController({ api, store, ui, models, admin: ad
           }
           if (!confirmed) {
             updateAdmin({ drafts: { ...adminState().drafts, [draftKey]: values } });
-            return;
+            return CANCELLED;
           }
           const answer = await bookingModel.updateBooking(api, id, body).catch(error => failWith(id, error));
           invalidateAfterChange();
@@ -127,7 +128,7 @@ export function createAdminBookingController({ api, store, ui, models, admin: ad
           .withConfirm(confirmed => bookingModel.deleteBooking(api, id, confirmed), { ui, title: "Hapus booking ini?", okLabel: "Ya, Hapus Booking", describeImpact: impact => deleteBookingBody(detail, hours, impact), known: detail.impact })
           .catch(error => failWith(id, error));
         if (!answer) {
-          return;
+          return CANCELLED;
         }
         invalidateAfterChange();
         if (answer.kept) {

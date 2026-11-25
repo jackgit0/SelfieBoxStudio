@@ -6,6 +6,7 @@
 import { isoDate } from "../core/format.js";
 import { shiftMonth } from "../components/calendar.js";
 import { sessionChangeBody, sessionImpactBody, studioImpactBody } from "../views/admin/dialogs.js";
+import { CANCELLED } from "./AdminController.js";
 
 // rute yang menampilkan jam kosong (Browse dan langkah Pilih Waktu, juga saat reschedule)
 const AVAILABILITY_ROUTES = ["home", "time"];
@@ -278,7 +279,7 @@ export function createStudioController({ api, store, ui, router, models, admin: 
       return adminCore.run(async () => {
         const answer = await adminModels().confirmable.withConfirm(confirmed => adminModels().studios.deleteStudio(api, id, confirmed), { ui, title: `Hapus ${studio.name}?`, okLabel: "Ya, Hapus Studio", describeImpact: studioImpactBody, known: studio.impact });
         if (!answer) {
-          return;
+          return CANCELLED;
         }
         updateAdmin({ studios: null, bookings: null, transactions: null, revenue: null, operations: null, sessions: {}, openStudios: without(adminState().openStudios, id) });
         await reloadMaster();
@@ -367,7 +368,7 @@ export function createStudioController({ api, store, ui, router, models, admin: 
           const answer = await adminModels().confirmable.withConfirm(confirmed => adminModels().sessions.updateSession(api, id, adminModels().sessions.changeBody(values), confirmed), { ui, title: `Ubah sesi ${session.start} - ${session.end}?`, okLabel: "Ya, Ubah Sesi", describeImpact: sessionChangeBody, known: session.impact, askFirst: false });
           if (!answer) {
             updateAdmin({ drafts: { ...adminState().drafts, [key]: values } });
-            return;
+            return CANCELLED;
           }
           updateAdmin({ editingSession: null, drafts: without(adminState().drafts, key), sessionDays: { ...adminState().sessionDays, [studio]: answer.date }, sessionMonths: { ...adminState().sessionMonths, [studio]: answer.date.slice(0, 7) } });
           await refreshSessions(studio);
@@ -387,7 +388,7 @@ export function createStudioController({ api, store, ui, router, models, admin: 
       return adminCore.run(async () => {
         const answer = await adminModels().confirmable.withConfirm(confirmed => adminModels().sessions.deleteSession(api, id, confirmed), { ui, title: `Hapus sesi ${session.date} ${session.start} - ${session.end}?`, okLabel: "Ya, Hapus Sesi", describeImpact: sessionImpactBody, known: session.impact });
         if (!answer) {
-          return;
+          return CANCELLED;
         }
         updateAdmin({ editingSession: null });
         await refreshSessions(studio);

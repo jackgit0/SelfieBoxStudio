@@ -145,3 +145,12 @@ test("delete: server menolak booking yang sedang berjalan → toast galat dan de
   assert.equal(toast().error, "Booking yang sedang berjalan tidak dapat dihapus");
   assert.deepEqual(requests(), ["DELETE /admin/bookings/5", "GET /admin/bookings/5"]);
 });
+
+test("dialog dibatalkan (hapus, Dibatalkan) → tanpa render ulang", async () => {
+  const { controller, store } = setup({ modalAnswers: [false, false], admin: { bookingDetail: detail() } });
+  let renders = 0;
+  store.subscribe(() => renders++);
+  await controller.delete({ id: "5" });
+  await controller.save({ id: "5" }, { status: "Dibatalkan" });
+  assert.equal(renders, 0);
+});
