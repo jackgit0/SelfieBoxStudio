@@ -83,6 +83,9 @@ export function createPaymentController({ api, store, ui, router, models, bookin
         await paymentModel.pay(api, id, DEFAULT_METHOD);
         await refresh();
       } catch (error) {
+        if (error.status == 401) {
+          return booking.loginExpired();
+        }
         store.update("runtime", { toast: { message: "", error: error.message } });
         return;
       }

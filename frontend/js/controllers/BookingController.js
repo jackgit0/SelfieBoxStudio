@@ -9,7 +9,7 @@ import { isoDate, parseSlot, slotLabel } from "../core/format.js";
 import { isStudioShown } from "../models/master.js";
 import { filterDate } from "../models/studio.js";
 import { monthOf, shiftMonth } from "../components/calendar.js";
-import { bookingFailedModal, cancelConfirmModal, inputInvalidModal, loginRequiredModal, sessionBookedModal, sessionGoneModal } from "../views/customer/bookingPopups.js";
+import { bookingFailedModal, cancelConfirmModal, inputInvalidModal, loginRequiredModal, sessionBookedModal, sessionExpiredModal, sessionGoneModal } from "../views/customer/bookingPopups.js";
 
 const EMPTY_BOOKING = { studio: null, date: null, slot: null, quote: null, rescheduleId: null };
 
@@ -61,6 +61,13 @@ export function createBookingController({ api, store, ui, router, models, packag
     store.update("persisted", { draft: null }, { silent: true });
     store.update("booking", { rescheduleId: null, ...fields }, { silent: true });
     router.navigate("/book/time");
+  }
+
+  // token kedaluwarsa: login yang tersimpan dilepas beserta data milik user
+  function forgetLogin() {
+    api.token = "";
+    store.update("persisted", { user: null, me: null }, { silent: true });
+    store.update("data", { bookings: [], sessions: [] }, { silent: true });
   }
 
   const controller = {
@@ -223,11 +230,16 @@ export function createBookingController({ api, store, ui, router, models, packag
         return;
       }
       if (state().persisted.me) {
-        api.token = "";
-        store.update("persisted", { user: null, me: null }, { silent: true });
-        store.update("data", { bookings: [], sessions: [] }, { silent: true });
+        forgetLogin();
       }
       router.navigate(answer === "register" ? "/register" : "/login");
+    },
+
+    // 401 saat membatalkan / membayar booking yang sudah ada (dulu toast "Belum login"): login dilepas, popup, lalu form Masuk
+    async loginExpired() {
+      forgetLogin();
+      await ui.modal(sessionExpiredModal());
+      router.navigate("/login");
     },
 
     // ---------- Booking Saya ----------
@@ -284,6 +296,9 @@ export function createBookingController({ api, store, ui, router, models, packag
         store.update("persisted", { cancelRes: result }, { silent: true });
         await refresh();
       } catch (error) {
+        if (error.status == 401) {
+          return controller.loginExpired();
+        }
         store.update("runtime", { toast: { message: "", error: error.message } });
         return;
       }

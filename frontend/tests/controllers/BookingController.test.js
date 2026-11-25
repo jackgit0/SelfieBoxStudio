@@ -345,3 +345,16 @@ test("syncReschedule: /bookings/:id/reschedule dibuka langsung memulai ubah jadw
   assert.equal(store.get().booking.rescheduleId, null);
   assert.deepEqual(log, []);
 });
+
+test("cancel dengan token kedaluwarsa (401): login dilepas, popup Sesi Login Berakhir, ke /login, tanpa draf booking", async () => {
+  const { store, api, log, ui, controller } = setup({ persisted: { me: 5, user: { id: 5, name: "Dewi" } }, runtime: { cancel: { reason: "Tidak ada waktu", detail: "" } }, modalAnswers: [true, "login"], responses: { "POST /bookings/7/cancel": { status: 401, body: { error: "Belum login" } } } });
+  await controller.cancel({ id: "7" });
+  assert.deepEqual(log, ["modal:Konfirmasi Pembatalan", "modal:Sesi Login Berakhir", "navigate:/login"]);
+  assert.equal(String(ui.modals[1].body), "<p>Sesi login kamu sudah berakhir. Silakan masuk kembali untuk melanjutkan.</p>");
+  assert.equal(api.token, "");
+  assert.equal(store.get().persisted.me, null);
+  assert.equal(store.get().persisted.user, null);
+  assert.equal(store.get().persisted.draft ?? null, null);
+  assert.deepEqual(store.get().data, { bookings: [], sessions: [] });
+  assert.equal(store.get().runtime.toast.error, "");
+});

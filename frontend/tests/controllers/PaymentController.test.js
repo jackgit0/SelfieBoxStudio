@@ -176,3 +176,13 @@ test("payNow: galat server → toast galat", async () => {
   assert.equal(store.get().runtime.toast.error, "Pembayaran sudah kedaluwarsa");
   assert.deepEqual(log, ["modal:Konfirmasi Pembayaran", "render"]);
 });
+
+test("payNow dengan token kedaluwarsa (401): popup Sesi Login Berakhir lalu /login, bukan toast", async () => {
+  const { api, log, store, controller } = setup({ modalAnswers: [true, "login"], responses: { "POST /bookings/12/pay": { status: 401, body: { error: "Belum login" } } } });
+  api.token = "jwt";
+  await controller.payNow({ id: "12" });
+  assert.deepEqual(log, ["modal:Konfirmasi Pembayaran", "modal:Sesi Login Berakhir", "navigate:/login"]);
+  assert.equal(api.token, "");
+  assert.equal(store.get().persisted.me, null);
+  assert.equal(store.get().runtime.toast.error, "lama");
+});

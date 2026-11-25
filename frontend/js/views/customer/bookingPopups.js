@@ -58,6 +58,17 @@ export function bookingFailedModal(message) {
   };
 }
 
+// token kedaluwarsa (401) saat membatalkan / membayar booking yang sudah ada: tanpa draf booking, hanya masuk kembali
+export function sessionExpiredModal() {
+  return {
+    title: "Sesi Login Berakhir",
+    className: "center",
+    kicker: modalIcon("info", "blue"),
+    body: html`<p>Sesi login kamu sudah berakhir. Silakan masuk kembali untuk melanjutkan.</p>`,
+    buttons: [{ label: "Masuk", value: "login", icon: "user" }],
+  };
+}
+
 // Batalkan booking (BookingController.cancel); "Kembali" agar tidak bersanding "Batal" dengan "Batalkan"
 export function cancelConfirmModal() {
   return {
