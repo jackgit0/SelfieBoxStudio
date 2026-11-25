@@ -1,0 +1,734 @@
+{
+  "schema": "dfd/1",
+  "title": "SelfieBox Studio (IMK Kelompok 6)",
+  "rootId": "d0",
+  "diagrams": [
+    {
+      "id": "d0",
+      "kind": "sitemap",
+      "title": "Sitemap SelfieBox Studio (IMK)",
+      "nodes": [
+        {
+          "id": "h",
+          "type": "sm-home",
+          "label": "Beranda",
+          "x": 964,
+          "y": 642
+        },
+        {
+          "id": "browse",
+          "type": "sm-page",
+          "label": "Browse Studio",
+          "x": 1150,
+          "y": 1114
+        },
+        {
+          "id": "studio",
+          "type": "sm-page",
+          "label": "Detail Studio",
+          "x": 1060,
+          "y": 1244
+        },
+        {
+          "id": "create",
+          "type": "sm-page",
+          "label": "Create Booking",
+          "x": 1060,
+          "y": 1374
+        },
+        {
+          "id": "mybook",
+          "type": "sm-page",
+          "label": "Booking Saya",
+          "x": 1570,
+          "y": 1114
+        },
+        {
+          "id": "bdet",
+          "type": "sm-page",
+          "label": "Booking Details",
+          "x": 1570,
+          "y": 1244
+        },
+        {
+          "id": "resch",
+          "type": "sm-page",
+          "label": "Reschedule",
+          "x": 1480,
+          "y": 1374
+        },
+        {
+          "id": "cancel",
+          "type": "sm-page",
+          "label": "Pembatalan & Refund",
+          "x": 1660,
+          "y": 1374
+        },
+        {
+          "id": "sa",
+          "type": "sm-page",
+          "label": "Session Assistant",
+          "x": 310,
+          "y": 1114
+        },
+        {
+          "id": "cam",
+          "type": "sm-page",
+          "label": "Camera Preview & Timer",
+          "x": 40,
+          "y": 1244
+        },
+        {
+          "id": "bg",
+          "type": "sm-page",
+          "label": "Background",
+          "x": 220,
+          "y": 1244
+        },
+        {
+          "id": "pose",
+          "type": "sm-page",
+          "label": "Pose Ideas",
+          "x": 400,
+          "y": 1244
+        },
+        {
+          "id": "staff",
+          "type": "sm-page",
+          "label": "Panggil Staff",
+          "x": 580,
+          "y": 1244
+        },
+        {
+          "id": "gal",
+          "type": "sm-page",
+          "label": "Galeri",
+          "x": 1900,
+          "y": 1114
+        },
+        {
+          "id": "album",
+          "type": "sm-page",
+          "label": "Album Sesi",
+          "x": 1900,
+          "y": 1244
+        },
+        {
+          "id": "photo",
+          "type": "sm-page",
+          "label": "Preview Foto",
+          "x": 1900,
+          "y": 1374
+        },
+        {
+          "id": "acc",
+          "type": "sm-page",
+          "label": "Account",
+          "x": 1240,
+          "y": 642
+        },
+        {
+          "id": "set",
+          "type": "sm-page",
+          "label": "Settings",
+          "x": 1480,
+          "y": 602
+        },
+        {
+          "id": "edit",
+          "type": "sm-page",
+          "label": "Edit Profile",
+          "x": 1720,
+          "y": 442
+        },
+        {
+          "id": "pref",
+          "type": "sm-page",
+          "label": "Preference",
+          "x": 1720,
+          "y": 522
+        },
+        {
+          "id": "pm",
+          "type": "sm-page",
+          "label": "Payment Method",
+          "x": 1720,
+          "y": 602
+        },
+        {
+          "id": "pw",
+          "type": "sm-page",
+          "label": "Change Password",
+          "x": 1720,
+          "y": 682
+        },
+        {
+          "id": "priv",
+          "type": "sm-page",
+          "label": "Privacy Policy",
+          "x": 1720,
+          "y": 762
+        },
+        {
+          "id": "ph",
+          "type": "sm-page",
+          "label": "Payment History",
+          "x": 1480,
+          "y": 842
+        },
+        {
+          "id": "rcpt",
+          "type": "sm-page",
+          "label": "Receipt",
+          "x": 1720,
+          "y": 842
+        },
+        {
+          "id": "help",
+          "type": "sm-page",
+          "label": "Help",
+          "x": 1480,
+          "y": 922
+        },
+        {
+          "id": "logout",
+          "type": "sm-page",
+          "label": "Konfirmasi Log Out",
+          "x": 1480,
+          "y": 362
+        },
+        {
+          "id": "auth",
+          "type": "sm-section",
+          "label": "Autentikasi",
+          "x": 970,
+          "y": 170
+        },
+        {
+          "id": "login",
+          "type": "sm-page",
+          "label": "Log In",
+          "x": 1060,
+          "y": 40
+        },
+        {
+          "id": "signup",
+          "type": "sm-page",
+          "label": "Sign Up",
+          "x": 1240,
+          "y": 40
+        },
+        {
+          "id": "forgot",
+          "type": "sm-page",
+          "label": "Lupa Sandi",
+          "x": 880,
+          "y": 40
+        },
+        {
+          "id": "reset",
+          "type": "sm-page",
+          "label": "Buat Sandi Baru",
+          "x": 700,
+          "y": 40
+        },
+        {
+          "id": "adm",
+          "type": "sm-section",
+          "label": "Admin",
+          "x": 700,
+          "y": 642
+        },
+        {
+          "id": "au",
+          "type": "sm-page",
+          "label": "User Management",
+          "x": 460,
+          "y": 402
+        },
+        {
+          "id": "as",
+          "type": "sm-page",
+          "label": "Studio Management",
+          "x": 460,
+          "y": 482
+        },
+        {
+          "id": "ass",
+          "type": "sm-page",
+          "label": "Session Management",
+          "x": 220,
+          "y": 482
+        },
+        {
+          "id": "ab",
+          "type": "sm-page",
+          "label": "Booking Management",
+          "x": 460,
+          "y": 562
+        },
+        {
+          "id": "ap",
+          "type": "sm-page",
+          "label": "Property Management",
+          "x": 460,
+          "y": 642
+        },
+        {
+          "id": "apo",
+          "type": "sm-page",
+          "label": "Pose Management",
+          "x": 460,
+          "y": 722
+        },
+        {
+          "id": "apay",
+          "type": "sm-page",
+          "label": "Payment Dashboard",
+          "x": 460,
+          "y": 802
+        },
+        {
+          "id": "landing",
+          "type": "sm-page",
+          "label": "Landing Page",
+          "x": 820,
+          "y": 1114
+        },
+        {
+          "id": "pkg",
+          "type": "sm-page",
+          "label": "Pilihan Paket",
+          "x": 1240,
+          "y": 1244
+        },
+        {
+          "id": "adash",
+          "type": "sm-page",
+          "label": "Revenue Dashboard",
+          "x": 460,
+          "y": 322
+        },
+        {
+          "id": "apk",
+          "type": "sm-page",
+          "label": "Package Management",
+          "x": 460,
+          "y": 882
+        },
+        {
+          "id": "aacc",
+          "type": "sm-page",
+          "label": "Admin Account",
+          "x": 460,
+          "y": 962
+        },
+        {
+          "id": "n1",
+          "type": "note",
+          "label": "Garis polos = hierarki (menu induk → halaman). Garis putus-putus = tautan silang. Landing Page adalah halaman pertama tamu (sebelum login): tamu bisa membuka Browse Studio, Detail Studio, Pilihan Paket dan mengisi Create Booking, lalu diminta login sebelum pembayaran (popup Belum Login). Menu Admin hanya terbuka setelah Log In dengan peran admin (masuk ke Revenue Dashboard); tidak tampil di navigasi pelanggan. Buat Sandi Baru dibuka dari tautan di email yang dikirim Lupa Sandi.",
+          "x": 40,
+          "y": 40
+        }
+      ],
+      "edges": [
+        {
+          "id": "e1",
+          "from": "h",
+          "to": "auth",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e2",
+          "from": "auth",
+          "to": "login",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e3",
+          "from": "auth",
+          "to": "signup",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e4",
+          "from": "h",
+          "to": "browse",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e5",
+          "from": "browse",
+          "to": "studio",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e6",
+          "from": "studio",
+          "to": "create",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e7",
+          "from": "h",
+          "to": "mybook",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e8",
+          "from": "mybook",
+          "to": "bdet",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e9",
+          "from": "bdet",
+          "to": "resch",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e10",
+          "from": "bdet",
+          "to": "cancel",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e11",
+          "from": "h",
+          "to": "sa",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e12",
+          "from": "sa",
+          "to": "cam",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e13",
+          "from": "sa",
+          "to": "bg",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e14",
+          "from": "sa",
+          "to": "pose",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e15",
+          "from": "sa",
+          "to": "staff",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e16",
+          "from": "h",
+          "to": "gal",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e17",
+          "from": "gal",
+          "to": "album",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e18",
+          "from": "album",
+          "to": "photo",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e19",
+          "from": "h",
+          "to": "acc",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e20",
+          "from": "acc",
+          "to": "set",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e21",
+          "from": "set",
+          "to": "edit",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e22",
+          "from": "set",
+          "to": "pref",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e23",
+          "from": "set",
+          "to": "pm",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e24",
+          "from": "set",
+          "to": "pw",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e25",
+          "from": "set",
+          "to": "priv",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e26",
+          "from": "acc",
+          "to": "ph",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e27",
+          "from": "ph",
+          "to": "rcpt",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e28",
+          "from": "acc",
+          "to": "help",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e29",
+          "from": "acc",
+          "to": "logout",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e30",
+          "from": "h",
+          "to": "adm",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e31",
+          "from": "adm",
+          "to": "au",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e32",
+          "from": "adm",
+          "to": "as",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e33",
+          "from": "as",
+          "to": "ass",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e34",
+          "from": "adm",
+          "to": "ab",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e35",
+          "from": "adm",
+          "to": "ap",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e36",
+          "from": "adm",
+          "to": "apo",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e37",
+          "from": "adm",
+          "to": "apay",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e38",
+          "from": "login",
+          "to": "signup",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e39",
+          "from": "signup",
+          "to": "login",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e40",
+          "from": "login",
+          "to": "adm",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e41",
+          "from": "create",
+          "to": "mybook",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e42",
+          "from": "mybook",
+          "to": "browse",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e43",
+          "from": "bdet",
+          "to": "sa",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e44",
+          "from": "bdet",
+          "to": "album",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e45",
+          "from": "cancel",
+          "to": "help",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e46",
+          "from": "acc",
+          "to": "edit",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e47",
+          "from": "pref",
+          "to": "pm",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e48",
+          "from": "logout",
+          "to": "landing",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e49",
+          "from": "h",
+          "to": "landing",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e50",
+          "from": "browse",
+          "to": "pkg",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e51",
+          "from": "adm",
+          "to": "adash",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e52",
+          "from": "adm",
+          "to": "apk",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e53",
+          "from": "adm",
+          "to": "aacc",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e54",
+          "from": "landing",
+          "to": "login",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e55",
+          "from": "landing",
+          "to": "signup",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e56",
+          "from": "landing",
+          "to": "browse",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e57",
+          "from": "landing",
+          "to": "studio",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e58",
+          "from": "landing",
+          "to": "pkg",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e59",
+          "from": "pkg",
+          "to": "browse",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e60",
+          "from": "create",
+          "to": "pkg",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e61",
+          "from": "create",
+          "to": "login",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e62",
+          "from": "auth",
+          "to": "forgot",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e63",
+          "from": "auth",
+          "to": "reset",
+          "relation": "hierarchy"
+        },
+        {
+          "id": "e64",
+          "from": "login",
+          "to": "forgot",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e65",
+          "from": "forgot",
+          "to": "login",
+          "relation": "crosslink"
+        },
+        {
+          "id": "e66",
+          "from": "reset",
+          "to": "login",
+          "relation": "crosslink"
+        }
+      ]
+    }
+  ]
+}

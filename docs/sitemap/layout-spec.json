@@ -1,0 +1,48 @@
+{
+  "left": [
+    "adm"
+  ],
+  "right": [
+    "acc"
+  ],
+  "top": [
+    "auth"
+  ],
+  "bottom": [
+    "sa",
+    "landing",
+    "browse",
+    "mybook",
+    "gal"
+  ],
+  "order": {
+    "acc": [
+      "logout",
+      "set",
+      "ph",
+      "help"
+    ],
+    "adm": [
+      "adash",
+      "au",
+      "as",
+      "ab",
+      "ap",
+      "apo",
+      "apay",
+      "apk",
+      "aacc"
+    ],
+    "browse": [
+      "studio",
+      "pkg"
+    ],
+    "auth": [
+      "reset",
+      "forgot",
+      "login",
+      "signup"
+    ]
+  },
+  "note": "n1"
+}
