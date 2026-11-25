@@ -5,12 +5,12 @@ function stopSessionTimers() { clearInterval(tick); clearInterval(poseT); stopCa
 V.session = () => {
   const s = sesOf() || S.sessions.filter(x => x.user_id == S.me && x.status == "Aktif").pop();
   if (!s) return `<div class="panel"><div class="card center"><h1 class="h2">Belum ada sesi aktif</h1><p class="m">Mulai dari menu Booking → pilih booking → Check-in & Mulai Sesi.</p><button class="btn" style="margin-top:12px" onclick="go('my')">Ke Booking Saya</button></div></div>`;
-  curSes = s.id; const p = pkOf(s.pkg), items = s.setup ? setupItems(s.setup) : [];
+  curSes = s.id; const p = pkOf(s.pkg);
   return `<div class="panel" style="max-width:1100px"><div class="row sp"><div><h1 class="h1">Sesi Foto</h1><p class="sub">Paket ${esc(p.name)} · target ${p.photo_count} foto (maks. ambil ${p.photo_count * 2}) · ${p.dur} menit</p></div><button class="btn ghost sm" onclick="csContact()">Customer Service</button></div>
 <div class="sess" style="margin-top:14px"><div class="card"><div id="tm" class="timer"></div><video id="v" autoplay playsinline muted></video><canvas id="cv" hidden></canvas>
 <div class="row" style="margin-top:12px"><button class="btn" id="shot" onclick="shoot()">${ic("camera", 18)} Ambil Foto</button><span id="cnt" class="m"></span></div><small id="ds" class="m"></small><div id="strip" class="strip"></div></div>
 <div class="stack"><div class="card"><h3 class="h3">Pose Rekomendasi</h3><p id="pose" style="font-size:17px;margin:10px 0"></p><button class="btn sm ghost" onclick="nextPose()">Pose lain</button></div>
-<div class="card"><h3 class="h3" style="margin-bottom:10px">Background & Properti</h3>${items.length ? previewHTML(s.setup) + `<p class="sm m" style="margin-top:8px">${items.map(i => esc(i.name)).join(", ")}</p>` : '<p class="m sm">Tidak ada setup tambahan pada sesi ini.</p>'}</div>
+<div class="card"><h3 class="h3" style="margin-bottom:10px">Background & Properti</h3><p class="m sm">Background dan properti tersedia di studio, pakai sesukamu.</p></div>
 ${S.staff ? `<div class="card"><h3 class="h3" style="margin-bottom:10px">Kendali Staf</h3><div class="row"><button class="btn sm ghost" onclick="staffAct('pause')">⏸ Jeda</button><button class="btn sm ghost" onclick="staffAct('resume')">▶ Lanjut</button><button class="btn sm danger" onclick="staffAct('stop')">⏹ Hentikan</button></div>${S.log.length ? `<p class="sm m" style="margin-top:8px">Log: ${esc(S.log.slice(-3).join(" · "))}</p>` : ""}</div>` : ""}</div></div></div>`;
 };
 V.gallery = () => {

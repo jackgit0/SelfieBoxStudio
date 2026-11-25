@@ -12,12 +12,10 @@ const wait = ms => new Promise(r => setTimeout(r, ms)), pad = n => String(n).pad
   ok((await call('PATCH', '/me', { name: 'Ana B', phone: '0899999999' }, U)).j.name === 'Ana B', 'customer mengubah profil'); ok((await call('PATCH', '/me', { name: '', phone: '1' }, U)).s === 400, 'validasi profil');
   // tarif studio + properti qty
   ok((await call('PATCH', '/admin/studios/1', { price: 20000 }, AD)).s === 200, 'admin mengatur biaya sewa studio');
-  const pid = (await call('POST', '/admin/properties', { name: 'Topi Langka', category: 'Topi', price: 3000, qty: 0 }, AD)).j.id;
-  ok((await call('POST', '/quote', { package_id: 1, studio_id: 1, setup: { acc: [pid] } }, U)).s === 400, 'properti qty 0 tidak dapat dipesan');
-  await call('PATCH', `/admin/properties/${pid}`, { qty: 2 }, AD); const q = (await call('POST', '/quote', { package_id: 1, studio_id: 1, setup: { bg: null, acc: [pid] } }, U)).j; ok(q.studio_fee === 20000 && q.add === 3000 && q.total === 50000 + 20000 + 3000, 'total = paket + biaya studio + add-on');
-  ok((await call('POST', '/quote', { package_id: 1, studio_id: 1, setup: { bg: pid } }, U)).s === 400, 'accessory tidak bisa dipakai sebagai background');
+  const pid = (await call('POST', '/admin/properties', { name: 'Topi Langka', category: 'Topi', qty: 0 }, AD)).j.id;
+  ok(pid && (await call('PATCH', `/admin/properties/${pid}`, { qty: 2 }, AD)).s === 200, 'admin menambah dan mengubah qty properti'); const q = (await call('POST', '/quote', { package_id: 1, studio_id: 1 }, U)).j; ok(q.studio_fee === 20000 && q.total === 50000 + 20000, 'total = paket + biaya studio');
   // slot jam 08.00-20.00 valid
-  const far = dayOf(6), near = dayOf(3), b1 = (await call('POST', '/bookings', { package_id: 1, studio_id: 1, date: far + ' 8:00', setup: { acc: [pid] } }, U)).j; ok(b1.amount === 73000 && b1.studio_fee === 20000, 'booking jam 08:00 + biaya studio tersimpan');
+  const far = dayOf(6), near = dayOf(3), b1 = (await call('POST', '/bookings', { package_id: 1, studio_id: 1, date: far + ' 8:00' }, U)).j; ok(b1.amount === 70000 && b1.studio_fee === 20000, 'booking jam 08:00 + biaya studio tersimpan');
   ok((await call('POST', '/bookings', { package_id: 1, studio_id: 1, date: far + ' 21:00' }, U)).s === 400, 'jam di luar 08-20 ditolak');
   // pembatalan belum bayar
   ok((await call('POST', `/bookings/${b1.id}/cancel`, { reason: 'Alasan ngawur' }, U)).s === 400, 'alasan pembatalan harus dari daftar'); ok((await call('POST', `/bookings/${b1.id}/cancel`, { reason: 'Pembatalan lainnya' }, U)).s === 400, '"lainnya" wajib diisi keterangan');

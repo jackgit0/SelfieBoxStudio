@@ -25,7 +25,7 @@ const FAC = [
   ["card", "Booking & Bayar Online", () => "Reservasi kapan saja, bayar via QRIS atau transfer, invoice langsung ke emailmu."],
   ["users", "Customer Service", () => "Tim kami siap membantu reschedule, refund, dan kendala teknis saat sesi berlangsung."]
 ];
-const STEPS = [["calendar", "Pilih studio & jadwal", "Lihat studio yang tersedia, pilih tanggal dan sesi 50 menit yang cocok."], ["tag", "Pilih paket & bayar", "Bandingkan paket, pakai kode promo bila ada, lalu bayar lewat QRIS atau transfer."], ["camera", "Datang & mulai foto", "Check-in, timer berjalan otomatis, dan panduan pose siap membantu."], ["images", "Pilih & unduh foto", "Pilih foto favorit sesuai kuota paket, lalu unduh atau kirim ke Google Drive."]];
+const STEPS = [["calendar", "Pilih studio & jadwal", "Lihat studio yang tersedia, pilih tanggal dan sesi 50 menit yang cocok."], ["tag", "Pilih paket & bayar", "Bandingkan paket, cek totalnya, lalu bayar lewat QRIS atau transfer."], ["camera", "Datang & mulai foto", "Check-in, timer berjalan otomatis, dan panduan pose siap membantu."], ["images", "Pilih & unduh foto", "Pilih foto favorit sesuai kuota paket, lalu unduh atau kirim ke Google Drive."]];
 function lpStudio(s) {
   return `<article class="lcard"><div class="simg" style="${bgi(s.img)}"></div><div class="sbody"><h3 class="h3">${esc(s.name)}</h3><p class="desc" style="min-height:0">${esc(s.description)}</p>
 <div class="row sp" style="margin-top:10px"><span class="m sm">${ic("users", 14)} ${esc(capLabel(s))} orang</span><b class="sm">${priceRange(s)}</b></div></div></article>`;

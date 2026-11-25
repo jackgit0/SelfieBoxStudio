@@ -1,14 +1,14 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
 const $ = s => document.querySelector(s);
 const BRAND = window.BRAND || "SelfieBox Studio";
-let PKG = [], ALLPKG = [], DISC = { pct: 0, label: "" }, PEOPLE = [], BUDGET = [], STUDIOS = [], ALLSTUDIOS = [], VIBES = [], PROP = [], POSES = {}, POLICY = { refund_hours: 2 };
+let PKG = [], ALLPKG = [], DISC = { pct: 0, label: "" }, PEOPLE = [], BUDGET = [], STUDIOS = [], ALLSTUDIOS = [], PROP = [], POSES = {}, POLICY = { refund_hours: 2 };
 const V = {};
 let S; try { S = JSON.parse(localStorage.getItem("snapia")); } catch (e) {}
-S = Object.assign({ user: null, me: null, admin: false, view: "landing", p: {}, pkg: null, bm: [], staff: false, log: [] }, S || {}); delete S.quiz; // sisa state lama (kuis rekomendasi paket sudah dihapus)
+S = Object.assign({ user: null, me: null, admin: false, view: "landing", p: {}, pkg: null, bm: [], staff: false, log: [] }, S || {}); delete S.quiz; delete S.setup; // sisa state lama (kuis rekomendasi paket dan pilihan setup properti sudah dihapus)
 if (S.acct === "pref") S.acct = "profile";
-S.setup = { bg: (S.setup && S.setup.bg) || null, acc: (S.setup && S.setup.acc) || [] }; S.bookings = []; S.sessions = [];
+S.bookings = []; S.sessions = [];
 const save = () => { try { localStorage.setItem("snapia", JSON.stringify({ ...S, bookings: [], sessions: [] })); } catch (e) {} };
-let msg = "", err = "", AV = {}, CAL = {}, B = { studio: null, date: null, slot: null }, editId = null, Q = null, promoCode = "";
+let msg = "", err = "", AV = {}, CAL = {}, B = { studio: null, date: null, slot: null }, editId = null, Q = null;
 const me = () => S.user;
 
 // ---------- utilitas ----------
@@ -79,7 +79,7 @@ function shell(inner) {
 }
 // muat ulang data master (studio/properti/paket) bila admin mengubahnya; render ulang hanya jika berbeda
 let _mj = "";
-async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, VIBES, PROP, POSES } = m); ALLSTUDIOS = ALLSTUDIOS || STUDIOS; if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
+async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, PROP, POSES } = m); ALLSTUDIOS = ALLSTUDIOS || STUDIOS; if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
 V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
 function render() {
   if (!S.me && !["auth", "landing"].includes(S.view)) S.view = "landing";
