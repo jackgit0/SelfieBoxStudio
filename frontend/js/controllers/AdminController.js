@@ -382,20 +382,8 @@ export function createAdminController({ api, store, ui, router, models, logout, 
     },
 
     // foto baris properti (data-change pada input file berform=): isian baris saat itu disimpan sebagai draf agar tidak hilang saat dirender ulang
-    async uploadPropertyImage({ key }, file, values = {}) {
-      if (!file) {
-        return;
-      }
-      setToast({});
-      store.update("admin", { drafts: { ...admin().drafts, ["property-" + key]: values } }, { silent: true });
-      try {
-        const url = await pages.uploads.uploadImage(api, await files.readImage(file));
-        store.update("admin", { images: { ...admin().images, ["property-" + key]: url } }, { silent: true });
-        setToast({ message: "Gambar diunggah. Klik Simpan untuk menerapkan." });
-      } catch (error) {
-        setToast({ error: error.message });
-      }
-      store.update("admin", {});
+    uploadPropertyImage({ key }, file, values = {}) {
+      return uploadRowImage("property-" + key, file, values);
     },
 
     async deleteProperty({ id }) {
@@ -423,6 +411,11 @@ export function createAdminController({ api, store, ui, router, models, logout, 
       return savePoseForm(id, values);
     },
 
+    // foto baris pose (sama seperti properti): gambar baru di admin.images["pose-<id|new>"], diterapkan saat Simpan / + Tambah
+    uploadPoseImage({ key }, file, values = {}) {
+      return uploadRowImage("pose-" + key, file, values);
+    },
+
     addPose(values) {
       return savePoseForm(null, values);
     },
@@ -439,7 +432,7 @@ export function createAdminController({ api, store, ui, router, models, logout, 
       }
       await controller.run(async () => {
         await pages.poses.deletePose(api, id);
-        store.update("admin", { poses: null }, { silent: true });
+        await reloadPoses();
       }, "Pose dihapus.");
     },
 
@@ -474,6 +467,29 @@ export function createAdminController({ api, store, ui, router, models, logout, 
     },
   };
 
+  // unggah foto satu baris tabel admin (properti, pose); key = "property-<id|new>" / "pose-<id|new>"
+  async function uploadRowImage(key, file, values) {
+    if (!file) {
+      return;
+    }
+    setToast({});
+    store.update("admin", { drafts: { ...admin().drafts, [key]: values } }, { silent: true });
+    try {
+      const url = await pages.uploads.uploadImage(api, await files.readImage(file));
+      store.update("admin", { images: { ...admin().images, [key]: url } }, { silent: true });
+      setToast({ message: "Gambar diunggah. Klik Simpan untuk menerapkan." });
+    } catch (error) {
+      setToast({ error: error.message });
+    }
+    store.update("admin", {});
+  }
+
+  // daftar pose dimuat ulang, pose di data master (layar Sesi Foto) juga
+  async function reloadPoses() {
+    store.update("admin", { poses: null }, { silent: true });
+    store.update("master", await models.master.loadMaster(api), { silent: true });
+  }
+
   // daftar properti dimuat ulang, properti di data master (halaman studio pelanggan) juga
   async function reloadProperties() {
     store.update("admin", { properties: null }, { silent: true });
@@ -496,12 +512,15 @@ export function createAdminController({ api, store, ui, router, models, logout, 
     );
   }
 
+  // simpan satu baris pose (id null = baru); galat → isian baris itu disimpan sebagai draf, foto yang diunggah tetap di admin.images
   function savePoseForm(id, values) {
     const key = "pose-" + (id || "new");
     return controller.run(
       async () => {
-        await pages.poses.savePose(api, id, pages.poses.poseBody(values));
-        store.update("admin", { poses: null, drafts: withoutDraft(key) }, { silent: true });
+        await pages.poses.savePose(api, id, pages.poses.poseBody(values, admin().images[key]));
+        const { [key]: droppedImage, ...images } = admin().images;
+        store.update("admin", { images, drafts: withoutDraft(key) }, { silent: true });
+        await reloadPoses();
       },
       "Pose disimpan.",
       undefined,

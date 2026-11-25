@@ -82,7 +82,6 @@ export const ROUTES = [
     title: "Daftar Pose",
     tab: null,
     menu: { label: "Pose", icon: "run" },
-    searchable: true,
   },
   {
     path: "/admin/transactions",
