@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createEvents } from "../../js/core/events.js";
+import { createEvents, formValues } from "../../js/core/events.js";
 
 // akar palsu: menyimpan listener per jenis event; elemen palsu dengan dataset dan closest(selector)
 function fakeRoot() {
@@ -177,4 +177,9 @@ test("klik di luar elemen ber-data-* tidak melakukan apa-apa", () => {
   root.fire("click", fakeEvent(null));
   assert.equal(calls.length, 0);
   assert.equal(logs.length, 0);
+});
+
+test("formValues: isian bernama dan tidak disabled dari form.elements (tombol tanpa name dilewati)", () => {
+  const form = { elements: [{ name: "name", value: "Dewi" }, { name: "phone", value: "0812" }, { name: "email", value: "d@x.id", disabled: true }, { name: "", value: "Simpan" }] };
+  assert.deepEqual(formValues(form), { name: "Dewi", phone: "0812" });
 });

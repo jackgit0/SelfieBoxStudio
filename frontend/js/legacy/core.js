@@ -43,7 +43,6 @@ function syncRoute(m) {
   const r = m.route;
   R.route = { name: r.name, path: m.path, params: numeric(m.params), query: m.query, title: r.title, tab: r.tab };
   if (r.name === "auth") R.auth.mode = r.params.mode;
-  if (r.name === "account") S.acct = r.params.tab;
   if (r.name === "time") CONTROLLERS.booking.syncReschedule(R.route.params.id); // /bookings/:id/reschedule dibuka langsung (BookingController)
 }
 // dialog bersama: components/modal.js openModal(); body dan kicker kode lama berupa HTML yang sudah di-escape pemanggil, cls = kelas tambahan .mbox
@@ -123,5 +122,4 @@ async function doReset() {
 async function adminLogin(username, password) {
   const r = await API.post("/admin/login", { username, password }); API.token = r.token; S.admin = true; S.draft = null; S.user = { name: "Admin", id: 0 }; S.me = "admin"; AD.me = r.admin; go(r.admin.must_change ? "aacct" : "adash");
 }
-async function changePw() { try { await API.post("/auth/forgot", { email: me().email }); R.toast.message = "Tautan untuk mengubah sandi telah dikirim ke " + me().email; } catch (x) { R.toast.error = x.message; } render(); }
-export { $, capLabel, changePw, doReset, eff, forgot, go, goPath, ic, icf, login, logout, me, modal, pkOf, priceRange, refresh, reg, render, renderAfter, renderBefore, renderContent, renderShell, staffToggle, studioOf, toasts };
+export { $, capLabel, doReset, eff, forgot, go, goPath, ic, icf, login, logout, me, modal, pkOf, priceRange, refresh, reg, render, renderAfter, renderBefore, renderContent, renderShell, staffToggle, studioOf, toasts };

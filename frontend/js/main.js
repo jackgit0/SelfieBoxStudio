@@ -4,7 +4,7 @@
 import { API_BASE, CS_EMAIL, CS_WA } from "./config.js";
 import { createStore } from "./core/store.js";
 import { ROUTES, createRouter } from "./core/router.js";
-import { createEvents } from "./core/events.js";
+import { createEvents, formValues } from "./core/events.js";
 import { createRenderer, installShellActions } from "./core/render.js";
 import { createApi } from "./models/api.js";
 import * as masterModel from "./models/master.js";
@@ -12,11 +12,14 @@ import * as studioModel from "./models/studio.js";
 import * as bookingModel from "./models/booking.js";
 import * as paymentModel from "./models/payment.js";
 import * as photoSessionModel from "./models/photoSession.js";
+import * as accountModel from "./models/account.js";
+import * as authModel from "./models/auth.js";
 import { openModal } from "./components/modal.js";
 import { createStudioController } from "./controllers/StudioController.js";
 import { createPackageController } from "./controllers/PackageController.js";
 import { createBookingController } from "./controllers/BookingController.js";
 import { createPaymentController } from "./controllers/PaymentController.js";
+import { createAccountController } from "./controllers/AccountController.js";
 import { browseView } from "./views/customer/browse.js";
 import { studioView } from "./views/customer/studio.js";
 import { packagesView } from "./views/customer/packages.js";
@@ -28,6 +31,7 @@ import { bookingsView } from "./views/customer/bookings.js";
 import { bookingDetailView } from "./views/customer/bookingDetail.js";
 import { cancelView } from "./views/customer/cancel.js";
 import { refundView } from "./views/customer/refund.js";
+import { accountView } from "./views/customer/account.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
 import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell, logout } from "./legacy/core.js";
 import "./legacy/landing.js";
@@ -85,12 +89,17 @@ function pagesFor({ studio, payment }, links) {
     "/bookings/:id": { view: (state, match) => bookingDetailView(state, match, links) },
     "/bookings/:id/cancel": { view: cancelView },
     "/bookings/:id/refund": { view: refundView },
+    // Pengaturan Akun: Edit Profil dan Riwayat Pembayaran (AccountController)
+    "/account": { view: (state, match) => accountView(state, match, links) },
+    "/account/payments": { view: (state, match) => accountView(state, match, links) },
   };
 }
 
 // aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
-function controllerActions({ studio, package: packages, booking, payment }) {
+function controllerActions({ studio, package: packages, booking, payment, account }) {
   return {
+    "account:saveProfile": (dataset, event) => account.saveProfile(formValues(event.target)),
+    "account:requestPasswordChange": account.requestPasswordChange,
     "payment:selectPackage": payment.selectPackage,
     "payment:setMethod": payment.setMethod,
     "payment:confirm": payment.confirm,
@@ -125,12 +134,13 @@ async function start() {
   const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: P, admin: AD }, { storage, persistKey: "snapia", session });
   const ui = createUi(store);
   const navigation = { navigate: path => goPath(path) };
-  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel };
+  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel };
   const studio = createStudioController({ api, store, ui, router: navigation, models });
   const packages = createPackageController({ store, ui, router: navigation, config: { wa: CS_WA, email: CS_EMAIL }, refreshMaster: studio.refreshMaster });
   const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster });
   const payment = createPaymentController({ api, store, ui, router: navigation, models, booking, refresh: booking.refreshData });
-  const controllers = { studio, package: packages, booking, payment };
+  const account = createAccountController({ api, store, models });
+  const controllers = { studio, package: packages, booking, payment, account };
   const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({

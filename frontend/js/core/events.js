@@ -82,6 +82,17 @@ export function createEvents({ navigate = null, logger = console } = {}) {
   return { registerActions, startEvents };
 }
 
+// isi form sebagai objek biasa { name: value } untuk controller (decisions.md 54): isian bernama yang tidak disabled
+export function formValues(form) {
+  const values = {};
+  for (const field of form.elements) {
+    if (field.name && !field.disabled) {
+      values[field.name] = field.value;
+    }
+  }
+  return values;
+}
+
 // instans bawaan untuk aplikasi; tes membuat instans sendiri dengan createEvents()
 const appEvents = createEvents();
 export const registerActions = appEvents.registerActions;

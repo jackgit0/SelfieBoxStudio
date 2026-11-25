@@ -1,12 +1,15 @@
 // ===== PANEL ADMIN: Dashboard, Pengguna, Studio, Booking, Properti, Pose, Transaksi, Paket & Diskon =====
 import { API, M, R, S, V } from "./state.js";
 import { API_BASE } from "../config.js";
-import { esc } from "../core/html.js";
+import { esc, raw } from "../core/html.js";
 import { formatDate as fmtDate, formatTime as fmtTime, padTwo as pad, formatRupiah as rp, todayIso as todayS } from "../core/format.js";
 import { $, go, ic, logout, modal, render } from "./core.js";
-import { PAYLBL, kvs } from "./customer.js";
+import { PAYMENT_LABELS as PAYLBL } from "../models/booking.js";
+import { keyValueRows } from "../components/keyValueRows.js";
 import { backgroundImage as bgi } from "../components/propertyVisual.js";
 import { openAuth } from "./landing.js";
+// baris "label — nilai" untuk detail booking admin (nilai dari kode lama sudah berupa HTML; dulu di customer.js, fase 8b memindahkannya)
+const kvs = rows => keyValueRows(rows.map(([label, value, cls]) => [raw(String(label)), raw(String(value)), cls])).markup;
 const AD = { loading: {}, imgs: {}, open: {}, q: "", opPeriod: "month", opEdit: null, cdet: null, bdet: null, bst: null, bstatus: "", scal: {}, sday: {}, sess: {}, sedit: null, sadd: null, stnew: null, stsum: null, sterr: null, stdone: null };
 function adminReset() { Object.keys(AD).forEach(k => { if (!["loading", "imgs", "open"].includes(k) && !["q", "opPeriod", "bstatus"].includes(k)) AD[k] = null; }); AD.q = ""; AD.opPeriod = "month"; AD.bstatus = ""; AD.imgs = {}; AD.open = {}; AD.loading = {}; AD.scal = {}; AD.sday = {}; AD.sess = {}; }
 // menu sidebar, judul halaman dan kotak cari: tabel rute (core/router.js) dan components/adminSidebar.js (refactor MVC fase 4)
