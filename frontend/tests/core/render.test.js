@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createStore } from "../../js/core/store.js";
-import { createRenderer, layoutOf, shellMarkup, composeOutlet, installShellActions } from "../../js/core/render.js";
+import { createRenderer, createPageHooks, layoutOf, shellMarkup, composeOutlet, installShellActions } from "../../js/core/render.js";
+import { createInitialState } from "../../js/core/state.js";
+import { createFakeStorage } from "../helpers/fakeStorage.js";
 import { ROUTES } from "../../js/core/router.js";
 import { html } from "../../js/core/html.js";
 
@@ -159,4 +161,73 @@ test("ui:toggleMenu membuka/menutup menu akun; klik di luar menutupnya", () => {
   listeners[0][1]({ target: { closest: () => null } });
   assert.equal(menu.hidden, true);
   assert.equal(avatar.attributes["aria-expanded"], "false");
+});
+
+// kait halaman (dulu renderBefore/syncRoute, renderShell, renderContent di legacy/core.js)
+function pageSetup({ admin = false, user = null } = {}) {
+  const sessionStorage = createFakeStorage();
+  const initial = { ...createInitialState(), admin: { studios: [{ id: 1 }, { id: 2 }], studioDone: { name: "Baru" }, query: "mawar", me: null } };
+  const store = createStore(initial, { session: { storage: sessionStorage, key: "snapia_booking", slices: { booking: ["studio", "date", "slot", "rescheduleId"] } } });
+  store.get().persisted.admin = admin;
+  if (user) {
+    store.get().persisted.user = user;
+    store.get().persisted.me = true;
+  }
+  const calls = { reschedule: [], renders: 0 };
+  store.subscribe(() => calls.renders++);
+  const hooks = createPageHooks({ store, syncReschedule: id => calls.reschedule.push(id) });
+  return { store, hooks, calls, sessionStorage };
+}
+const matchOf = (path, params = {}, query = {}, url = path) => ({ route: routeOf(path), path: url, params, query });
+
+test("createPageHooks before: runtime.route dari rute aktif (id angka), tanpa render ulang; booking berjalan disimpan per tab", () => {
+  const { store, hooks, calls, sessionStorage } = pageSetup({ user: { name: "Dewi" } });
+  store.get().booking.studio = 3;
+  hooks.before(matchOf("/bookings/:id", { id: "12" }, { tab: "history" }, "/bookings/12"));
+  assert.deepEqual(store.get().runtime.route, { name: "bdetail", path: "/bookings/12", params: { id: 12 }, query: { tab: "history" }, title: "Detail Booking", tab: "my" });
+  assert.equal(calls.renders, 0);
+  assert.deepEqual(JSON.parse(sessionStorage.getItem("snapia_booking")).booking, { studio: 3 });
+  assert.deepEqual(calls.reschedule, []);
+});
+
+test("createPageHooks before: form masuk mengikuti mode rute; Pilih Waktu menyinkronkan ubah jadwal dari URL", () => {
+  const { store, hooks, calls } = pageSetup();
+  hooks.before(matchOf("/register"));
+  assert.equal(store.get().runtime.auth.mode, "register");
+  hooks.before(matchOf("/bookings/:id/reschedule", { id: "7" }, {}, "/bookings/7/reschedule"));
+  hooks.before(matchOf("/book/time"));
+  assert.deepEqual(calls.reschedule, [7, undefined]);
+});
+
+test("createPageHooks before: notifikasi Studio berhasil ditambahkan hanya bertahan di halaman Studio admin", () => {
+  const { store, hooks } = pageSetup({ admin: true });
+  hooks.before(matchOf("/admin/studios"));
+  assert.deepEqual(store.get().admin.studioDone, { name: "Baru" });
+  hooks.before(matchOf("/admin/props"));
+  assert.equal(store.get().admin.studioDone, null);
+});
+
+test("createPageHooks shell: layout dari rute + peran; nama user hanya bila masuk", () => {
+  const customer = pageSetup({ user: { name: "Dewi" } });
+  customer.hooks.before(matchOf("/browse"));
+  assert.match(String(customer.hooks.shell(matchOf("/browse"))), /Dewi[^]*<main id="outlet" class="page">/);
+  const guest = pageSetup();
+  guest.hooks.before(matchOf("/browse"));
+  assert.doesNotMatch(String(guest.hooks.shell(matchOf("/browse"))), /Dewi/);
+  const admin = pageSetup({ admin: true });
+  admin.hooks.before(matchOf("/admin/studios"));
+  assert.match(String(admin.hooks.shell(matchOf("/admin/studios"))), /class="adm"/);
+});
+
+test("createPageHooks outlet: isi view rute + toast; admin dengan header (judul + jumlah, kotak cari)", () => {
+  const admin = pageSetup({ admin: true });
+  const match = { ...matchOf("/admin/studios"), route: { ...routeOf("/admin/studios"), view: state => html`<p>${state.admin.query}</p>` } };
+  admin.hooks.before(match);
+  admin.store.get().runtime.toast.message = "Studio disimpan.";
+  const markup = String(admin.hooks.outlet(match));
+  assert.match(markup, /<h1>Daftar Studio \(2\)<\/h1>[^]*value="mawar"[^]*<div class="toast">Studio disimpan.<\/div><p>mawar<\/p>$/);
+  const customer = pageSetup();
+  const plain = matchOf("/packages");
+  customer.hooks.before(plain);
+  assert.equal(String(customer.hooks.outlet(plain)), "");
 });

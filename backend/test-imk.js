@@ -240,9 +240,8 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
   }
 
   // ===== Refactor MVC fase 4: shell tanpa dialog bawaan browser (decisions.md 4, 27, 41) =====
-  { const JS = allJs(), core = src('js/legacy/core.js');
+  { const JS = allJs();
     ok(!/\bprompt\(/.test(JS), 'frontend: tanpa prompt() bawaan browser (PIN staf lewat modal)');
-    ok(!/\balert\(/.test(core), 'core.js: tanpa alert() bawaan browser (kontak CS lewat modal)'); // kode: diganti di fase 9 (semua berkas tanpa dialog bawaan)
     for (const s of ['Masuk Mode Staf', 'Masukkan PIN staf', 'inputmode="numeric"', 'Hubungi Customer Service', 'Silakan hubungi staf di studio atau kontak Customer Service Anda.']) ok(JS.includes(s), `frontend memuat "${s}"`);
   }
 
@@ -264,6 +263,17 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!/confirm\(["'`](Hapus item rekap|Hapus akun|Hapus paket)/.test(JS), 'frontend: hapus item rekap, akun pelanggan dan paket tanpa confirm() bawaan browser');
     ok(!/\bconfirm\(["'`]/.test(JS), 'frontend: tanpa confirm() bawaan browser sama sekali (properti dan pose lewat modal, fase 8b)');
     for (const s of ['Konfirmasi Hapus Item Rekap', 'Hapus item rekap ini?', 'Konfirmasi Hapus Akun', 'beserta SELURUH booking, pembayaran, dan foto miliknya?', 'Tindakan ini tidak dapat dibatalkan.', 'Konfirmasi Hapus Paket', 'Hapus paket ini? (Jika pernah dibeli, paket hanya dinonaktifkan.)', 'Konfirmasi Hapus Properti', 'Hapus properti ini?', 'Ya, Hapus Properti', 'Konfirmasi Hapus Pose', 'Hapus pose ini?', 'Ya, Hapus Pose']) ok(JS.includes(s), `frontend memuat "${s}"`);
+  }
+
+  // ===== Refactor MVC fase 9: tanpa kode lama, tanpa jembatan window, innerHTML hanya di perender, CSS tanpa gradient (decisions.md 79–84) =====
+  { const JS = allJs(), CSS = allCss(), files = fs.readdirSync(path.join(FRONT, 'js'), { recursive: true }).filter(f => f.endsWith('.js')).map(f => f.split(path.sep).join('/'));
+    const index = fs.readFileSync(path.join(FRONT, 'index.html'), 'utf8');
+    ok(!files.some(f => f.startsWith('legacy')), 'frontend: folder js/legacy/, legacy-bridge.js dan legacy-actions.js sudah dihapus');
+    ok(!JS.includes('legacy-bridge') && !JS.includes('installLegacyBridge'), 'frontend: tanpa jembatan window (legacy-bridge)');
+    ok(!/\bwindow\.(go|goPath|S|R|M|BK|AD|V|me|ic|modal|render)\b/.test(JS), 'frontend: tidak ada kode yang membaca nama aplikasi dari window (window.go dan sejenisnya)');
+    ok(!/\bon(click|change|input|keydown|submit|load)=/.test(JS + index), 'frontend: tanpa atribut on…= (semua lewat data-*)');
+    const html = files.filter(f => /\binnerHTML\s*=/.test(fs.readFileSync(path.join(FRONT, 'js', f), 'utf8')) && !['core/render.js', 'components/modal.js', 'components/sessionScreen.js'].includes(f));
+    ok(!html.length, 'frontend: innerHTML = hanya di core/render.js, components/modal.js dan components/sessionScreen.js' + (html.length ? ` (masih di ${html.join(', ')})` : ''));
   }
 
 

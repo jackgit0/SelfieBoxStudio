@@ -1,6 +1,6 @@
 // Router dengan path History API (decisions.md 7): tabel rute, match(), guard(), navigate(), back/forward dan tautan #reset=.
 // Modul ini tidak menyentuh window/document saat diimpor: history, location dan target event diberikan oleh main.js lewat createRouter().
-// Sampai setiap view dipindah (fase 4–8b), "name" = kunci view lama (V[name] di js/legacy) dan go() lama dipetakan lewat legacyPath().
+// "name" = nama halaman (sama dengan kunci view lama), dibaca layoutOf() dan runtime.route.name.
 
 // access: public = tamu dan customer (admin dialihkan ke /admin); guest = hanya tamu (yang sudah masuk ke berandanya);
 //         customer = harus masuk sebagai customer; admin = hanya admin.
@@ -154,28 +154,6 @@ export function pathFor(name, params = {}, routes = ROUTES) {
     return "/" + pattern.map(part => (part.startsWith(":") ? encodeURIComponent(String(params[part.slice(1)])) : part)).join("/");
   }
   return null;
-}
-
-// shim go(view, params) lama: kunci view + parameter lama → path.
-// context = { rescheduleId (BK.rescheduleId), loginMode (R.auth.mode), sessionId (sesi foto yang dibuka) }
-export function legacyPath(view, params = {}, context = {}) {
-  if (view === "time") {
-    return context.rescheduleId ? pathFor("time", { id: context.rescheduleId }) : "/book/time";
-  }
-  if (view === "auth") {
-    return pathFor("auth", { mode: params.mode || context.loginMode || "login" }) || "/login";
-  }
-  if (view === "my") {
-    return params.tab === "hist" ? "/bookings?tab=history" : "/bookings";
-  }
-  if (view === "account") {
-    return params.tab === "pay" ? "/account/payments" : "/account";
-  }
-  if (view === "session") {
-    const id = params.id ?? context.sessionId;
-    return id ? pathFor("session", { id }) : "/gallery";
-  }
-  return pathFor(view, params.id === undefined ? {} : { id: params.id }) || "/";
 }
 
 // history, location = milik browser (atau tiruan di tes); events = target addEventListener (window);

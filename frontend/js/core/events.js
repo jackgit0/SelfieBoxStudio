@@ -1,4 +1,4 @@
-// Event terdelegasi: satu listener per jenis event di elemen akar, menggantikan atribut onclick="…".
+// Event terdelegasi: satu listener per jenis event di elemen akar, menggantikan atribut handler inline (on…) di HTML.
 // <button data-action="payment:confirm" data-id="12"> → aksi "payment:confirm" dipanggil dengan (dataset, event).
 // data-change (change), data-input (input), data-enter (keydown Enter), data-submit (submit form, preventDefault),
 // data-route="/path" (klik, pindah halaman lewat navigate). data-stop di elemen dalam = klik tidak diteruskan ke elemen luar.

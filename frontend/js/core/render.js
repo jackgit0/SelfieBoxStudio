@@ -4,7 +4,7 @@
 // Modul ini tidak menyentuh window/document saat diimpor; elemen akar dan document diberikan main.js.
 import { html } from "./html.js";
 import { navbar, bottomBar } from "../components/navbar.js";
-import { adminSidebar } from "../components/adminSidebar.js";
+import { adminHeader, adminSidebar, adminTitle } from "../components/adminSidebar.js";
 import { renderToasts } from "../components/toast.js";
 
 // nama rute + session = { admin } → "landing" | "auth" | "admin" | "customer" (aturan render() lama)
@@ -91,6 +91,51 @@ export function createRenderer({ root, resolve, shell, outlet, before = () => {}
   }
 
   return { render, renderOutlet, mountShell, start };
+}
+
+// params rute berupa angka (id booking/studio) menjadi Number, seperti S.p.id lama
+function numericParams(params) {
+  return Object.fromEntries(Object.entries(params).map(([key, value]) => [key, /^\d+$/.test(value) ? Number(value) : value]));
+}
+
+// Kait halaman untuk createRenderer (main.js): before = catat rute aktif di runtime.route (dibaca view dan controller), mode form masuk,
+// ubah jadwal yang dibuka lewat URL (BookingController.syncReschedule), simpan booking berjalan per tab;
+// shell = navbar/sidebar menurut layout; outlet = isi view rute (route.view) dengan toast, dan header admin di panel admin.
+export function createPageHooks({ store, syncReschedule }) {
+  const layoutNow = () => {
+    const state = store.get();
+    return layoutOf(state.runtime.route.name, { admin: state.persisted.admin });
+  };
+  return {
+    before(match) {
+      const route = match.route;
+      const params = numericParams(match.params);
+      const runtime = { route: { name: route.name, path: match.path, params, query: match.query, title: route.title, tab: route.tab } };
+      if (route.name === "auth") {
+        runtime.auth = { ...store.get().runtime.auth, mode: route.params.mode };
+      }
+      store.update("runtime", runtime, { silent: true });
+      if (route.name === "time") {
+        syncReschedule(params.id); // /bookings/:id/reschedule dibuka langsung; /book/time melepas ubah jadwal
+      }
+      store.persistSession();
+      if (layoutNow() === "admin" && route.name !== "astudio") {
+        store.update("admin", { studioDone: null }, { silent: true }); // notifikasi "Studio berhasil ditambahkan" hanya di halaman Studio
+      }
+    },
+    shell(match) {
+      const persisted = store.get().persisted;
+      return shellMarkup({ layout: layoutNow(), route: match.route, session: { user: persisted.me ? persisted.user : null, staff: persisted.staff } });
+    },
+    outlet(match) {
+      const state = store.get();
+      const layout = layoutNow();
+      const content = typeof match.route.view === "function" ? match.route.view(state, match) : "";
+      const admin = state.admin || {};
+      const header = layout === "admin" ? adminHeader({ route: match.route, title: adminTitle(match.route, admin), mustChange: Boolean(admin.me && admin.me.must_change), query: admin.query }) : "";
+      return composeOutlet({ layout, content, toast: state.runtime.toast, header });
+    },
+  };
 }
 
 const MENU_BUTTON = '[data-action="ui:toggleMenu"]';

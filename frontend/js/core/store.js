@@ -2,8 +2,8 @@
 // Slice "persisted" disimpan ke storage (localStorage["snapia"], kunci lama dipertahankan agar login tetap berlaku).
 // Opsi session = { storage, key, slices: { slice: [field, …] } } menyimpan field tertentu per tab (sessionStorage["snapia_booking"]:
 // booking berjalan tanpa quote, decisions.md 26); kuncinya dihapus bila semua field kosong.
-// Slice dipegang lewat rujukan: update() menggabungkan ke objek slice yang sama, sehingga kode lama yang memegang objeknya
-// (S, M, R, BK, D, P, AD di js/legacy) tetap melihat perubahan. Selama kode lama masih ada, ubah slice dengan update(), bukan set().
+// Slice dipegang lewat rujukan (decisions.md 33): update() menggabungkan ke objek slice yang sama, sehingga controller yang
+// memegang objek slice (mis. state = store.get()) tetap melihat perubahan; set() mengganti slice utuh.
 
 const PERSISTED = "persisted";
 // kunci state lama yang dibuang saat dimuat: kuis rekomendasi paket dan pilihan properti (fitur sudah dihapus),

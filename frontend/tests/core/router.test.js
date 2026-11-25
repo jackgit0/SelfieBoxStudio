@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ROUTES, match, guard, homePath, pathFor, legacyPath, createRouter } from "../../js/core/router.js";
+import { ROUTES, match, guard, homePath, pathFor, createRouter } from "../../js/core/router.js";
 
 // ---------- match ----------
 
@@ -142,47 +142,6 @@ test("pathFor: nama rute + parameter → path", () => {
   assert.equal(pathFor("time", { id: 9 }), "/bookings/9/reschedule");
   assert.equal(pathFor("studio", {}), null);
   assert.equal(pathFor("nope", {}), null);
-});
-
-test("legacyPath: setiap kunci view lama + parameter → path yang benar", () => {
-  const cases = [
-    [["landing"], "/"],
-    [["home"], "/browse"],
-    [["packages"], "/packages"],
-    [["studio", { id: 3 }], "/studios/3"],
-    [["time"], "/book/time"],
-    [["time", {}, { rescheduleId: 12 }], "/bookings/12/reschedule"],
-    [["pay"], "/book/pay"],
-    [["success", { id: 4 }], "/bookings/4/success"],
-    [["rescheduled", { id: 4 }], "/bookings/4/rescheduled"],
-    [["my"], "/bookings"],
-    [["my", { tab: "up" }], "/bookings"],
-    [["my", { tab: "hist" }], "/bookings?tab=history"],
-    [["bdetail", { id: 8 }], "/bookings/8"],
-    [["cancel", { id: 8 }], "/bookings/8/cancel"],
-    [["refund", { id: 8 }], "/bookings/8/refund"],
-    [["account"], "/account"],
-    [["account", { tab: "profile" }], "/account"],
-    [["account", { tab: "pay" }], "/account/payments"],
-    [["gallery"], "/gallery"],
-    [["session", {}, { sessionId: 41 }], "/sessions/41"],
-    [["session"], "/gallery"],
-    [["auth"], "/login"],
-    [["auth", {}, { loginMode: "register" }], "/register"],
-    [["auth", { mode: "forgot" }, { loginMode: "register" }], "/forgot-password"],
-    [["auth", {}, { loginMode: "reset" }], "/reset-password"],
-    [["adash"], "/admin"],
-    [["acust"], "/admin/users"],
-    [["astudio"], "/admin/studios"],
-    [["abook"], "/admin/bookings"],
-    [["aprop"], "/admin/props"],
-    [["apose"], "/admin/poses"],
-    [["atrx"], "/admin/transactions"],
-    [["apkg"], "/admin/packages"],
-    [["aacct"], "/admin/account"],
-    [["nope"], "/"],
-  ];
-  for (const [[view, params, context], path] of cases) assert.equal(legacyPath(view, params, context), path, `${view} ${JSON.stringify(params || {})}`);
 });
 
 // ---------- createRouter: navigate, popstate, guard saat resolve, #reset= ----------

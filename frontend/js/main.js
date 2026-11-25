@@ -1,11 +1,13 @@
 // Titik masuk aplikasi (satu-satunya <script type="module"> di index.html).
-// Menyiapkan API, store, router, renderer dan event data-*, membungkus objek state kode lama (js/legacy) dengan store, memasang jembatan window
-// untuk atribut onclick lama, lalu menjalankan isi boot.js lama: muat data master, tautan #reset= (router), pulihkan login (AuthController), render pertama.
+// Menyiapkan API, store, controller, router, renderer dan event data-*, lalu: muat data master, tautan #reset= (router),
+// pulihkan login (AuthController), render pertama. start() hanya berjalan di browser (ada document), jadi tes Node dapat mengimpor modul ini.
 import { API_BASE, BRAND, CS_EMAIL, CS_WA, GOOGLE_CLIENT_ID } from "./config.js";
 import { createStore } from "./core/store.js";
 import { ROUTES, createRouter } from "./core/router.js";
 import { createEvents, formValues } from "./core/events.js";
-import { createRenderer, installShellActions } from "./core/render.js";
+import { createPageHooks, createRenderer, installShellActions } from "./core/render.js";
+import { createInitialState } from "./core/state.js";
+import { createNavigator } from "./core/navigation.js";
 import { createApi } from "./models/api.js";
 import * as masterModel from "./models/master.js";
 import * as studioModel from "./models/studio.js";
@@ -31,7 +33,7 @@ import { createLandingController } from "./controllers/LandingController.js";
 import { landingView } from "./views/landing.js";
 import { createPhotoSessionController, createPhotoState } from "./controllers/PhotoSessionController.js";
 import { createGalleryController } from "./controllers/GalleryController.js";
-import { createAdminController } from "./controllers/AdminController.js";
+import { createAdminController, createAdminState } from "./controllers/AdminController.js";
 import { createAdminBookingController } from "./controllers/AdminBookingController.js";
 import * as adminModels from "./models/admin/index.js";
 import { photoSessionView } from "./views/session/photoSession.js";
@@ -61,10 +63,6 @@ import { loginView } from "./views/auth/login.js";
 import { registerView } from "./views/auth/register.js";
 import { forgotView } from "./views/auth/forgot.js";
 import { resetView } from "./views/auth/reset.js";
-import { S, M, BK, R, D, AD, connectLegacy } from "./legacy/state.js";
-import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell } from "./legacy/core.js";
-import { installLegacyBridge } from "./legacy-bridge.js";
-import { registerLegacyActions } from "./legacy-actions.js";
 
 // localStorage/sessionStorage bisa melempar galat bila diblokir browser; aplikasi tetap jalan tanpa penyimpanan
 function browserStorage(name = "localStorage") {
@@ -120,7 +118,7 @@ function createUi(store) {
   };
 }
 
-// halaman yang sudah MVC: view (state, match) → Safe dan kait after(match) per path rute; rute lain masih memakai V.<view> lama.
+// halaman per path rute: view (state, match) → Safe, kait after(match) setelah outlet dirender, leave() saat halaman ditinggalkan.
 // links = { invoiceUrl } untuk view yang menautkan invoice (token tetap di models/api.js, decisions.md 50)
 function pagesFor({ studio, payment, landing, photo, gallery, admin, adminBooking }, links) {
   const showAvailability = () => studio.prefetchAvailability();
@@ -172,8 +170,8 @@ function pagesFor({ studio, payment, landing, photo, gallery, admin, adminBookin
   };
 }
 
-// aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
-function controllerActions({ studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin, adminBooking }) {
+// aksi data-* milik controller (diekspor untuk tests/main.test.js: setiap aksi di view terdaftar di sini); kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
+export function controllerActions({ studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin, adminBooking }) {
   return {
     "admin:search": (dataset, event) => admin.setSearch(event.target.value),
     "admin:setOperationsPeriod": (dataset, event) => admin.setOperationsPeriod(event.target.value),
@@ -277,9 +275,12 @@ async function start() {
   const api = createApi({ base: API_BASE, storage });
   // booking berjalan (studio, tanggal, sesi, id reschedule; tanpa quote) bertahan saat dimuat ulang, hanya di tab ini (decisions.md 26)
   const session = { storage: browserStorage("sessionStorage"), key: "snapia_booking", slices: { booking: ["studio", "date", "slot", "rescheduleId"] } };
-  const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: createPhotoState(), admin: AD }, { storage, persistKey: "snapia", session });
+  const store = createStore({ ...createInitialState(), photo: createPhotoState(), admin: createAdminState() }, { storage, persistKey: "snapia", session });
+  const state = store.get();
   const ui = createUi(store);
-  const navigation = { navigate: path => goPath(path) };
+  // router dibuat setelah controller (tabel halamannya memakai controller), jadi navigasi meneruskan ke router lewat rujukan
+  let router = null;
+  const navigation = createNavigator({ store, router: { navigate: path => router.navigate(path) }, scrollToTop: () => window.scrollTo({ top: 0, behavior: "instant" }) });
   const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel, contact: contactModel, drive: driveModel, gallery: galleryModel, admin: adminModels };
   // AdminController dibuat setelah AuthController (saling memakai); controller yang lebih dulu dibuat memanggilnya lewat adminCore
   let admin = null;
@@ -313,47 +314,48 @@ async function start() {
   const controllers = { studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin, adminBooking };
   const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl, adminPhotoUrl: api.adminPhotoUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
-  const router = createRouter({
+  router = createRouter({
     routes,
     history: window.history,
     location: window.location,
     events: window,
-    getSession: () => ({ loggedIn: Boolean(S.me), admin: Boolean(S.admin), mustChange: Boolean(S.admin && AD.me && AD.me.must_change) }),
+    getSession: () => ({ loggedIn: Boolean(state.persisted.me), admin: Boolean(state.persisted.admin), mustChange: Boolean(state.persisted.admin && state.admin.me && state.admin.me.must_change) }),
     onChange: cause => {
       if (cause !== "navigate") {
-        R.toast.message = R.toast.error = ""; // back/forward dan tautan reset (go() sudah membersihkannya sendiri)
+        store.update("runtime", { toast: { message: "", error: "" } }, { silent: true }); // back/forward dan tautan reset (navigasi aplikasi sudah membersihkannya sendiri)
       }
-      render();
+      renderer.render();
     },
     // tautan "buat sandi baru" dari email (/#reset=<token>): login yang tersimpan dilepas
     // (juga saat tautan dibuka di tab yang sudah memuat aplikasi: data user sebelumnya ikut dibersihkan)
     onResetLink: token => {
-      R.auth.resetToken = token;
+      store.update("runtime", { auth: { ...state.runtime.auth, resetToken: token } }, { silent: true });
       api.token = "";
-      S.user = S.me = null;
-      S.admin = false;
-      D.bookings = [];
-      D.sessions = [];
+      store.update("persisted", { user: null, me: null, admin: false }, { silent: true });
+      store.update("data", { bookings: [], sessions: [] }, { silent: true });
     },
   });
-  // shell sekali per rute, outlet setiap render (core/render.js); kait-kaitnya masih kode lama (V.<view>, toast, header admin)
-  const outlet = match => renderContent(match, match.route.view ? match.route.view(store.get(), match) : null);
-  const renderer = createRenderer({ root: document.getElementById("app"), resolve: () => router.resolve(), before: renderBefore, shell: renderShell, outlet, after: renderAfter });
-  connectLegacy({ api, store, router, renderer, controllers });
-  installLegacyBridge();
+  // shell sekali per rute, outlet setiap render (core/render.js)
+  const hooks = createPageHooks({ store, syncReschedule: id => booking.syncReschedule(id) });
+  const root = document.getElementById("app");
+  const renderer = createRenderer({ root, resolve: () => router.resolve(), before: hooks.before, shell: hooks.shell, outlet: hooks.outlet });
   renderer.start(store);
 
-  // atribut data-* (core/events.js) di seluruh dokumen; data-route pindah halaman seperti go() lama (decisions.md 42)
-  const events = createEvents({ navigate: path => goPath(path) });
+  // atribut data-* (core/events.js) di seluruh dokumen; data-route pindah halaman lewat navigasi aplikasi (decisions.md 42)
+  const events = createEvents({ navigate: path => navigation.navigate(path) });
   installShellActions({ registerActions: events.registerActions, document });
-  registerLegacyActions(events.registerActions);
   events.registerActions(controllerActions(controllers));
   events.startEvents(document);
 
   try {
     store.update("master", await masterModel.loadMaster(api), { silent: true });
   } catch (error) {
-    $("#app").innerHTML = "<p style='padding:24px'>Server API tidak dapat dihubungi. Jalankan backend: <code>cd backend && npm start</code></p>";
+    const message = document.createElement("p");
+    message.style.padding = "24px";
+    const command = document.createElement("code");
+    command.textContent = "cd backend && npm start";
+    message.append("Server API tidak dapat dihubungi. Jalankan backend: ", command);
+    root.replaceChildren(message);
     return;
   }
 
@@ -362,8 +364,10 @@ async function start() {
 
   // pulihkan login tersimpan (Mode Staf tidak ikut dipulihkan); token pelanggan di sesi admin → dialog Akses Ditolak (AuthController)
   if (await auth.restoreSession()) {
-    render();
+    renderer.render();
   }
 }
 
-start();
+if (typeof document !== "undefined") {
+  start();
+}
