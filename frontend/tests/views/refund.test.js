@@ -3,14 +3,15 @@ import assert from "node:assert/strict";
 import { Safe } from "../../js/core/html.js";
 import { refundView } from "../../js/views/customer/refund.js";
 import { sampleState } from "../helpers/fixtures.js";
+import { flat } from "../helpers/markup.js";
 
-const matchFor = id => ({ route: { name: "refund" }, params: { id: String(id) }, query: {}, path: `/bookings/${id}/refund` });
+const matchFor = id => ({ route: { name: "refund" }, params: { id: flat(id) }, query: {}, path: `/bookings/${id}/refund` });
 function view(cancelResult, id = 12) {
   const value = sampleState({ persisted: { cancelRes: cancelResult } });
   value.data.bookings = [{ id: 12, studio: 1, package_id: 1, date: "2026-11-27 10:00", status: "Dibatalkan" }];
   const markup = refundView(value, matchFor(id));
   assert.ok(markup instanceof Safe);
-  return String(markup);
+  return flat(markup);
 }
 
 test("refund: berhasil → waktu, status Refunded, total, kembali ke Browse", () => {

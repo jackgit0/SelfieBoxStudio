@@ -6,7 +6,13 @@ import { packageOf } from "./master.js";
 import { freeHours } from "./studio.js";
 
 // label status pembayaran (pay_status dari server)
-export const PAYMENT_LABELS = { paid: "Lunas", refunded: "Refunded", refund_failed: "Refund gagal", pending: "Menunggu pembayaran", batal: "Batal" };
+export const PAYMENT_LABELS = {
+  paid: "Lunas",
+  refunded: "Refunded",
+  refund_failed: "Refund gagal",
+  pending: "Menunggu pembayaran",
+  batal: "Batal",
+};
 
 // rincian harga sebelum booking dibuat (boleh untuk tamu)
 export function quote(api, { packageId, studioId }) {
@@ -39,7 +45,10 @@ export function isSlotGone(cache, studioId, slot, now) {
 // baris rincian pembayaran sebuah booking: [label, nilai, kelas]; biaya studio (data lama) + paket, diskon utama, total
 export function paymentRows(master, booking) {
   const fee = booking.studio_fee || 0;
-  const rows = [["Studio", formatRupiah(fee)], ["Paket " + packageOf(master, booking.package_id).name, formatRupiah(booking.subtotal - fee)]];
+  const rows = [
+    ["Studio", formatRupiah(fee)],
+    ["Paket " + packageOf(master, booking.package_id).name, formatRupiah(booking.subtotal - fee)],
+  ];
   if (booking.main_disc) {
     rows.push(["Diskon utama", "-" + formatRupiah(booking.main_disc), "disc"]);
   }

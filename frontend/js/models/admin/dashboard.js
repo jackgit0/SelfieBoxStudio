@@ -1,6 +1,11 @@
 // Dashboard admin: pendapatan (hari ini, 7 dan 30 hari, sejak awal, harian) dan Rekapitulasi Operasional per periode.
 
-export const PERIODS = [["day", "Hari ini"], ["week", "7 hari terakhir"], ["month", "30 hari terakhir"], ["all", "Sejak pemesanan pertama"]];
+export const PERIODS = [
+  ["day", "Hari ini"],
+  ["week", "7 hari terakhir"],
+  ["month", "30 hari terakhir"],
+  ["all", "Sejak pemesanan pertama"],
+];
 
 export function loadRevenue(api) {
   return api.get("/admin/revenue");

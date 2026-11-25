@@ -90,6 +90,8 @@ export function cancelledSummary(result) {
     return "";
   }
   const refunded = result.refunded ? `, ${result.refunded} di-refund` : "";
-  const failed = result.refund_failed ? `, ${result.refund_failed} refund gagal (tindak lanjuti manual di menu Transaksi)` : "";
+  const failed = result.refund_failed
+    ? `, ${result.refund_failed} refund gagal (tindak lanjuti manual di menu Transaksi)`
+    : "";
   return ` ${result.cancelled} booking dibatalkan${refunded}${failed}.`;
 }

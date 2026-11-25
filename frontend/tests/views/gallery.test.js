@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Safe } from "../../js/core/html.js";
 import { galleryView, deletePhotoModal, deleteSelectedModal, deleteFailedModal } from "../../js/views/session/gallery.js";
 import { sampleState } from "../helpers/fixtures.js";
+import { flat } from "../helpers/markup.js";
 
 const match = { route: { name: "gallery" }, params: {}, query: {}, path: "/gallery" };
 const photos = () => [
@@ -23,7 +24,7 @@ function stateWith({ sessions, deleteMode = false, selection = [], current = nul
 const render = state => {
   const markup = galleryView(state, match);
   assert.ok(markup instanceof Safe);
-  return String(markup);
+  return flat(markup);
 };
 
 test("tanpa sesi foto: Belum ada sesi foto, ke Booking Saya", () => {
@@ -36,9 +37,9 @@ test("sesi terbaru milik user tampil, pilihan sesi lewat data-change; kuota terp
   assert.match(text, /<select style="width:auto;max-width:100%" data-change="gallery:showSession"><option value="40" >/);
   assert.match(text, /<option value="41" selected>[^<]* · Basic<\/option><\/select>/);
   assert.doesNotMatch(text, /value="50"/);
-  assert.match(text, /Terpilih untuk dicetak: <b>2\/3<\/b>  · ⭐ Favorit: <b>1<\/b>/);
+  assert.match(text, /Terpilih untuk dicetak: ?<b>2\/3<\/b> +· ⭐ Favorit: <b>1<\/b>/);
   assert.match(text, /<h3 class="h3" style="margin:14px 0 8px">Kelompok 1 <small class="m">\(foto mirip\)<\/small><\/h3>/);
-  assert.match(text, /<h3 class="h3" style="margin:14px 0 8px">Kelompok 2 <\/h3>/);
+  assert.match(text, /<h3 class="h3" style="margin:14px 0 8px">Kelompok 2 ?<\/h3>/);
   assert.doesNotMatch(text, /onclick=|onchange=/);
 });
 
@@ -68,10 +69,10 @@ test("Konfirmasi Pilihan selalu ada; Unduh Foto Terpilih setelah dikonfirmasi; s
 });
 
 test("modal hapus foto, hapus massal dan gagal hapus", () => {
-  assert.deepEqual({ ...deletePhotoModal(), body: String(deletePhotoModal().body) }, { title: "Konfirmasi Hapus Foto", body: "<p>Hapus foto ini secara permanen?</p>", buttons: [{ label: "Batal", value: false, style: "ghost" }, { label: "Hapus", value: true, style: "danger" }] });
-  assert.equal(String(deleteSelectedModal(3).body), "<p>Hapus 3 foto terpilih secara permanen? Foto favorit tidak ikut terhapus.</p>");
+  assert.deepEqual({ ...deletePhotoModal(), body: flat(deletePhotoModal().body) }, { title: "Konfirmasi Hapus Foto", body: "<p>Hapus foto ini secara permanen?</p>", buttons: [{ label: "Batal", value: false, style: "ghost" }, { label: "Hapus", value: true, style: "danger" }] });
+  assert.equal(flat(deleteSelectedModal(3).body), "<p>Hapus 3 foto terpilih secara permanen? Foto favorit tidak ikut terhapus.</p>");
   assert.equal(deleteSelectedModal(3).title, "Konfirmasi Hapus Foto");
-  assert.deepEqual({ ...deleteFailedModal("<b>x"), body: String(deleteFailedModal("<b>x").body) }, { title: "Foto Gagal Dihapus", body: "<p>&lt;b&gt;x</p>" });
+  assert.deepEqual({ ...deleteFailedModal("<b>x"), body: flat(deleteFailedModal("<b>x").body) }, { title: "Foto Gagal Dihapus", body: "<p>&lt;b&gt;x</p>" });
 });
 
 // sesi dibuat bersama booking, jadi id tidak mengikuti urutan mulai: sesi yang baru dimulai (id 61) bisa lebih kecil

@@ -8,6 +8,7 @@ import { createFakeApi } from "../helpers/fakeApi.js";
 import { createFakeUi } from "../helpers/fakeUi.js";
 import { createFakeStorage } from "../helpers/fakeStorage.js";
 import { sampleState } from "../helpers/fixtures.js";
+import { flat } from "../helpers/markup.js";
 
 const detail = (overrides = {}) => ({ id: 5, slot: "2026-11-26 9:00", customer: { name: "Budi", email: "b@x.id", phone: "0812" }, studio_name: "Melati", package_id: 1, package_name: "Basic", status: "Menunggu Pembayaran", allowed: ["Terbayar", "Dibatalkan"], packages: [{ id: 1, name: "Basic", price: 50000 }, { id: 2, name: "Standard", price: 90000 }], payment: { status: "pending", amount: 50000 }, impact: { status: "Menunggu Pembayaran", paid: false, refund_amount: 0 }, ...overrides });
 const failure = (status, error, extra = {}) => ({ status, body: { error, ...extra } });
@@ -73,7 +74,7 @@ test("save: Dibatalkan pada booking terbayar → dialog dengan baris refund; set
   const { controller, ui, api, toast } = setup({ modalAnswers: [true], admin: { bookingDetail: paid }, responses: { "PATCH /admin/bookings/5": { body: { ...paid, status: "Dibatalkan", refund: { state: "refunded", amount: 45000 }, notified: true } } } });
   await controller.save({ id: "5" }, { status: "Dibatalkan" });
   assert.equal(ui.modals[0].title, "Batalkan booking ini?");
-  assert.match(String(ui.modals[0].body), /Booking Melati · 2026-11-26 · 09:00 - 09:50 atas nama Budi diubah menjadi Dibatalkan\. Dana Rp45\.000 akan dikembalikan 100% kepada pelanggan dan sesinya dibuka kembali\. Pelanggan menerima email pemberitahuan\./);
+  assert.match(flat(ui.modals[0].body), /Booking Melati · 2026-11-26 · 09:00 - 09:50 atas nama Budi diubah menjadi Dibatalkan\. Dana Rp45\.000 akan dikembalikan 100% kepada pelanggan dan sesinya dibuka kembali\. Pelanggan menerima email pemberitahuan\./);
   assert.deepEqual(ui.modals[0].buttons.map(button => button.label), ["Kembali", "Ya, Batalkan Booking"]);
   assert.deepEqual(api.calls[0].body, { status: "Dibatalkan" });
   assert.equal(toast().message, "Booking diperbarui. Dana Rp45.000 dikembalikan 100%. Pelanggan diberi tahu lewat email.");
@@ -82,7 +83,7 @@ test("save: Dibatalkan pada booking terbayar → dialog dengan baris refund; set
 test("save: Dibatalkan belum dibayar → teks tanpa refund; Kembali → tidak ada PATCH, pilihan disimpan sebagai draf", async () => {
   const { controller, ui, requests, admin } = setup({ modalAnswers: [false], admin: { bookingDetail: detail() } });
   await controller.save({ id: "5" }, { status: "Dibatalkan", package_id: "1" });
-  assert.match(String(ui.modals[0].body), /Booking belum dibayar, jadi tidak ada dana yang dikembalikan; sesinya dibuka kembali\./);
+  assert.match(flat(ui.modals[0].body), /Booking belum dibayar, jadi tidak ada dana yang dikembalikan; sesinya dibuka kembali\./);
   assert.deepEqual(requests(), []);
   assert.deepEqual(admin().drafts["booking-5"], { status: "Dibatalkan", package_id: "1" });
 });
@@ -93,8 +94,8 @@ test("save: Sesi Berjalan / Selesai → dialog Ubah status (tidak dapat dikembal
   await controller.save({ id: "5" }, { status: "Sesi Berjalan" });
   await controller.save({ id: "5" }, { status: "Selesai" });
   assert.deepEqual(ui.modals.map(modal => modal.title), ["Ubah status menjadi Sesi Berjalan?", "Ubah status menjadi Selesai?"]);
-  assert.match(String(ui.modals[0].body), /Timer sesi foto booking ini langsung dimulai\. Status tidak dapat dikembalikan\. Pelanggan menerima email pemberitahuan\./);
-  assert.match(String(ui.modals[1].body), /Booking ditandai selesai dan sesi fotonya diakhiri\./);
+  assert.match(flat(ui.modals[0].body), /Timer sesi foto booking ini langsung dimulai\. Status tidak dapat dikembalikan\. Pelanggan menerima email pemberitahuan\./);
+  assert.match(flat(ui.modals[1].body), /Booking ditandai selesai dan sesi fotonya diakhiri\./);
   assert.deepEqual(ui.modals[0].buttons.map(button => button.label), ["Kembali", "Ya, Ubah Status"]);
 });
 
@@ -121,7 +122,7 @@ test("delete: dialog Hapus booking ini? dengan baris refund lebih dulu, 409 damp
   await controller.delete({ id: "5" });
   assert.equal(ui.modals.length, 1);
   assert.equal(ui.modals[0].title, "Hapus booking ini?");
-  assert.match(String(ui.modals[0].body), /Booking Melati · 2026-11-26 · 09:00 - 09:50 atas nama Budi\. Status booking: Terbayar \(sudah dibayar\)\. Dana Rp45\.000 akan dikembalikan 100% lebih dulu, lalu booking dihapus dan sesinya dibuka kembali\. Pelanggan menerima email pemberitahuan\. Tindakan ini tidak dapat dibatalkan\./);
+  assert.match(flat(ui.modals[0].body), /Booking Melati · 2026-11-26 · 09:00 - 09:50 atas nama Budi\. Status booking: Terbayar \(sudah dibayar\)\. Dana Rp45\.000 akan dikembalikan 100% lebih dulu, lalu booking dihapus dan sesinya dibuka kembali\. Pelanggan menerima email pemberitahuan\. Tindakan ini tidak dapat dibatalkan\./);
   assert.deepEqual(ui.modals[0].buttons.map(button => button.label), ["Kembali", "Ya, Hapus Booking"]);
   assert.deepEqual(requests(), ["DELETE /admin/bookings/5", "DELETE /admin/bookings/5?confirm=1"]);
   assert.equal(admin().bookingDetail, null);
@@ -135,7 +136,7 @@ test("delete: refund gagal (kept) → toast galat server, detail dimuat ulang; b
   assert.equal(admin().bookingDetail.status, "Dibatalkan");
   const cancelled = setup({ modalAnswers: [false], admin: { bookingDetail: detail({ status: "Dibatalkan", impact: { status: "Dibatalkan", paid: false } }) } });
   await cancelled.controller.delete({ id: "5" });
-  assert.match(String(cancelled.ui.modals[0].body), /\(belum dibayar\)\. Booking akan dihapus dari riwayat\. Tindakan ini tidak dapat dibatalkan\./);
+  assert.match(flat(cancelled.ui.modals[0].body), /\(belum dibayar\)\. Booking akan dihapus dari riwayat\. Tindakan ini tidak dapat dibatalkan\./);
   assert.deepEqual(cancelled.requests(), []);
 });
 

@@ -21,8 +21,14 @@ export function sessionGoneModal({ studioShown, slotText }) {
     title: "Sesi Tidak Tersedia",
     className: "center",
     kicker: modalIcon("clock"),
-    body: studioShown ? html`<p>Sesi ${slotText} tidak lagi tersedia. Silakan pilih sesi lain.</p>` : html`<p>Studio ini sedang tidak tersedia. Silakan pilih studio lain.</p>`,
-    buttons: [studioShown ? { label: "Pilih Sesi Lain", value: 1, icon: "calendar" } : { label: "Cari Studio Lain", value: 1, icon: "search" }],
+    body: studioShown
+      ? html`<p>Sesi ${slotText} tidak lagi tersedia. Silakan pilih sesi lain.</p>`
+      : html`<p>Studio ini sedang tidak tersedia. Silakan pilih studio lain.</p>`,
+    buttons: [
+      studioShown
+        ? { label: "Pilih Sesi Lain", value: 1, icon: "calendar" }
+        : { label: "Cari Studio Lain", value: 1, icon: "search" },
+    ],
   };
 }
 
@@ -43,7 +49,10 @@ export function loginRequiredModal() {
     className: "center",
     kicker: modalIcon("info", "blue"),
     body: html`<p>Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.</p>`,
-    buttons: [{ label: "Masuk", value: "login", icon: "user" }, { label: "Daftar", value: "register", style: "ghost" }],
+    buttons: [
+      { label: "Masuk", value: "login", icon: "user" },
+      { label: "Daftar", value: "register", style: "ghost" },
+    ],
   };
 }
 
@@ -74,7 +83,10 @@ export function cancelConfirmModal() {
   return {
     title: "Konfirmasi Pembatalan",
     body: html`<p>Yakin membatalkan booking ini?</p>`,
-    buttons: [{ label: "Kembali", value: false, style: "ghost" }, { label: "Ya, Batalkan", value: true }],
+    buttons: [
+      { label: "Kembali", value: false, style: "ghost" },
+      { label: "Ya, Batalkan", value: true },
+    ],
   };
 }
 
@@ -83,6 +95,9 @@ export function payConfirmModal() {
   return {
     title: "Konfirmasi Pembayaran",
     body: html`<p>Bayar sekarang via QRIS (simulasi)?</p>`,
-    buttons: [{ label: "Batal", value: false, style: "ghost" }, { label: "Bayar", value: true }],
+    buttons: [
+      { label: "Batal", value: false, style: "ghost" },
+      { label: "Bayar", value: true },
+    ],
   };
 }

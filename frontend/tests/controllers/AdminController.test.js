@@ -46,7 +46,7 @@ test("handleError: 403 \"Hanya admin\" → satu dialog Akses ditolak, login dile
   const { controller, log, ui, store } = setupAdmin({ modalAnswers: ["login"] });
   await controller.handleError(forbidden("Hanya admin"), "Hanya admin yang dapat menambahkan studio.");
   assert.deepEqual(log, ["logout", "modal:Akses ditolak", "navigate:/login"]);
-  assert.match(String(ui.modals[0].body), /Hanya admin yang dapat menambahkan studio\. Akun yang sedang masuk adalah akun pelanggan\. Masuk dengan akun admin untuk melanjutkan\./);
+  assert.match(flat(ui.modals[0].body), /Hanya admin yang dapat menambahkan studio\. Akun yang sedang masuk adalah akun pelanggan\. Masuk dengan akun admin untuk melanjutkan\./);
   assert.deepEqual(ui.modals[0].buttons.map(button => [button.label, button.value, button.style]), [["Kembali ke Beranda", "home", "ghost"], ["Masuk sebagai Admin", "login", undefined]]);
   assert.equal(store.get().runtime.accessDeniedOpen, false);
 });
@@ -57,7 +57,7 @@ test("Akses ditolak: Kembali ke Beranda tetap di beranda (logout sudah pindah), 
   await controller.showAccessDenied();
   await first;
   assert.equal(ui.modals.length, 1);
-  assert.match(String(ui.modals[0].body), /Hanya admin yang dapat membuka halaman admin\./);
+  assert.match(flat(ui.modals[0].body), /Hanya admin yang dapat membuka halaman admin\./);
   assert.deepEqual(log, ["logout", "modal:Akses ditolak"]);
 });
 
@@ -154,7 +154,7 @@ test("run: galat akses lewat handleError dengan kalimat what (403 Hanya admin �
     throw forbidden("Hanya admin");
   }, "Disimpan.", "Hanya admin yang dapat mengubah studio.");
   assert.equal(done, false);
-  assert.match(String(ui.modals[0].body), /Hanya admin yang dapat mengubah studio\./);
+  assert.match(flat(ui.modals[0].body), /Hanya admin yang dapat mengubah studio\./);
   assert.equal(store.get().runtime.toast.error, "");
 });
 
@@ -237,7 +237,7 @@ test("deleteOperation: modal Konfirmasi Hapus Item Rekap; Kembali → tanpa perm
   await setup.controller.deleteOperation({ id: "4" });
   assert.equal(setup.api.calls.length, 0);
   assert.equal(setup.ui.modals[0].title, "Konfirmasi Hapus Item Rekap");
-  assert.equal(String(setup.ui.modals[0].body), "<p>Hapus item rekap ini?</p>");
+  assert.equal(flat(setup.ui.modals[0].body), "<p>Hapus item rekap ini?</p>");
   setup = setupAdmin({ modalAnswers: [true], admin: { operations: operationsData, editingOperation: operationsData.items[0] }, responses: { "DELETE /admin/ops/4": { body: { ok: true } } } });
   await setup.controller.deleteOperation({ id: "4" });
   assert.equal(setup.api.calls[0].method, "DELETE");
@@ -269,7 +269,7 @@ test("deleteCustomer: modal Konfirmasi Hapus Akun dengan nama (di-escape) sekali
   await controller.deleteCustomer({ id: "3", name: "Dewi <i>" });
   assert.equal(ui.modals.length, 1);
   assert.equal(ui.modals[0].title, "Konfirmasi Hapus Akun");
-  assert.equal(String(ui.modals[0].body), "<p>Hapus akun \"Dewi &lt;i&gt;\" beserta SELURUH booking, pembayaran, dan foto miliknya?</p><p>Tindakan ini tidak dapat dibatalkan.</p>");
+  assert.equal(flat(ui.modals[0].body), "<p>Hapus akun \"Dewi &lt;i&gt;\" beserta SELURUH booking, pembayaran, dan foto miliknya?</p><p>Tindakan ini tidak dapat dibatalkan.</p>");
   assert.deepEqual(ui.modals[0].buttons.map(button => button.label), ["Kembali", "Ya, Hapus Akun"]);
   assert.deepEqual(api.calls.map(call => `${call.method} ${call.path}`), ["DELETE /admin/customers/3"]);
   const admin = store.get().admin;
@@ -338,7 +338,7 @@ test("deletePackage: modal Konfirmasi Hapus Paket; dinonaktifkan atau dihapus se
   let setup = setupAdmin({ modalAnswers: [true], admin: { packages: [] }, responses: { "DELETE /admin/packages/1": { body: { deactivated: true } } } });
   await setup.controller.deletePackage({ id: "1" });
   assert.equal(setup.ui.modals[0].title, "Konfirmasi Hapus Paket");
-  assert.equal(String(setup.ui.modals[0].body), "<p>Hapus paket ini? (Jika pernah dibeli, paket hanya dinonaktifkan.)</p>");
+  assert.equal(flat(setup.ui.modals[0].body), "<p>Hapus paket ini? (Jika pernah dibeli, paket hanya dinonaktifkan.)</p>");
   assert.equal(setup.store.get().runtime.toast.message, "Paket pernah dibeli, jadi dinonaktifkan (riwayat tetap utuh).");
   setup = setupAdmin({ modalAnswers: [true], admin: { packages: [] }, responses: { "DELETE /admin/packages/1": { body: { ok: true } } } });
   await setup.controller.deletePackage({ id: "1" });
@@ -396,6 +396,7 @@ test("saveAccount: 403 Password saat ini salah → toast galat, admin tetap masu
 
 // ---------- Properti dan Pose (fase 8b) ----------
 import * as masterModel from "../../js/models/master.js";
+import { flat } from "../helpers/markup.js";
 
 function setupCatalog({ responses = {}, modalAnswers = [], admin = {}, readImage = async file => "data:" + file.name } = {}) {
   const store = createStore({ ...sampleState({ persisted: { admin: true }, runtime: { accessDeniedOpen: false } }), admin: { ...createAdminState(), me: { username: "admin", must_change: false }, ...admin } }, { storage: createFakeStorage(), persistKey: "snapia" });
@@ -449,7 +450,7 @@ test("properti: hapus lewat modal Konfirmasi Hapus Properti; Kembali → tanpa p
   assert.deepEqual(requests(), []);
   await controller.deleteProperty({ id: "4" });
   assert.equal(ui.modals[0].title, "Konfirmasi Hapus Properti");
-  assert.match(String(ui.modals[0].body), /<p>Hapus properti ini\?<\/p>/);
+  assert.match(flat(ui.modals[0].body), /<p>Hapus properti ini\?<\/p>/);
   assert.deepEqual(ui.modals[0].buttons.map(button => button.label), ["Kembali", "Ya, Hapus Properti"]);
   assert.deepEqual(requests(), ["DELETE /admin/properties/4", "GET /master"]);
   assert.equal(toast().message, "Properti dihapus.");
@@ -466,7 +467,7 @@ test("pose: muat, simpan (PATCH), tambah (POST), gagal → draf, hapus lewat mod
   assert.deepEqual(admin().drafts["pose-new"], { nama: "", people_range_id: "1" });
   await controller.deletePose({ id: "6" });
   assert.equal(ui.modals[0].title, "Konfirmasi Hapus Pose");
-  assert.match(String(ui.modals[0].body), /Hapus pose ini\?/);
+  assert.match(flat(ui.modals[0].body), /Hapus pose ini\?/);
   assert.deepEqual(requests(), ["GET /admin/poses", "PATCH /admin/poses/6", "POST /admin/poses", "DELETE /admin/poses/6"]);
   assert.equal(toast().message, "Pose dihapus.");
 });

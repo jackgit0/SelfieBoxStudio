@@ -3,22 +3,23 @@ import assert from "node:assert/strict";
 import { Safe } from "../../js/core/html.js";
 import { bookingDetailView } from "../../js/views/customer/bookingDetail.js";
 import { sampleState } from "../helpers/fixtures.js";
+import { flat } from "../helpers/markup.js";
 
 const now = new Date(2026, 10, 25, 9, 30);
 const links = { invoiceUrl: (id, download) => `/api/bookings/${id}/invoice?t=tok${download ? "&dl=1" : ""}` };
-const matchFor = id => ({ route: { name: "bdetail" }, params: { id: String(id) }, query: {}, path: `/bookings/${id}` });
+const matchFor = id => ({ route: { name: "bdetail" }, params: { id: flat(id) }, query: {}, path: `/bookings/${id}` });
 const base = { id: 12, user_id: 5, studio: 1, package_id: 2, date: "2026-11-27 10:00", paid_at: Date.UTC(2026, 10, 25, 3, 4, 5), pay_status: "paid", method: "QRIS", studio_fee: 0, subtotal: 90000, main_disc: 0, amount: 90000, paid: 1 };
 function view(fields = {}, id = 12) {
   const value = sampleState({ persisted: { me: 5 } });
   value.data.bookings = [{ ...base, ...fields }];
-  return String(bookingDetailView(value, matchFor(id), links, now));
+  return flat(bookingDetailView(value, matchFor(id), links, now));
 }
 
 test("bookingDetail: tidak ditemukan → kembali ke Booking Saya", () => {
   const value = sampleState();
   const markup = bookingDetailView(value, matchFor(99), links, now);
   assert.ok(markup instanceof Safe);
-  assert.match(String(markup), /<button class="back" data-route="\/bookings"><svg[^]*?<\/svg> Kembali<\/button><div class="card">Booking tidak ditemukan\.<\/div>/);
+  assert.match(flat(markup), /<button class="back" data-route="\/bookings"><svg[^]*?<\/svg> Kembali<\/button><div class="card">Booking tidak ditemukan\.<\/div>/);
 });
 
 test("bookingDetail: Terbayar → Reschedule, Batalkan, Check-in; tautan studio; detail + invoice", () => {

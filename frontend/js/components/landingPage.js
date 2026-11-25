@@ -31,7 +31,12 @@ export function createLandingPage({ document, window }) {
           tops[id] = section.getBoundingClientRect().top;
         }
       }
-      return { tops, innerHeight: window.innerHeight, scrollY: window.scrollY, scrollHeight: document.documentElement.scrollHeight };
+      return {
+        tops,
+        innerHeight: window.innerHeight,
+        scrollY: window.scrollY,
+        scrollHeight: document.documentElement.scrollHeight,
+      };
     },
     markSection(id, scrolled) {
       document.querySelectorAll("[data-s]").forEach(button => button.classList.toggle("on", button.dataset.s === id));

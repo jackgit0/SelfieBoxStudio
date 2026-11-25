@@ -8,5 +8,12 @@ export function rescheduledView(state, match) {
   if (!booking) {
     return html`<div class="card">Memuat…</div>`;
   }
-  return html`<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Reschedule Berhasil</h1><img class="ill" src="/img/ill-reschedule.png" alt=""><div style="text-align:left">${bookingRows(state.master, booking)}</div><button class="btn block" style="margin-top:18px" data-route="/browse">Kembali ke Beranda</button></div></div>`;
+  return html`<div class="panel" style="max-width:640px">
+    <div class="card center">
+      <h1 class="h1">Reschedule Berhasil</h1>
+      <img class="ill" src="/img/ill-reschedule.png" alt="" />
+      <div style="text-align:left">${bookingRows(state.master, booking)}</div>
+      <button class="btn block" style="margin-top:18px" data-route="/browse">Kembali ke Beranda</button>
+    </div>
+  </div>`;
 }

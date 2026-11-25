@@ -171,7 +171,19 @@ function pagesFor({ studio, payment, landing, photo, gallery, admin, adminBookin
 }
 
 // aksi data-* milik controller (diekspor untuk tests/main.test.js: setiap aksi di view terdaftar di sini); kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
-export function controllerActions({ studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin, adminBooking }) {
+export function controllerActions({
+  studio,
+  package: packages,
+  booking,
+  payment,
+  account,
+  auth,
+  landing,
+  photo,
+  gallery,
+  admin,
+  adminBooking,
+}) {
   return {
     "admin:search": (dataset, event) => admin.setSearch(event.target.value),
     "admin:setOperationsPeriod": (dataset, event) => admin.setOperationsPeriod(event.target.value),
@@ -191,7 +203,8 @@ export function controllerActions({ studio, package: packages, booking, payment,
     "studio:toggleStudio": studio.toggleStudio,
     "studio:openNew": studio.openNew,
     "studio:cancelNew": studio.cancelNew,
-    "studio:uploadImage": (dataset, event) => studio.uploadImage(dataset, event.target.files[0], formValues(event.target.form)),
+    "studio:uploadImage": (dataset, event) =>
+      studio.uploadImage(dataset, event.target.files[0], formValues(event.target.form)),
     "studio:review": (dataset, event) => studio.review(formValues(event.target)),
     "studio:backToForm": studio.backToForm,
     "studio:save": studio.save,
@@ -207,7 +220,8 @@ export function controllerActions({ studio, package: packages, booking, payment,
     "studio:deleteSession": studio.deleteSession,
     "admin:saveProperty": (dataset, event) => admin.saveProperty(dataset, formValues(event.target)),
     "admin:addProperty": (dataset, event) => admin.addProperty(formValues(event.target)),
-    "admin:uploadPropertyImage": (dataset, event) => admin.uploadPropertyImage(dataset, event.target.files[0], formValues(event.target.form)),
+    "admin:uploadPropertyImage": (dataset, event) =>
+      admin.uploadPropertyImage(dataset, event.target.files[0], formValues(event.target.form)),
     "admin:deleteProperty": admin.deleteProperty,
     "admin:savePose": (dataset, event) => admin.savePose(dataset, formValues(event.target)),
     "admin:addPose": (dataset, event) => admin.addPose(formValues(event.target)),
@@ -274,27 +288,91 @@ async function start() {
   const storage = browserStorage();
   const api = createApi({ base: API_BASE, storage });
   // booking berjalan (studio, tanggal, sesi, id reschedule; tanpa quote) bertahan saat dimuat ulang, hanya di tab ini (decisions.md 26)
-  const session = { storage: browserStorage("sessionStorage"), key: "snapia_booking", slices: { booking: ["studio", "date", "slot", "rescheduleId"] } };
-  const store = createStore({ ...createInitialState(), photo: createPhotoState(), admin: createAdminState() }, { storage, persistKey: "snapia", session });
+  const session = {
+    storage: browserStorage("sessionStorage"),
+    key: "snapia_booking",
+    slices: { booking: ["studio", "date", "slot", "rescheduleId"] },
+  };
+  const store = createStore(
+    { ...createInitialState(), photo: createPhotoState(), admin: createAdminState() },
+    { storage, persistKey: "snapia", session },
+  );
   const state = store.get();
   const ui = createUi(store);
   // router dibuat setelah controller (tabel halamannya memakai controller), jadi navigasi meneruskan ke router lewat rujukan
   let router = null;
-  const navigation = createNavigator({ store, router: { navigate: path => router.navigate(path) }, scrollToTop: () => window.scrollTo({ top: 0, behavior: "instant" }) });
-  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel, contact: contactModel, drive: driveModel, gallery: galleryModel, admin: adminModels };
+  const navigation = createNavigator({
+    store,
+    router: { navigate: path => router.navigate(path) },
+    scrollToTop: () => window.scrollTo({ top: 0, behavior: "instant" }),
+  });
+  const models = {
+    master: masterModel,
+    studio: studioModel,
+    booking: bookingModel,
+    payment: paymentModel,
+    photoSession: photoSessionModel,
+    account: accountModel,
+    auth: authModel,
+    contact: contactModel,
+    drive: driveModel,
+    gallery: galleryModel,
+    admin: adminModels,
+  };
   // AdminController dibuat setelah AuthController (saling memakai); controller yang lebih dulu dibuat memanggilnya lewat adminCore
   let admin = null;
-  const adminCore = { run: (...args) => admin.run(...args), load: (...args) => admin.load(...args), handleAccessError: (...args) => admin.handleAccessError(...args) };
+  const adminCore = {
+    run: (...args) => admin.run(...args),
+    load: (...args) => admin.load(...args),
+    handleAccessError: (...args) => admin.handleAccessError(...args),
+  };
   const files = { readImage: file => shrinkImage(file, window) };
   const studio = createStudioController({ api, store, ui, router: navigation, models, admin: adminCore, files });
-  const packages = createPackageController({ store, ui, router: navigation, config: { wa: CS_WA, email: CS_EMAIL }, refreshMaster: studio.refreshMaster });
-  const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster });
-  const payment = createPaymentController({ api, store, ui, router: navigation, models, booking, refresh: booking.refreshData });
+  const packages = createPackageController({
+    store,
+    ui,
+    router: navigation,
+    config: { wa: CS_WA, email: CS_EMAIL },
+    refreshMaster: studio.refreshMaster,
+  });
+  const booking = createBookingController({
+    api,
+    store,
+    ui,
+    router: navigation,
+    models,
+    packages,
+    refreshMaster: studio.refreshMaster,
+  });
+  const payment = createPaymentController({
+    api,
+    store,
+    ui,
+    router: navigation,
+    models,
+    booking,
+    refresh: booking.refreshData,
+  });
   const account = createAccountController({ api, store, models });
   // AuthController dan AdminController saling memakai: keluar (auth.logout) dan dialog Akses ditolak (admin.showAccessDenied)
-  const auth = createAuthController({ api, store, ui, router: navigation, models, booking, accessDenied: () => admin.showAccessDenied() });
+  const auth = createAuthController({
+    api,
+    store,
+    ui,
+    router: navigation,
+    models,
+    booking,
+    accessDenied: () => admin.showAccessDenied(),
+  });
   admin = createAdminController({ api, store, ui, router: navigation, models, logout: () => auth.logout(), files });
-  const landing = createLandingController({ api, store, router: navigation, models, page: createLandingPage({ document, window }), timers: { setTimeout: (callback, delay) => window.setTimeout(callback, delay) } });
+  const landing = createLandingController({
+    api,
+    store,
+    router: navigation,
+    models,
+    page: createLandingPage({ document, window }),
+    timers: { setTimeout: (callback, delay) => window.setTimeout(callback, delay) },
+  });
   const photo = createPhotoSessionController({
     api,
     store,
@@ -302,16 +380,44 @@ async function start() {
     router: navigation,
     models,
     screen: createSessionScreen({ document }),
-    media: navigator.mediaDevices ? { getUserMedia: constraints => navigator.mediaDevices.getUserMedia(constraints) } : null,
-    timers: { setInterval: (callback, delay) => window.setInterval(callback, delay), clearInterval: id => window.clearInterval(id), setTimeout: (callback, delay) => window.setTimeout(callback, delay) },
+    media: navigator.mediaDevices
+      ? { getUserMedia: constraints => navigator.mediaDevices.getUserMedia(constraints) }
+      : null,
+    timers: {
+      setInterval: (callback, delay) => window.setInterval(callback, delay),
+      clearInterval: id => window.clearInterval(id),
+      setTimeout: (callback, delay) => window.setTimeout(callback, delay),
+    },
     sound: createBeeper(window.AudioContext),
     drive: { clientId: GOOGLE_CLIENT_ID, google: () => window.google, fetch: (...request) => window.fetch(...request) },
     refreshData: booking.refreshData,
     brand: BRAND,
   });
-  const gallery = createGalleryController({ api, store, ui, models, drive: { fetch: (...request) => window.fetch(...request) }, files: { download: downloadFile }, photoSession: photo, refreshData: booking.refreshData, brand: BRAND });
+  const gallery = createGalleryController({
+    api,
+    store,
+    ui,
+    models,
+    drive: { fetch: (...request) => window.fetch(...request) },
+    files: { download: downloadFile },
+    photoSession: photo,
+    refreshData: booking.refreshData,
+    brand: BRAND,
+  });
   const adminBooking = createAdminBookingController({ api, store, ui, models, admin });
-  const controllers = { studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin, adminBooking };
+  const controllers = {
+    studio,
+    package: packages,
+    booking,
+    payment,
+    account,
+    auth,
+    landing,
+    photo,
+    gallery,
+    admin,
+    adminBooking,
+  };
   const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl, adminPhotoUrl: api.adminPhotoUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   router = createRouter({
@@ -319,7 +425,11 @@ async function start() {
     history: window.history,
     location: window.location,
     events: window,
-    getSession: () => ({ loggedIn: Boolean(state.persisted.me), admin: Boolean(state.persisted.admin), mustChange: Boolean(state.persisted.admin && state.admin.me && state.admin.me.must_change) }),
+    getSession: () => ({
+      loggedIn: Boolean(state.persisted.me),
+      admin: Boolean(state.persisted.admin),
+      mustChange: Boolean(state.persisted.admin && state.admin.me && state.admin.me.must_change),
+    }),
     onChange: cause => {
       if (cause !== "navigate") {
         store.update("runtime", { toast: { message: "", error: "" } }, { silent: true }); // back/forward dan tautan reset (navigasi aplikasi sudah membersihkannya sendiri)
@@ -338,7 +448,13 @@ async function start() {
   // shell sekali per rute, outlet setiap render (core/render.js)
   const hooks = createPageHooks({ store, syncReschedule: id => booking.syncReschedule(id) });
   const root = document.getElementById("app");
-  const renderer = createRenderer({ root, resolve: () => router.resolve(), before: hooks.before, shell: hooks.shell, outlet: hooks.outlet });
+  const renderer = createRenderer({
+    root,
+    resolve: () => router.resolve(),
+    before: hooks.before,
+    shell: hooks.shell,
+    outlet: hooks.outlet,
+  });
   renderer.start(store);
 
   // atribut data-* (core/events.js) di seluruh dokumen; data-route pindah halaman lewat navigasi aplikasi (decisions.md 42)

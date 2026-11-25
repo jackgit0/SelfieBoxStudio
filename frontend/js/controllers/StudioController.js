@@ -12,7 +12,16 @@ import { CANCELLED } from "./AdminController.js";
 const AVAILABILITY_ROUTES = ["home", "time"];
 
 // admin = AdminController (run, load, handleAccessError); files.readImage(file) → data URL yang sudah diperkecil (components/imageFile.js)
-export function createStudioController({ api, store, ui, router, models, admin: adminCore = null, files = null, now = () => new Date() }) {
+export function createStudioController({
+  api,
+  store,
+  ui,
+  router,
+  models,
+  admin: adminCore = null,
+  files = null,
+  now = () => new Date(),
+}) {
   const { studio: studioModel, master: masterModel } = models;
 
   // bulan sekarang (batas mundur kalender)
@@ -25,7 +34,10 @@ export function createStudioController({ api, store, ui, router, models, admin: 
   function availabilityTargets(state) {
     const today = isoDate(now());
     if (state.runtime.route.name === "home") {
-      return { date: studioModel.filterDate(state.persisted.hDate, today), studioIds: state.master.studios.map(studio => studio.id) };
+      return {
+        date: studioModel.filterDate(state.persisted.hDate, today),
+        studioIds: state.master.studios.map(studio => studio.id),
+      };
     }
     const studioIds = state.booking.studio ? [state.booking.studio] : [];
     return { date: state.booking.date || today, studioIds };
@@ -63,7 +75,9 @@ export function createStudioController({ api, store, ui, router, models, admin: 
   // setelah sesi berubah: cache sesi studio itu dibuang, ringkasan dikosongkan, daftar studio (jumlah sesi, dampak hapus) dimuat ulang tanpa layar Memuat
   async function refreshSessions(studioId) {
     const prefix = studioId + "|";
-    const sessions = Object.fromEntries(Object.entries(adminState().sessions).filter(([key]) => !key.startsWith(prefix)));
+    const sessions = Object.fromEntries(
+      Object.entries(adminState().sessions).filter(([key]) => !key.startsWith(prefix)),
+    );
     updateAdmin({ sessions, bookings: null, transactions: null, revenue: null, operations: null });
     try {
       updateAdmin({ studios: await adminModels().studios.loadStudios(api) });
@@ -171,7 +185,16 @@ export function createStudioController({ api, store, ui, router, models, admin: 
 
     cancelNew() {
       setToast({});
-      updateAdmin({ newStudio: null, studioSummary: false, studioErrors: null, images: without(adminState().images, "new"), openStudios: { ...adminState().openStudios, new: false } }, { silent: false });
+      updateAdmin(
+        {
+          newStudio: null,
+          studioSummary: false,
+          studioErrors: null,
+          images: without(adminState().images, "new"),
+          openStudios: { ...adminState().openStudios, new: false },
+        },
+        { silent: false },
+      );
     },
 
     // unggah gambar (data-change pada input file di dalam form studio). key = "new" atau id studio; values = isian form saat itu,
@@ -205,7 +228,10 @@ export function createStudioController({ api, store, ui, router, models, admin: 
       const body = adminModels().studios.studioBody(values);
       const errors = adminModels().studios.newStudioErrors(body, adminState().studios, adminState().images.new);
       setToast({});
-      updateAdmin({ newStudio: body, studioDone: null, studioErrors: errors, studioSummary: !errors }, { silent: false });
+      updateAdmin(
+        { newStudio: body, studioDone: null, studioErrors: errors, studioSummary: !errors },
+        { silent: false },
+      );
       if (errors) {
         ui.focus(".amain .inv");
       }
@@ -233,10 +259,17 @@ export function createStudioController({ api, store, ui, router, models, admin: 
             if (!errors) {
               throw error;
             }
-            updateAdmin({ studioErrors: errors, studioSummary: false, ...(error.status == 409 ? { studios: null } : {}) });
+            updateAdmin({
+              studioErrors: errors,
+              studioSummary: false,
+              ...(error.status == 409 ? { studios: null } : {}),
+            });
             return;
           }
-          const text = draft.status == "UNAVAILABLE" ? `${name} disimpan dengan status Tidak tersedia, belum tampil di daftar studio pelanggan.` : `${name} tersedia dan tampil di daftar studio pelanggan.`;
+          const text =
+            draft.status == "UNAVAILABLE"
+              ? `${name} disimpan dengan status Tidak tersedia, belum tampil di daftar studio pelanggan.`
+              : `${name} tersedia dan tampil di daftar studio pelanggan.`;
           updateAdmin({
             images: without(adminState().images, "new"),
             openStudios: { ...adminState().openStudios, new: false, [created.id]: true },
@@ -261,7 +294,11 @@ export function createStudioController({ api, store, ui, router, models, admin: 
           const body = adminModels().studios.studioBody(values, adminState().images[id]);
           body.price = body.price || 0;
           await adminModels().studios.updateStudio(api, id, body);
-          updateAdmin({ images: without(adminState().images, id), drafts: without(adminState().drafts, key), studios: null });
+          updateAdmin({
+            images: without(adminState().images, id),
+            drafts: without(adminState().drafts, key),
+            studios: null,
+          });
           await reloadMaster();
         },
         "Studio disimpan.",
@@ -277,11 +314,28 @@ export function createStudioController({ api, store, ui, router, models, admin: 
         return Promise.resolve(false);
       }
       return adminCore.run(async () => {
-        const answer = await adminModels().confirmable.withConfirm(confirmed => adminModels().studios.deleteStudio(api, id, confirmed), { ui, title: `Hapus ${studio.name}?`, okLabel: "Ya, Hapus Studio", describeImpact: studioImpactBody, known: studio.impact });
+        const answer = await adminModels().confirmable.withConfirm(
+          confirmed => adminModels().studios.deleteStudio(api, id, confirmed),
+          {
+            ui,
+            title: `Hapus ${studio.name}?`,
+            okLabel: "Ya, Hapus Studio",
+            describeImpact: studioImpactBody,
+            known: studio.impact,
+          },
+        );
         if (!answer) {
           return CANCELLED;
         }
-        updateAdmin({ studios: null, bookings: null, transactions: null, revenue: null, operations: null, sessions: {}, openStudios: without(adminState().openStudios, id) });
+        updateAdmin({
+          studios: null,
+          bookings: null,
+          transactions: null,
+          revenue: null,
+          operations: null,
+          sessions: {},
+          openStudios: without(adminState().openStudios, id),
+        });
         await reloadMaster();
         setToast({ message: `Studio "${studio.name}" dihapus.` + adminModels().studios.cancelledSummary(answer) });
       });
@@ -308,28 +362,48 @@ export function createStudioController({ api, store, ui, router, models, admin: 
         setToast({ error: error.message });
         list = [];
       }
-      updateAdmin({ sessions: { ...adminState().sessions, [key]: list }, loading: { ...adminState().loading, [flag]: false } }, { silent: false });
+      updateAdmin(
+        { sessions: { ...adminState().sessions, [key]: list }, loading: { ...adminState().loading, [flag]: false } },
+        { silent: false },
+      );
     },
 
     // panah bulan (tanpa batas mundur); hari terpilih ikut pindah bulan; form sesi ditutup
     moveSessionMonth({ studio, step }) {
       const sessionModel = adminModels().sessions;
       const month = sessionModel.shiftMonth(sessionModel.shownMonth(adminState(), studio, today()), step);
-      updateAdmin({ sessionMonths: { ...adminState().sessionMonths, [studio]: month }, sessionDays: { ...adminState().sessionDays, [studio]: sessionModel.dayForMonth(month, today()) }, editingSession: null, addingSessionFor: null }, { silent: false });
+      updateAdmin(
+        {
+          sessionMonths: { ...adminState().sessionMonths, [studio]: month },
+          sessionDays: { ...adminState().sessionDays, [studio]: sessionModel.dayForMonth(month, today()) },
+          editingSession: null,
+          addingSessionFor: null,
+        },
+        { silent: false },
+      );
     },
 
     pickSessionDay({ studio, date }) {
-      updateAdmin({ sessionDays: { ...adminState().sessionDays, [studio]: date }, editingSession: null, addingSessionFor: null }, { silent: false });
+      updateAdmin(
+        { sessionDays: { ...adminState().sessionDays, [studio]: date }, editingSession: null, addingSessionFor: null },
+        { silent: false },
+      );
     },
 
     // chip jam: buka/tutup form ubah sesi itu
     toggleSession({ id }) {
-      updateAdmin({ editingSession: adminState().editingSession == id ? null : Number(id), addingSessionFor: null }, { silent: false });
+      updateAdmin(
+        { editingSession: adminState().editingSession == id ? null : Number(id), addingSessionFor: null },
+        { silent: false },
+      );
     },
 
     // chip TAMBAH: buka/tutup form tambah sesi studio itu
     toggleAddSession({ studio }) {
-      updateAdmin({ addingSessionFor: adminState().addingSessionFor == studio ? null : Number(studio), editingSession: null }, { silent: false });
+      updateAdmin(
+        { addingSessionFor: adminState().addingSessionFor == studio ? null : Number(studio), editingSession: null },
+        { silent: false },
+      );
     },
 
     closeSessionForm() {
@@ -342,9 +416,17 @@ export function createStudioController({ api, store, ui, router, models, admin: 
       return adminCore.run(
         async () => {
           const answer = await adminModels().sessions.addSessions(api, studio, adminModels().sessions.addBody(values));
-          updateAdmin({ addingSessionFor: null, drafts: without(adminState().drafts, key), sessionDays: { ...adminState().sessionDays, [studio]: values.date }, sessionMonths: { ...adminState().sessionMonths, [studio]: values.date.slice(0, 7) } });
+          updateAdmin({
+            addingSessionFor: null,
+            drafts: without(adminState().drafts, key),
+            sessionDays: { ...adminState().sessionDays, [studio]: values.date },
+            sessionMonths: { ...adminState().sessionMonths, [studio]: values.date.slice(0, 7) },
+          });
           await refreshSessions(studio);
-          let message = answer.created.length > 1 ? `${answer.created.length} sesi berhasil ditambahkan.` : "Sesi berhasil ditambahkan.";
+          let message =
+            answer.created.length > 1
+              ? `${answer.created.length} sesi berhasil ditambahkan.`
+              : "Sesi berhasil ditambahkan.";
           if (answer.skipped.length) {
             message += ` ${answer.skipped.length} tanggal dilewati karena bertabrakan: ${answer.skipped.join(", ")}.`;
           }
@@ -365,14 +447,36 @@ export function createStudioController({ api, store, ui, router, models, admin: 
       const key = "session-" + id;
       return adminCore.run(
         async () => {
-          const answer = await adminModels().confirmable.withConfirm(confirmed => adminModels().sessions.updateSession(api, id, adminModels().sessions.changeBody(values), confirmed), { ui, title: `Ubah sesi ${session.start} - ${session.end}?`, okLabel: "Ya, Ubah Sesi", describeImpact: sessionChangeBody, known: session.impact, askFirst: false });
+          const answer = await adminModels().confirmable.withConfirm(
+            confirmed =>
+              adminModels().sessions.updateSession(api, id, adminModels().sessions.changeBody(values), confirmed),
+            {
+              ui,
+              title: `Ubah sesi ${session.start} - ${session.end}?`,
+              okLabel: "Ya, Ubah Sesi",
+              describeImpact: sessionChangeBody,
+              known: session.impact,
+              askFirst: false,
+            },
+          );
           if (!answer) {
             updateAdmin({ drafts: { ...adminState().drafts, [key]: values } });
             return CANCELLED;
           }
-          updateAdmin({ editingSession: null, drafts: without(adminState().drafts, key), sessionDays: { ...adminState().sessionDays, [studio]: answer.date }, sessionMonths: { ...adminState().sessionMonths, [studio]: answer.date.slice(0, 7) } });
+          updateAdmin({
+            editingSession: null,
+            drafts: without(adminState().drafts, key),
+            sessionDays: { ...adminState().sessionDays, [studio]: answer.date },
+            sessionMonths: { ...adminState().sessionMonths, [studio]: answer.date.slice(0, 7) },
+          });
           await refreshSessions(studio);
-          setToast({ message: "Sesi berhasil diperbarui." + (answer.notified ? ` Pelanggan dari ${answer.notified} booking terdampak sudah diberi tahu lewat email.` : "") });
+          setToast({
+            message:
+              "Sesi berhasil diperbarui." +
+              (answer.notified
+                ? ` Pelanggan dari ${answer.notified} booking terdampak sudah diberi tahu lewat email.`
+                : ""),
+          });
         },
         "",
         undefined,
@@ -386,7 +490,16 @@ export function createStudioController({ api, store, ui, router, models, admin: 
         return Promise.resolve(false);
       }
       return adminCore.run(async () => {
-        const answer = await adminModels().confirmable.withConfirm(confirmed => adminModels().sessions.deleteSession(api, id, confirmed), { ui, title: `Hapus sesi ${session.date} ${session.start} - ${session.end}?`, okLabel: "Ya, Hapus Sesi", describeImpact: sessionImpactBody, known: session.impact });
+        const answer = await adminModels().confirmable.withConfirm(
+          confirmed => adminModels().sessions.deleteSession(api, id, confirmed),
+          {
+            ui,
+            title: `Hapus sesi ${session.date} ${session.start} - ${session.end}?`,
+            okLabel: "Ya, Hapus Sesi",
+            describeImpact: sessionImpactBody,
+            known: session.impact,
+          },
+        );
         if (!answer) {
           return CANCELLED;
         }

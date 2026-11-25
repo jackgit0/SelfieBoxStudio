@@ -10,10 +10,33 @@ import { sessionStatus, photoStrip, stopSessionModal } from "../views/session/ph
 
 // isi awal slice photo (dulu objek P di legacy/session.js)
 export function createPhotoState() {
-  return { drive: { token: null, folder: null }, session: null, poseIndex: 0, tickTimer: null, poseTimer: null, stream: null, gallerySession: null, deleteMode: false, deleteSelection: new Set() };
+  return {
+    drive: { token: null, folder: null },
+    session: null,
+    poseIndex: 0,
+    tickTimer: null,
+    poseTimer: null,
+    stream: null,
+    gallerySession: null,
+    deleteMode: false,
+    deleteSelection: new Set(),
+  };
 }
 
-export function createPhotoSessionController({ api, store, ui, router, models, screen, media, timers, sound, drive, refreshData, brand }) {
+export function createPhotoSessionController({
+  api,
+  store,
+  ui,
+  router,
+  models,
+  screen,
+  media,
+  timers,
+  sound,
+  drive,
+  refreshData,
+  brand,
+}) {
   const sessions = models.photoSession;
   const state = () => store.get();
   const photo = () => state().photo;
@@ -114,7 +137,13 @@ export function createPhotoSessionController({ api, store, ui, router, models, s
 
   async function uploadToDrive(item) {
     const token = photo().drive.token;
-    const result = await models.drive.upload({ fetch: drive.fetch, token, folder: photo().drive.folder, folderName: brand + " - " + new Date().toLocaleDateString("id-ID"), photo: item });
+    const result = await models.drive.upload({
+      fetch: drive.fetch,
+      token,
+      folder: photo().drive.folder,
+      folderName: brand + " - " + new Date().toLocaleDateString("id-ID"),
+      photo: item,
+    });
     photo().drive.folder = result.folder;
     if (result.driveId) {
       item.driveId = result.driveId;
@@ -137,7 +166,11 @@ export function createPhotoSessionController({ api, store, ui, router, models, s
       photo().drive.token = token;
       // toast sesudah pindah halaman: navigasi mengosongkan toast (dulu toast ini tidak pernah terlihat)
       router.navigate(`/sessions/${photo().session}`);
-      showToast({ message: token ? "Google Drive terhubung: foto otomatis dikirim ke Drive Anda." : "Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server." });
+      showToast({
+        message: token
+          ? "Google Drive terhubung: foto otomatis dikirim ke Drive Anda."
+          : "Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server.",
+      });
     },
 
     // Buka Sesi (Detail Booking): sesi yang sedang dibuka atau sesi aktif user, selain itu Galeri
@@ -196,7 +229,9 @@ export function createPhotoSessionController({ api, store, ui, router, models, s
       if (!session || session.status != "Aktif" || session.paused) {
         return;
       }
-      const emojis = session.setup ? session.setup.acc.map(id => (state().master.properties.find(item => item.id == id) || {}).e || "") : [];
+      const emojis = session.setup
+        ? session.setup.acc.map(id => (state().master.properties.find(item => item.id == id) || {}).e || "")
+        : [];
       const image = screen.capture({ emojis });
       try {
         const answer = await sessions.shoot(api, session.id, image);
@@ -223,7 +258,11 @@ export function createPhotoSessionController({ api, store, ui, router, models, s
       }
       try {
         const answer = await sessions.staffAction(api, session.id, command);
-        store.update("persisted", { log: [...state().persisted.log, command + " " + new Date().toLocaleTimeString()] }, { silent: true });
+        store.update(
+          "persisted",
+          { log: [...state().persisted.log, command + " " + new Date().toLocaleTimeString()] },
+          { silent: true },
+        );
         session.left = answer.left;
         session.paused = answer.paused;
         session.status = answer.status;

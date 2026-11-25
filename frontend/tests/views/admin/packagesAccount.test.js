@@ -5,9 +5,10 @@ import { createAdminState } from "../../../js/controllers/AdminController.js";
 import { packagesView } from "../../../js/views/admin/packages.js";
 import { accountView } from "../../../js/views/admin/account.js";
 import { sampleState } from "../../helpers/fixtures.js";
+import { flat } from "../../helpers/markup.js";
 
 const stateWith = admin => ({ ...sampleState(), admin: { ...createAdminState(), ...admin } });
-const render = view => String(view);
+const render = view => flat(view);
 const packageList = [{ id: 1, name: "Basic <x>", price: 50000, photo_count: 3, dur: 15, strip_size: "2x6", strip_material: "Glossy", active: 1 }, { id: 3, name: "Lama", price: 10000, photo_count: 1, dur: 5, strip_size: "", strip_material: "", active: 0 }];
 const discount = { pct: 10, label: "Promo \"Merdeka\"" };
 

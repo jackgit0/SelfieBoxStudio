@@ -30,7 +30,12 @@ export function dayForMonth(month, today) {
 
 // isian form Tambah sesi → body server; berulang kosong = 1 hari
 export function addBody(values) {
-  return { date: values.date, start: values.start, end: values.end, repeat: values.repeat === "" || values.repeat === undefined ? 1 : Number(values.repeat) };
+  return {
+    date: values.date,
+    start: values.start,
+    end: values.end,
+    repeat: values.repeat === "" || values.repeat === undefined ? 1 : Number(values.repeat),
+  };
 }
 
 export function changeBody(values) {

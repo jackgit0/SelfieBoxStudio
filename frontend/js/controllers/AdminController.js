@@ -4,7 +4,16 @@
 // - handleError: 401 → keluar; 403 "Hanya admin" → dialog Akses ditolak; 403 "Ganti password" → Akun Admin; selain itu toast galat
 // logout = AuthController.logout (main.js). Studio + Detail Sesi = StudioController, Booking = AdminBookingController (memakai inti ini);
 // Properti dan Pose di sini (fase 8b). files.readImage(file) → data URL yang sudah diperkecil (components/imageFile.js)
-import { DEFAULT_DENIED, accessDeniedModal, confirmModal, deleteCustomerBody, deleteOperationBody, deletePackageBody, deletePoseBody, deletePropertyBody } from "../views/admin/dialogs.js";
+import {
+  DEFAULT_DENIED,
+  accessDeniedModal,
+  confirmModal,
+  deleteCustomerBody,
+  deleteOperationBody,
+  deletePackageBody,
+  deletePoseBody,
+  deletePropertyBody,
+} from "../views/admin/dialogs.js";
 
 // nilai kembali aksi run() yang dibatalkan admin di dialog konfirmasi: tidak ada yang berubah, jadi halaman tidak dirender ulang
 // (fokus kembali ke tombol yang membuka dialog) dan toast tidak diubah
@@ -172,7 +181,13 @@ export function createAdminController({ api, store, ui, router, models, logout, 
 
     // ---------- Dashboard (/admin) ----------
     loadDashboard() {
-      return Promise.all([controller.load("revenue", () => pages.dashboard.loadRevenue(api), {}), controller.load("operations", () => pages.dashboard.loadOperations(api, admin().operationsPeriod), { period: "", items: [] })]);
+      return Promise.all([
+        controller.load("revenue", () => pages.dashboard.loadRevenue(api), {}),
+        controller.load("operations", () => pages.dashboard.loadOperations(api, admin().operationsPeriod), {
+          period: "",
+          items: [],
+        }),
+      ]);
     },
 
     // periode rekap: rekap dikosongkan lalu dimuat ulang oleh kait after halaman
@@ -196,7 +211,11 @@ export function createAdminController({ api, store, ui, router, models, logout, 
       return controller.run(
         async () => {
           await pages.dashboard.saveOperation(api, editing && editing.id, pages.dashboard.operationBody(values));
-          store.update("admin", { editingOperation: null, operations: null, drafts: withoutDraft("operation") }, { silent: true });
+          store.update(
+            "admin",
+            { editingOperation: null, operations: null, drafts: withoutDraft("operation") },
+            { silent: true },
+          );
         },
         "Rekap operasional disimpan.",
         undefined,
@@ -205,7 +224,13 @@ export function createAdminController({ api, store, ui, router, models, logout, 
     },
 
     async deleteOperation({ id }) {
-      if (!(await controller.confirm({ title: "Konfirmasi Hapus Item Rekap", body: deleteOperationBody(), okLabel: "Ya, Hapus Item" }))) {
+      if (
+        !(await controller.confirm({
+          title: "Konfirmasi Hapus Item Rekap",
+          body: deleteOperationBody(),
+          okLabel: "Ya, Hapus Item",
+        }))
+      ) {
         return;
       }
       await controller.run(async () => {
@@ -235,32 +260,71 @@ export function createAdminController({ api, store, ui, router, models, logout, 
     // hapus akun beserta seluruh booking, pembayaran dan fotonya; data turunan (ringkasan, studio, booking, transaksi) dimuat ulang
     deleteCustomer({ id, name }) {
       return controller.run(async () => {
-        const answer = await pages.confirmable.withConfirm(confirmed => pages.users.deleteCustomer(api, id, confirmed), { ui, title: "Konfirmasi Hapus Akun", okLabel: "Ya, Hapus Akun", describeImpact: () => deleteCustomerBody(name), known: null });
+        const answer = await pages.confirmable.withConfirm(
+          confirmed => pages.users.deleteCustomer(api, id, confirmed),
+          {
+            ui,
+            title: "Konfirmasi Hapus Akun",
+            okLabel: "Ya, Hapus Akun",
+            describeImpact: () => deleteCustomerBody(name),
+            known: null,
+          },
+        );
         if (!answer) {
           return CANCELLED;
         }
-        store.update("admin", { customers: null, customerDetail: null, revenue: null, operations: null, studios: null, bookings: null, transactions: null, sessions: {} }, { silent: true });
+        store.update(
+          "admin",
+          {
+            customers: null,
+            customerDetail: null,
+            revenue: null,
+            operations: null,
+            studios: null,
+            bookings: null,
+            transactions: null,
+            sessions: {},
+          },
+          { silent: true },
+        );
         setToast({ message: `Akun dihapus (${answer.photos_deleted} foto ikut terhapus).` });
       });
     },
 
     // ---------- Transaksi (/admin/transactions) ----------
     loadTransactions() {
-      return controller.load("transactions", () => pages.transactions.loadTransactions(api), { rows: [], paid: 0, refunded: 0 });
+      return controller.load("transactions", () => pages.transactions.loadTransactions(api), {
+        rows: [],
+        paid: 0,
+        refunded: 0,
+      });
     },
 
     // ---------- Paket & Diskon (/admin/packages) ----------
     loadPackagesPage() {
-      return Promise.all([controller.load("packages", () => pages.packages.loadPackages(api), []), controller.load("discount", () => pages.packages.loadDiscount(api), { pct: 0, label: "" })]);
+      return Promise.all([
+        controller.load("packages", () => pages.packages.loadPackages(api), []),
+        controller.load("discount", () => pages.packages.loadDiscount(api), { pct: 0, label: "" }),
+      ]);
     },
 
     // values = isian baris paket (form package-form-<id>)
     savePackage({ id }, values) {
-      return savePackageForm("package-" + id, values, () => pages.packages.savePackage(api, id, pages.packages.packageBody(values)), "Paket disimpan. Harga baru berlaku untuk booking berikutnya.");
+      return savePackageForm(
+        "package-" + id,
+        values,
+        () => pages.packages.savePackage(api, id, pages.packages.packageBody(values)),
+        "Paket disimpan. Harga baru berlaku untuk booking berikutnya.",
+      );
     },
 
     addPackage(values) {
-      return savePackageForm("package-new", values, () => pages.packages.addPackage(api, pages.packages.packageBody(values)), "Paket baru ditambahkan.");
+      return savePackageForm(
+        "package-new",
+        values,
+        () => pages.packages.addPackage(api, pages.packages.packageBody(values)),
+        "Paket baru ditambahkan.",
+      );
     },
 
     activatePackage({ id }) {
@@ -271,13 +335,23 @@ export function createAdminController({ api, store, ui, router, models, logout, 
     },
 
     async deletePackage({ id }) {
-      if (!(await controller.confirm({ title: "Konfirmasi Hapus Paket", body: deletePackageBody(), okLabel: "Ya, Hapus Paket" }))) {
+      if (
+        !(await controller.confirm({
+          title: "Konfirmasi Hapus Paket",
+          body: deletePackageBody(),
+          okLabel: "Ya, Hapus Paket",
+        }))
+      ) {
         return;
       }
       await controller.run(async () => {
         const answer = await pages.packages.deletePackage(api, id);
         store.update("admin", { packages: null }, { silent: true });
-        setToast({ message: answer.deactivated ? "Paket pernah dibeli, jadi dinonaktifkan (riwayat tetap utuh)." : "Paket dihapus." });
+        setToast({
+          message: answer.deactivated
+            ? "Paket pernah dibeli, jadi dinonaktifkan (riwayat tetap utuh)."
+            : "Paket dihapus.",
+        });
       });
     },
 
@@ -325,7 +399,13 @@ export function createAdminController({ api, store, ui, router, models, logout, 
     },
 
     async deleteProperty({ id }) {
-      if (!(await controller.confirm({ title: "Konfirmasi Hapus Properti", body: deletePropertyBody(), okLabel: "Ya, Hapus Properti" }))) {
+      if (
+        !(await controller.confirm({
+          title: "Konfirmasi Hapus Properti",
+          body: deletePropertyBody(),
+          okLabel: "Ya, Hapus Properti",
+        }))
+      ) {
         return;
       }
       await controller.run(async () => {
@@ -348,7 +428,13 @@ export function createAdminController({ api, store, ui, router, models, logout, 
     },
 
     async deletePose({ id }) {
-      if (!(await controller.confirm({ title: "Konfirmasi Hapus Pose", body: deletePoseBody(), okLabel: "Ya, Hapus Pose" }))) {
+      if (
+        !(await controller.confirm({
+          title: "Konfirmasi Hapus Pose",
+          body: deletePoseBody(),
+          okLabel: "Ya, Hapus Pose",
+        }))
+      ) {
         return;
       }
       await controller.run(async () => {
@@ -375,7 +461,11 @@ export function createAdminController({ api, store, ui, router, models, logout, 
         async () => {
           const answer = await pages.account.saveAccount(api, values);
           api.token = answer.token;
-          store.update("admin", { me: { username: answer.username, must_change: false }, drafts: withoutDraft("account") }, { silent: true });
+          store.update(
+            "admin",
+            { me: { username: answer.username, must_change: false }, drafts: withoutDraft("account") },
+            { silent: true },
+          );
         },
         "Akun admin diperbarui.",
         undefined,

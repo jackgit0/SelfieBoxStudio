@@ -9,7 +9,15 @@ import { isoDate, parseSlot, slotLabel } from "../core/format.js";
 import { isStudioShown } from "../models/master.js";
 import { filterDate } from "../models/studio.js";
 import { monthOf, shiftMonth } from "../components/calendar.js";
-import { bookingFailedModal, cancelConfirmModal, inputInvalidModal, loginRequiredModal, sessionBookedModal, sessionExpiredModal, sessionGoneModal } from "../views/customer/bookingPopups.js";
+import {
+  bookingFailedModal,
+  cancelConfirmModal,
+  inputInvalidModal,
+  loginRequiredModal,
+  sessionBookedModal,
+  sessionExpiredModal,
+  sessionGoneModal,
+} from "../views/customer/bookingPopups.js";
 
 const EMPTY_BOOKING = { studio: null, date: null, slot: null, quote: null, rescheduleId: null };
 
@@ -19,15 +27,42 @@ const EMPTY_BOOKING = { studio: null, date: null, slot: null, quote: null, resch
 export const BOOKING_ERRORS = [
   { name: "login", matches: error => error.status == 401, open: controller => controller.requireLogin() },
   // "Jadwal sudah tidak tersedia" (booking) / "Jadwal baru tidak tersedia" (reschedule)
-  { name: "sessionBooked", matches: error => error.status == 409 && /^Jadwal (sudah|baru) tidak tersedia/.test(error.message), open: controller => controller.showSessionBooked() },
+  {
+    name: "sessionBooked",
+    matches: error => error.status == 409 && /^Jadwal (sudah|baru) tidak tersedia/.test(error.message),
+    open: controller => controller.showSessionBooked(),
+  },
   // "Paket tidak valid" / "Paket/studio tidak valid" dengan paket yang sudah nonaktif → Paket Tidak Ditemukan
-  { name: "package", matches: () => true, open: (controller, error, next) => controller.packages.handleError(error, next) },
-  { name: "inputInvalid", matches: error => error.message === "Format/jam slot tidak valid", open: controller => controller.showInputInvalid() },
+  {
+    name: "package",
+    matches: () => true,
+    open: (controller, error, next) => controller.packages.handleError(error, next),
+  },
+  {
+    name: "inputInvalid",
+    matches: error => error.message === "Format/jam slot tidak valid",
+    open: controller => controller.showInputInvalid(),
+  },
   // paket masih aktif: sesinya lewat atau studionya hilang
-  { name: "sessionGone", matches: error => ["Jadwal sudah lewat", "Studio tidak tersedia", "Paket/studio tidak valid"].includes(error.message), open: controller => controller.showSessionGone() },
+  {
+    name: "sessionGone",
+    matches: error =>
+      ["Jadwal sudah lewat", "Studio tidak tersedia", "Paket/studio tidak valid"].includes(error.message),
+    open: controller => controller.showSessionGone(),
+  },
 ];
 
-export function createBookingController({ api, store, ui, router, models, packages, refreshMaster, refresh: refreshOverride, now = () => new Date() }) {
+export function createBookingController({
+  api,
+  store,
+  ui,
+  router,
+  models,
+  packages,
+  refreshMaster,
+  refresh: refreshOverride,
+  now = () => new Date(),
+}) {
   const bookingModel = models.booking;
   const refresh = () => (refreshOverride ? refreshOverride() : controller.refreshData());
   const state = () => store.get();
@@ -97,7 +132,11 @@ export function createBookingController({ api, store, ui, router, models, packag
         return;
       }
       forgetMonth();
-      store.update("booking", { rescheduleId: id, studio: existing.studio, date: parseSlot(existing.date).date, slot: null }, { silent: true });
+      store.update(
+        "booking",
+        { rescheduleId: id, studio: existing.studio, date: parseSlot(existing.date).date, slot: null },
+        { silent: true },
+      );
       router.navigate(timePath());
     },
 
@@ -154,7 +193,11 @@ export function createBookingController({ api, store, ui, router, models, packag
       const draft = state().persisted.draft;
       forgetMonth();
       store.update("persisted", { draft: null }, { silent: true });
-      store.update("booking", { rescheduleId: null, studio: draft.studio, date: draft.date, slot: draft.slot, quote: null }, { silent: true });
+      store.update(
+        "booking",
+        { rescheduleId: null, studio: draft.studio, date: draft.date, slot: draft.slot, quote: null },
+        { silent: true },
+      );
       try {
         await loadQuote();
       } catch (error) {
@@ -264,7 +307,11 @@ export function createBookingController({ api, store, ui, router, models, packag
       const existing = bookingModel.bookingById(state().data.bookings, id);
       if (existing && bookingModel.canChange(existing)) {
         forgetMonth();
-        store.update("booking", { rescheduleId: id, studio: existing.studio, date: parseSlot(existing.date).date, slot: null, quote: null }, { silent: true });
+        store.update(
+          "booking",
+          { rescheduleId: id, studio: existing.studio, date: parseSlot(existing.date).date, slot: null, quote: null },
+          { silent: true },
+        );
       }
     },
 

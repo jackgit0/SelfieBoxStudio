@@ -8,7 +8,14 @@
 export const confirmPath = path => path + (path.includes("?") ? "&" : "?") + "confirm=1";
 
 function ask(ui, { title, okLabel, describeImpact }, impact) {
-  const options = { title, body: describeImpact(impact), buttons: [{ label: "Kembali", value: false, style: "ghost" }, { label: okLabel, value: true }] };
+  const options = {
+    title,
+    body: describeImpact(impact),
+    buttons: [
+      { label: "Kembali", value: false, style: "ghost" },
+      { label: okLabel, value: true },
+    ],
+  };
   return Promise.resolve(ui.modal(options)).then(answer => answer === true);
 }
 

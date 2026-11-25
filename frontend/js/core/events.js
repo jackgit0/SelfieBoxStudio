@@ -13,7 +13,13 @@ const LISTENERS = {
 
 // klik tautan dengan tombol pengubah (tab baru, unduh) atau tombol tengah dibiarkan ke browser
 function opensElsewhere(event) {
-  return event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || (event.button !== undefined && event.button !== 0);
+  return (
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    event.altKey ||
+    (event.button !== undefined && event.button !== 0)
+  );
 }
 
 export function createEvents({ navigate = null, logger = console } = {}) {

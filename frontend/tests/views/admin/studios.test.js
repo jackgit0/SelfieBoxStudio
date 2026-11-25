@@ -4,11 +4,12 @@ import assert from "node:assert/strict";
 import { createAdminState } from "../../../js/controllers/AdminController.js";
 import { studiosView } from "../../../js/views/admin/studios.js";
 import { sampleState } from "../../helpers/fixtures.js";
+import { flat } from "../../helpers/markup.js";
 
 const now = new Date(2026, 10, 25, 9, 0);
 const studio = (overrides = {}) => ({ id: 3, name: "Melati <b>", status: "AVAILABLE", description: "Terang", address: "Jl. Veteran", price: 15000, people_range_id: 2, budget_range_id: 1, img: "/media/m.jpg", sessions: 4, bookings: 5, active_bookings: 2, impact: {}, ...overrides });
 const stateWith = admin => ({ ...sampleState({ master: { budgetRanges: [{ id: 1, budget: "< 100rb" }, { id: 2, budget: "100-200rb" }] } }), admin: { ...createAdminState(), ...admin } });
-const render = admin => String(studiosView(stateWith(admin), {}, now));
+const render = admin => flat(studiosView(stateWith(admin), {}, now));
 
 test("studios: Memuat… sampai daftar ada", () => {
   assert.match(render({}), /Memuat…/);

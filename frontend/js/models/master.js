@@ -30,7 +30,16 @@ export async function loadMaster(api) {
 
 // paket menurut id, termasuk yang nonaktif; paket yang sudah dihapus → placeholder
 export function packageOf(master, id) {
-  return master.allPackages.find(item => item.id == id) || { name: "(paket dihapus)", price: 0, photo_count: 1, dur: 1, strip_size: "", strip_material: "" };
+  return (
+    master.allPackages.find(item => item.id == id) || {
+      name: "(paket dihapus)",
+      price: 0,
+      photo_count: 1,
+      dur: 1,
+      strip_size: "",
+      strip_material: "",
+    }
+  );
 }
 
 // harga paket setelah diskon utama
@@ -39,7 +48,16 @@ export function effectivePrice(master, item) {
 }
 
 export function studioOf(master, id) {
-  return master.allStudios.find(studio => studio.id == id) || { id, name: "(studio dihapus)", img: "", address: "-", price: 0, description: "" };
+  return (
+    master.allStudios.find(studio => studio.id == id) || {
+      id,
+      name: "(studio dihapus)",
+      img: "",
+      address: "-",
+      price: 0,
+      description: "",
+    }
+  );
 }
 
 // "Rp 50k - Rp 90k": rentang harga paket aktif untuk sebuah studio
@@ -50,12 +68,17 @@ export function priceRange(master, studio) {
   const prices = master.packages.map(item => effectivePrice(master, item) + (studio.price || 0));
   const lowest = Math.min(...prices);
   const highest = Math.max(...prices);
-  return lowest === highest ? formatRupiahShort(lowest) : formatRupiahShort(lowest) + " - " + formatRupiahShort(highest);
+  return lowest === highest
+    ? formatRupiahShort(lowest)
+    : formatRupiahShort(lowest) + " - " + formatRupiahShort(highest);
 }
 
 // "3 - 5": kapasitas orang sebuah studio
 export function capacityLabel(master, studio) {
-  return ((master.peopleRanges.find(range => range.id == studio.people_range_id) || {}).range || "").replace("-", " - ");
+  return ((master.peopleRanges.find(range => range.id == studio.people_range_id) || {}).range || "").replace(
+    "-",
+    " - ",
+  );
 }
 
 // studio tampil ke pelanggan (ada di daftar studio aktif)

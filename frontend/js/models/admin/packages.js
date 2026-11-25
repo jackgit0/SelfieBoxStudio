@@ -10,7 +10,14 @@ export function loadDiscount(api) {
 
 // isian baris paket (teks) → body server
 export function packageBody(values) {
-  return { name: values.name, price: +values.price, photo_count: +values.photo_count, dur: +values.dur, strip_size: values.strip_size, strip_material: values.strip_material };
+  return {
+    name: values.name,
+    price: +values.price,
+    photo_count: +values.photo_count,
+    dur: +values.dur,
+    strip_size: values.strip_size,
+    strip_material: values.strip_material,
+  };
 }
 
 export function discountBody(values) {

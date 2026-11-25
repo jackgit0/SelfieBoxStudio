@@ -9,7 +9,15 @@ function isFinderArea(x, y) {
 }
 
 function finderCell(x, y) {
-  return x % 6 == 0 || y % 6 == 0 || x == 14 || x == 20 || y == 14 || y == 20 || (x % 6 > 1 && x % 6 < 5 && y % 6 > 1 && y % 6 < 5);
+  return (
+    x % 6 == 0 ||
+    y % 6 == 0 ||
+    x == 14 ||
+    x == 20 ||
+    y == 14 ||
+    y == 20 ||
+    (x % 6 > 1 && x % 6 < 5 && y % 6 > 1 && y % 6 < 5)
+  );
 }
 
 export function qr(seed) {
@@ -25,5 +33,7 @@ export function qr(seed) {
     }
   }
   // markup buatan kode sendiri (angka saja), aman dipasang apa adanya
-  return raw(`<svg viewBox="0 0 21 21" width="160" fill="#1c2748" style="background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line-2)">${cells}</svg>`);
+  return raw(
+    `<svg viewBox="0 0 21 21" width="160" fill="#1c2748" style="background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line-2)">${cells}</svg>`,
+  );
 }

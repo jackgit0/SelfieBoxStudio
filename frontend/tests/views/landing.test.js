@@ -3,13 +3,14 @@ import assert from "node:assert/strict";
 import { Safe } from "../../js/core/html.js";
 import { landingView, currentSection, LANDING_SECTIONS } from "../../js/views/landing.js";
 import { sampleState } from "../helpers/fixtures.js";
+import { flat } from "../helpers/markup.js";
 
 const match = { route: { name: "landing" }, params: {}, query: {}, path: "/" };
 const options = { brand: "SelfieBox Studio", wa: "", email: "", now: new Date(2026, 10, 25) };
 function view(state = sampleState({ runtime: { contact: { n: "", e: "", m: "", ok: "", err: "", busy: false } } }), extra = {}) {
   const markup = landingView(state, match, { ...options, ...extra });
   assert.ok(markup instanceof Safe);
-  return String(markup);
+  return flat(markup);
 }
 const withContact = contact => sampleState({ runtime: { contact: { n: "", e: "", m: "", ok: "", err: "", busy: false, ...contact } } });
 

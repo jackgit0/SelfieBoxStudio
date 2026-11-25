@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createAdminState } from "../../../js/controllers/AdminController.js";
 import { sessionPanel } from "../../../js/views/admin/sessions.js";
+import { flat } from "../../helpers/markup.js";
 
 const today = "2026-11-25";
 const studio = { id: 3, name: "Melati" };
@@ -13,10 +14,10 @@ const list = [
   { id: 10, date: "2026-11-25", start: "11:00", end: "11:50", status: "UNAVAILABLE", past: false, booking: { id: 13, customer: "Sari", status: "Sesi Berjalan" }, impact: {} },
   { id: 11, date: "2026-11-27", start: "09:00", end: "09:50", status: "AVAILABLE", past: false, booking: null, impact: {} },
 ];
-const render = admin => String(sessionPanel({ ...createAdminState(), sessions: { "3|2026-11": list }, ...admin }, studio, today));
+const render = admin => flat(sessionPanel({ ...createAdminState(), sessions: { "3|2026-11": list }, ...admin }, studio, today));
 
 test("sesi: Memuat… sampai sesi bulan itu ada", () => {
-  assert.match(String(sessionPanel(createAdminState(), studio, today)), /Detail Sesi<\/h4><p class="m">Memuat…/);
+  assert.match(flat(sessionPanel(createAdminState(), studio, today)), /Detail Sesi<\/h4><p class="m">Memuat…/);
 });
 
 test("sesi: kalender November 2026 (Senin pertama, 6 kotak kosong, 30 hari), titik pada hari bersesi, hari ini dan hari terpilih", () => {

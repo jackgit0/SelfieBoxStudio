@@ -1,0 +1,4 @@
+# Hanya js/ yang diformat Prettier (HTML di dalam html`…` ikut dirapikan)
+css/
+img/
+index.html

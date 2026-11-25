@@ -5,8 +5,9 @@ import { createAdminState } from "../../../js/controllers/AdminController.js";
 import { propertiesView } from "../../../js/views/admin/properties.js";
 import { posesView } from "../../../js/views/admin/poses.js";
 import { sampleState } from "../../helpers/fixtures.js";
+import { flat } from "../../helpers/markup.js";
 
-const render = (view, admin) => String(view({ ...sampleState(), admin: { ...createAdminState(), ...admin } }));
+const render = (view, admin) => flat(view({ ...sampleState(), admin: { ...createAdminState(), ...admin } }));
 const property = (overrides = {}) => ({ id: 4, name: "Topi <b>", category: "Kacamata", qty: 2, img: "/media/t.jpg", ...overrides });
 
 test("properti: Memuat…; baris dengan form property-form-<id>, foto, nama di-escape, kategori terpilih, qty, Simpan dan Hapus", () => {

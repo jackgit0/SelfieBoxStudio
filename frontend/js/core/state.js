@@ -6,7 +6,20 @@ export function createInitialState() {
     // state tersimpan (localStorage["snapia"]): user, peran admin, paket pilihan, bookmark studio, Mode Staf, …
     persisted: { user: null, me: null, admin: false, pkg: null, bm: [], staff: false, log: [] },
     // data master dari /api/master (models/master.js loadMaster); json = isi terakhir untuk refreshMaster
-    master: { packages: [], allPackages: [], favouritePackageId: null, discount: { pct: 0, label: "" }, peopleRanges: [], budgetRanges: [], studios: [], allStudios: [], properties: [], poses: {}, policy: { refund_hours: 2 }, json: "" },
+    master: {
+      packages: [],
+      allPackages: [],
+      favouritePackageId: null,
+      discount: { pct: 0, label: "" },
+      peopleRanges: [],
+      budgetRanges: [],
+      studios: [],
+      allStudios: [],
+      properties: [],
+      poses: {},
+      policy: { refund_hours: 2 },
+      json: "",
+    },
     // booking yang sedang diisi: studio, tanggal, sesi; quote = rincian harga dari /api/quote; rescheduleId = id booking yang sedang diubah jadwalnya
     booking: { studio: null, date: null, slot: null, quote: null, rescheduleId: null },
     // state sementara: rute aktif (nama, params, query, judul, tab), toast, cache ketersediaan slot, bulan kalender, isian pembatalan,

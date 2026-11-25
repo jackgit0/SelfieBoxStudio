@@ -5,14 +5,31 @@ import { html } from "../core/html.js";
 import { icon } from "./icon.js";
 
 // elemen yang bisa difokus di dalam dialog (kunci Tab berputar di antaranya)
-const FOCUSABLE = "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]";
+const FOCUSABLE =
+  "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]";
 
 // options = { title, body, buttons, kicker, className }
 // body dan kicker: Safe (html`…`/raw) dipasang apa adanya, teks biasa di-escape;
 // buttons = [{ label, value, style ("ghost"/"soft"/"danger"), icon }]
-export function renderModal({ title, body = "", buttons = [{ label: "Tutup", value: null }], kicker = "", className = "" }) {
-  const buttonMarkup = buttons.map((button, index) => html`<button class="btn sm ${button.style || ""}" data-i="${index}">${button.icon ? icon(button.icon, 16) : ""}${button.label}</button>`);
-  return html`<div class="mbox ${className}" role="dialog" aria-modal="true" aria-labelledby="mdl-t">${kicker}<h3 id="mdl-t">${title}</h3><div class="mtx">${body}</div><div class="row mbtn">${buttonMarkup}</div></div>`;
+export function renderModal({
+  title,
+  body = "",
+  buttons = [{ label: "Tutup", value: null }],
+  kicker = "",
+  className = "",
+}) {
+  const buttonMarkup = buttons.map(
+    (button, index) =>
+      html`<button class="btn sm ${button.style || ""}" data-i="${index}">
+        ${button.icon ? icon(button.icon, 16) : ""}${button.label}
+      </button>`,
+  );
+  return html`<div class="mbox ${className}" role="dialog" aria-modal="true" aria-labelledby="mdl-t">
+    ${kicker}
+    <h3 id="mdl-t">${title}</h3>
+    <div class="mtx">${body}</div>
+    <div class="row mbtn">${buttonMarkup}</div>
+  </div>`;
 }
 
 // fokus awal: tombol aksi pertama (bukan tombol di dalam isi, mis. daftar paket), kecuali initialFocus menunjuk elemen lain (mis. isian PIN)
@@ -61,7 +78,13 @@ export function openModal(options) {
         close(null);
         return;
       }
-      if (event.key === "Enter" && enterValue !== undefined && event.target && event.target.tagName === "INPUT" && box.contains(event.target)) {
+      if (
+        event.key === "Enter" &&
+        enterValue !== undefined &&
+        event.target &&
+        event.target.tagName === "INPUT" &&
+        box.contains(event.target)
+      ) {
         event.preventDefault();
         close(enterValue);
         return;

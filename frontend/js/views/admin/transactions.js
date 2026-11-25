@@ -11,9 +11,22 @@ const statusTone = status => (status == "paid" ? "ok" : status == "refunded" ? "
 function paymentRows(rows, query) {
   const shown = rows.filter(row => matchesQuery(query, row.customer, row.email, row.invoice, row.status, row.method));
   if (!shown.length) {
-    return html`<tr><td colspan="7" class="m">Belum ada transaksi.</td></tr>`;
+    return html`<tr>
+      <td colspan="7" class="m">Belum ada transaksi.</td>
+    </tr>`;
   }
-  return shown.map(row => html`<tr><td>${row.invoice}</td><td>${formatDateTimeWib(row.paid_at)}</td><td>${row.customer}<br><small class="m">${row.email}</small></td><td>${row.method || "-"}</td><td>${formatRupiah(row.amount)}</td><td><span class="tag ${statusTone(row.status)}">${PAYMENT_LABELS[row.status] || row.status}</span></td><td>${row.refunded_at ? formatDateTimeWib(row.refunded_at) : "-"}</td></tr>`);
+  return shown.map(
+    row =>
+      html`<tr>
+        <td>${row.invoice}</td>
+        <td>${formatDateTimeWib(row.paid_at)}</td>
+        <td>${row.customer}<br /><small class="m">${row.email}</small></td>
+        <td>${row.method || "-"}</td>
+        <td>${formatRupiah(row.amount)}</td>
+        <td><span class="tag ${statusTone(row.status)}">${PAYMENT_LABELS[row.status] || row.status}</span></td>
+        <td>${row.refunded_at ? formatDateTimeWib(row.refunded_at) : "-"}</td>
+      </tr>`,
+  );
 }
 
 export function transactionsView(state) {
@@ -21,6 +34,24 @@ export function transactionsView(state) {
   if (!transactions) {
     return loadingCard();
   }
-  return html`<div class="stats"><div class="stat"><small class="m">Total pembayaran masuk</small><b>${formatRupiah(transactions.paid)}</b></div><div class="stat"><small class="m">Total refund</small><b>${formatRupiah(transactions.refunded)}</b></div></div>
-<div class="card"><div class="tbl"><table><tr><th>Invoice</th><th>Waktu bayar</th><th>Pelanggan</th><th>Metode</th><th>Nominal</th><th>Status</th><th>Refund</th></tr>${paymentRows(transactions.rows, query)}</table></div></div>`;
+  return html`<div class="stats">
+      <div class="stat"><small class="m">Total pembayaran masuk</small><b>${formatRupiah(transactions.paid)}</b></div>
+      <div class="stat"><small class="m">Total refund</small><b>${formatRupiah(transactions.refunded)}</b></div>
+    </div>
+    <div class="card">
+      <div class="tbl">
+        <table>
+          <tr>
+            <th>Invoice</th>
+            <th>Waktu bayar</th>
+            <th>Pelanggan</th>
+            <th>Metode</th>
+            <th>Nominal</th>
+            <th>Status</th>
+            <th>Refund</th>
+          </tr>
+          ${paymentRows(transactions.rows, query)}
+        </table>
+      </div>
+    </div>`;
 }

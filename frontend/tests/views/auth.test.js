@@ -7,12 +7,13 @@ import { forgotView } from "../../js/views/auth/forgot.js";
 import { resetView } from "../../js/views/auth/reset.js";
 import { staffPinModal } from "../../js/views/auth/staff.js";
 import { sampleState } from "../helpers/fixtures.js";
+import { flat } from "../helpers/markup.js";
 
 const matchFor = mode => ({ route: { name: "auth", params: { mode } }, params: {}, query: {}, path: "/" + mode });
 function render(view, mode, { persisted = {}, booking = {}, runtime = {} } = {}) {
   const markup = view(sampleState({ persisted, booking, runtime: { auth: { mode, resetToken: "" }, ...runtime } }), matchFor(mode));
   assert.ok(markup instanceof Safe);
-  return String(markup);
+  return flat(markup);
 }
 const draft = { studio: 1, date: "2026-11-27", slot: "2026-11-27 10:00" };
 
@@ -62,7 +63,7 @@ test("forgot dan reset: tanpa tab dan tanpa catatan draf; Kembali ke /login", ()
 test("staffPinModal: judul, isian PIN numerik dan fokus awal di isian, Enter = Masuk, fokus kembali ke avatar", () => {
   const options = staffPinModal();
   assert.equal(options.title, "Masuk Mode Staf");
-  assert.match(String(options.body), /<p>Masukkan PIN staf untuk mengaktifkan Mode Staf\.<\/p><label for="staff-pin">PIN staf<\/label><input id="staff-pin" type="password" inputmode="numeric" autocomplete="off">/);
+  assert.match(flat(options.body), /<p>Masukkan PIN staf untuk mengaktifkan Mode Staf\.<\/p><label for="staff-pin">PIN staf<\/label><input id="staff-pin" type="password" inputmode="numeric" autocomplete="off">/);
   assert.deepEqual(options.buttons, [{ label: "Batal", value: null, style: "ghost" }, { label: "Masuk", value: "ok" }]);
   assert.equal(options.initialFocus, "#staff-pin");
   assert.equal(options.returnFocus, ".avatar");

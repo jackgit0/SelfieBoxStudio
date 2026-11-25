@@ -14,13 +14,19 @@ export function authorize({ clientId, google }) {
       resolve(null);
       return;
     }
-    google.accounts.oauth2.initTokenClient({ client_id: clientId, scope: SCOPE, callback: answer => resolve(answer.access_token || null) }).requestAccessToken();
+    google.accounts.oauth2
+      .initTokenClient({ client_id: clientId, scope: SCOPE, callback: answer => resolve(answer.access_token || null) })
+      .requestAccessToken();
   });
 }
 
 async function createFolder({ fetch, token, name }) {
   const headers = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
-  const answer = await fetch(FILES, { method: "POST", headers, body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder" }) });
+  const answer = await fetch(FILES, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder" }),
+  });
   return (await answer.json()).id;
 }
 
@@ -30,11 +36,15 @@ export async function upload({ fetch, token, folder, folderName, photo }) {
     return { status: "lokal", folder };
   }
   try {
-    const target = folder || await createFolder({ fetch, token, name: folderName });
+    const target = folder || (await createFolder({ fetch, token, name: folderName }));
     folder = target;
     const meta = JSON.stringify({ name: "foto-" + photo.id + ".jpg", parents: [target] });
     const body = `--${BOUNDARY}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${BOUNDARY}\r\nContent-Type: image/jpeg\r\nContent-Transfer-Encoding: base64\r\n\r\n${photo.img.split(",")[1]}\r\n--${BOUNDARY}--`;
-    const answer = await fetch(UPLOAD, { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "multipart/related; boundary=" + BOUNDARY }, body });
+    const answer = await fetch(UPLOAD, {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "multipart/related; boundary=" + BOUNDARY },
+      body,
+    });
     if (answer.ok) {
       return { status: "drive", driveId: (await answer.json()).id, folder: target };
     }

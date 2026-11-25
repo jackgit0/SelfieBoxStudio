@@ -10,18 +10,25 @@ import { icon } from "../../components/icon.js";
 import { loadingCard, selectField } from "../../components/adminWidgets.js";
 import { sessionPanel } from "./sessions.js";
 
-const STATUS_OPTIONS = [["AVAILABLE", "Tersedia"], ["UNAVAILABLE", "Tidak tersedia"]];
+const STATUS_OPTIONS = [
+  ["AVAILABLE", "Tersedia"],
+  ["UNAVAILABLE", "Tidak tersedia"],
+];
 const isAvailable = studio => studio.status != "UNAVAILABLE";
 
-const fieldError = (errors, field) => (errors && errors[field] ? html`<p class="ferr" id="ste_${field}">${errors[field]}</p>` : "");
-const invalidAttributes = (errors, field) => (errors && errors[field] ? html` aria-invalid="true" aria-describedby="ste_${field}"` : "");
+const fieldError = (errors, field) =>
+  errors && errors[field] ? html`<p class="ferr" id="ste_${field}">${errors[field]}</p>` : "";
+const invalidAttributes = (errors, field) =>
+  errors && errors[field] ? html` aria-invalid="true" aria-describedby="ste_${field}"` : "";
 const invalidClass = (errors, field) => (errors && errors[field] ? "inv" : "");
 
 function errorBanner(errors) {
   if (!errors) {
     return "";
   }
-  return html`<div class="ferr-top" role="alert">${icon("alert", 18)}<span>${errors.top}${errors.other ? ` (${errors.other})` : ""}</span></div>`;
+  return html`<div class="ferr-top" role="alert">
+    ${icon("alert", 18)}<span>${errors.top}${errors.other ? ` (${errors.other})` : ""}</span>
+  </div>`;
 }
 
 // studio = baris daftar (null untuk studio baru); values = isian yang tampil; image = gambar yang tampil; errors hanya untuk studio baru
@@ -31,33 +38,154 @@ function studioForm({ studio, values, image, errors, master }) {
   const isNew = !studio;
   const capacity = master.peopleRanges.map(range => [range.id, range.range + " orang"]);
   const budgets = master.budgetRanges.map(range => [range.id, range.budget]);
-  const intro = isNew ? html`<p class="sm m" style="margin-bottom:10px">Isi data studio. Nama dan gambar wajib diisi, dan nama tidak boleh sama dengan studio lain.</p>${errorBanner(errors)}` : "";
-  const buttons = isNew ? html`<button class="btn ghost" type="button" data-action="studio:cancelNew">Batal</button><button class="btn" type="submit">Lihat Ringkasan</button>` : html`<button class="btn" type="submit">Simpan</button>`;
-  const note = isNew ? "" : html`<p class="sm m" style="margin-top:8px">${studio.active_bookings} booking aktif dari ${studio.bookings} booking (tanpa yang batal) · status Tidak tersedia menyembunyikan studio dari customer tanpa mengubah booking yang sudah ada</p>`;
+  const intro = isNew
+    ? html`<p class="sm m" style="margin-bottom:10px">
+          Isi data studio. Nama dan gambar wajib diisi, dan nama tidak boleh sama dengan studio lain.
+        </p>
+        ${errorBanner(errors)}`
+    : "";
+  const buttons = isNew
+    ? html`<button class="btn ghost" type="button" data-action="studio:cancelNew">Batal</button
+        ><button class="btn" type="submit">Lihat Ringkasan</button>`
+    : html`<button class="btn" type="submit">Simpan</button>`;
+  const note = isNew
+    ? ""
+    : html`<p class="sm m" style="margin-top:8px">
+        ${studio.active_bookings} booking aktif dari ${studio.bookings} booking (tanpa yang batal) · status Tidak
+        tersedia menyembunyikan studio dari customer tanpa mengubah booking yang sudah ada
+      </p>`;
   const submit = isNew ? html`data-submit="studio:review"` : html`data-submit="studio:edit" data-id="${studio.id}"`;
-  return html`<form class="spanel" novalidate ${submit}><h4>${isNew ? "Detail Studio Baru" : "Detail Studio"}</h4>${intro}<div class="sgrid"><div><label for="st${id}n">Nama</label><input id="st${id}n" name="name" class="${invalidClass(errors, "name")}" placeholder="Contoh: Studio Kreatif" value="${values.name || ""}"${invalidAttributes(errors, "name")}>${fieldError(errors, "name")}<label for="st${id}s">Status</label>${selectField({ id: `st${id}s`, name: "status", options: STATUS_OPTIONS, current: values.status || "AVAILABLE" })}<label for="st${id}d">Deskripsi</label><textarea id="st${id}d" name="description">${values.description || ""}</textarea><label for="st${id}a">Alamat / Lokasi</label><input id="st${id}a" name="address" value="${values.address || "Jl. Veteran No. 3"}">
-<div class="row" style="flex-wrap:nowrap"><div class="grow"><label for="st${id}p">Biaya sewa studio (Rp)</label><input id="st${id}p" name="price" type="number" min="0" step="1" class="${invalidClass(errors, "price")}" value="${values.price ?? 0}"${invalidAttributes(errors, "price")}>${fieldError(errors, "price")}</div><div class="grow"><label for="st${id}r">Kapasitas</label>${selectField({ id: `st${id}r`, name: "people_range_id", options: capacity, current: values.people_range_id || 1 })}</div><div class="grow"><label for="st${id}b">Rentang budget</label>${selectField({ id: `st${id}b`, name: "budget_range_id", options: budgets, current: values.budget_range_id || 1 })}</div></div></div>
-<div><label>Gambar</label><div class="thumb ${invalidClass(errors, "img")}" style="${backgroundImage(image)}">${image ? "" : "Belum ada gambar"}</div>${fieldError(errors, "img")}<div class="row" style="margin-top:10px"><label class="btn sm soft" style="margin:0">${icon("upload", 16)} ${image && isNew ? "Ganti gambar" : "Unggah gambar"}<input type="file" accept="image/*" hidden data-change="studio:uploadImage" data-studio="${imageKey}"></label></div>
-<div class="row" style="margin-top:18px">${buttons}</div>${note}</div></div></form>`;
+  return html`<form class="spanel" novalidate ${submit}>
+    <h4>${isNew ? "Detail Studio Baru" : "Detail Studio"}</h4>
+    ${intro}
+    <div class="sgrid">
+      <div>
+        <label for="st${id}n">Nama</label
+        ><input
+          id="st${id}n"
+          name="name"
+          class="${invalidClass(errors, "name")}"
+          placeholder="Contoh: Studio Kreatif"
+          value="${values.name || ""}"
+          ${invalidAttributes(errors, "name")}
+        />${fieldError(errors, "name")}<label for="st${id}s">Status</label
+        >${selectField({ id: `st${id}s`, name: "status", options: STATUS_OPTIONS, current: values.status || "AVAILABLE" })}<label
+          for="st${id}d"
+          >Deskripsi</label
+        ><textarea id="st${id}d" name="description">${values.description || ""}</textarea
+        ><label for="st${id}a">Alamat / Lokasi</label
+        ><input id="st${id}a" name="address" value="${values.address || "Jl. Veteran No. 3"}" />
+        <div class="row" style="flex-wrap:nowrap">
+          <div class="grow">
+            <label for="st${id}p">Biaya sewa studio (Rp)</label
+            ><input
+              id="st${id}p"
+              name="price"
+              type="number"
+              min="0"
+              step="1"
+              class="${invalidClass(errors, "price")}"
+              value="${values.price ?? 0}"
+              ${invalidAttributes(errors, "price")}
+            />${fieldError(errors, "price")}
+          </div>
+          <div class="grow">
+            <label for="st${id}r">Kapasitas</label
+            >${selectField({ id: `st${id}r`, name: "people_range_id", options: capacity, current: values.people_range_id || 1 })}
+          </div>
+          <div class="grow">
+            <label for="st${id}b">Rentang budget</label
+            >${selectField({ id: `st${id}b`, name: "budget_range_id", options: budgets, current: values.budget_range_id || 1 })}
+          </div>
+        </div>
+      </div>
+      <div>
+        <label>Gambar</label>
+        <div class="thumb ${invalidClass(errors, "img")}" style="${backgroundImage(image)}">
+          ${image ? "" : "Belum ada gambar"}
+        </div>
+        ${fieldError(errors, "img")}
+        <div class="row" style="margin-top:10px">
+          <label class="btn sm soft" style="margin:0"
+            >${icon("upload", 16)} ${image && isNew ? "Ganti gambar" : "Unggah gambar"}<input
+              type="file"
+              accept="image/*"
+              hidden
+              data-change="studio:uploadImage"
+              data-studio="${imageKey}"
+          /></label>
+        </div>
+        <div class="row" style="margin-top:18px">${buttons}</div>
+        ${note}
+      </div>
+    </div>
+  </form>`;
 }
 
 function summaryCard(values, image, master) {
   const capacity = master.peopleRanges.find(range => range.id == values.people_range_id);
   const budget = master.budgetRanges.find(range => range.id == values.budget_range_id);
   const name = String(values.name).trim();
-  const row = (term, value) => html`<dt>${term}</dt><dd>${value}</dd>`;
-  return html`<div class="body one"><div class="spanel"><h4>Ringkasan Studio</h4><p class="sm m" style="margin-bottom:12px">Periksa data studio baru sebelum disimpan. Pilih Ubah untuk memperbaiki isian.</p><div class="sgrid"><dl class="sumdl">
-${row("Nama", name)}${row("Deskripsi", values.description || "-")}${row("Status", isAvailable(values) ? "Tersedia" : "Tidak tersedia")}${row("Alamat / Lokasi", values.address || "-")}${row("Biaya sewa studio", formatRupiah(values.price))}${row("Kapasitas", capacity ? capacity.range + " orang" : "-")}${row("Rentang budget", budget ? budget.budget : "-")}</dl>
-<div><div class="thumb" style="${backgroundImage(image)}" role="img" aria-label="Gambar ${name}"></div></div></div>
-<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" data-action="studio:backToForm">${icon("edit", 16)} Ubah</button><button class="btn" data-action="studio:save">Simpan Studio</button></div></div></div>`;
+  const row = (term, value) =>
+    html`<dt>${term}</dt>
+      <dd>${value}</dd>`;
+  return html`<div class="body one">
+    <div class="spanel">
+      <h4>Ringkasan Studio</h4>
+      <p class="sm m" style="margin-bottom:12px">
+        Periksa data studio baru sebelum disimpan. Pilih Ubah untuk memperbaiki isian.
+      </p>
+      <div class="sgrid">
+        <dl class="sumdl">
+          ${row("Nama", name)}${row("Deskripsi", values.description || "-")}${row("Status", isAvailable(values) ? "Tersedia" : "Tidak tersedia")}${row("Alamat / Lokasi", values.address || "-")}${row("Biaya sewa studio", formatRupiah(values.price))}${row("Kapasitas", capacity ? capacity.range + " orang" : "-")}${row("Rentang budget", budget ? budget.budget : "-")}
+        </dl>
+        <div><div class="thumb" style="${backgroundImage(image)}" role="img" aria-label="Gambar ${name}"></div></div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:18px">
+        <button class="btn ghost" data-action="studio:backToForm">${icon("edit", 16)} Ubah</button
+        ><button class="btn" data-action="studio:save">Simpan Studio</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 function studioRow(studio, admin, master, today) {
   const open = Boolean(admin.openStudios[studio.id]);
-  const meta = formatRupiah(studio.price || 0) + ` · ${studio.sessions} sesi` + (studio.address ? " · " + studio.address : "");
-  const body = open ? html`<div class="body one">${studioForm({ studio, values: admin.drafts["studio-" + studio.id] || studio, image: admin.images[studio.id] || studio.img || "", errors: null, master })}${sessionPanel(admin, studio, today)}</div>` : "";
-  return html`<div class="acc"><div class="acc-h"><button class="acc-t" data-action="studio:toggleStudio" data-id="${studio.id}" aria-expanded="${String(open)}"><span>${studio.name}</span><span class="tag ${isAvailable(studio) ? "ok" : "off"}">${isAvailable(studio) ? "Tersedia" : "Tidak tersedia"}</span><span class="meta">${meta}</span></button>
-<button class="ibtn del" data-action="studio:delete" data-id="${studio.id}" title="Hapus studio" aria-label="Hapus ${studio.name}">${icon("trash", 18)}</button><button class="ibtn" data-action="studio:toggleStudio" data-id="${studio.id}" aria-label="Buka/tutup detail" aria-expanded="${String(open)}">${icon(open ? "up" : "down", 20)}</button></div>${body}</div>`;
+  const meta =
+    formatRupiah(studio.price || 0) + ` · ${studio.sessions} sesi` + (studio.address ? " · " + studio.address : "");
+  const body = open
+    ? html`<div class="body one">
+        ${studioForm({ studio, values: admin.drafts["studio-" + studio.id] || studio, image: admin.images[studio.id] || studio.img || "", errors: null, master })}${sessionPanel(admin, studio, today)}
+      </div>`
+    : "";
+  return html`<div class="acc">
+    <div class="acc-h">
+      <button class="acc-t" data-action="studio:toggleStudio" data-id="${studio.id}" aria-expanded="${String(open)}">
+        <span>${studio.name}</span
+        ><span class="tag ${isAvailable(studio) ? "ok" : "off"}"
+          >${isAvailable(studio) ? "Tersedia" : "Tidak tersedia"}</span
+        ><span class="meta">${meta}</span>
+      </button>
+      <button
+        class="ibtn del"
+        data-action="studio:delete"
+        data-id="${studio.id}"
+        title="Hapus studio"
+        aria-label="Hapus ${studio.name}"
+      >
+        ${icon("trash", 18)}</button
+      ><button
+        class="ibtn"
+        data-action="studio:toggleStudio"
+        data-id="${studio.id}"
+        aria-label="Buka/tutup detail"
+        aria-expanded="${String(open)}"
+      >
+        ${icon(open ? "up" : "down", 20)}
+      </button>
+    </div>
+    ${body}
+  </div>`;
 }
 
 function newStudioSection(admin, master) {
@@ -68,14 +196,26 @@ function newStudioSection(admin, master) {
   if (summary) {
     body = summaryCard(admin.newStudio, image, master);
   } else if (open) {
-    body = html`<div class="body one">${studioForm({ studio: null, values: admin.newStudio || {}, image, errors: admin.studioErrors, master })}</div>`;
+    body = html`<div class="body one">
+      ${studioForm({ studio: null, values: admin.newStudio || {}, image, errors: admin.studioErrors, master })}
+    </div>`;
   }
-  return html`<div class="acc"><button data-action="studio:openNew" aria-expanded="${String(open)}"><span>${icon("plus", 18)} Tambah studio${summary ? " · Ringkasan" : ""}</span>${icon(open ? "up" : "down", 20)}</button>${body}</div>`;
+  return html`<div class="acc">
+    <button data-action="studio:openNew" aria-expanded="${String(open)}">
+      <span>${icon("plus", 18)} Tambah studio${summary ? " · Ringkasan" : ""}</span
+      >${icon(open ? "up" : "down", 20)}</button
+    >${body}
+  </div>`;
 }
 
 // kartu Berhasil: tampil di halaman Studio sampai aksi admin berikutnya
 function doneCard(done) {
-  return done ? html`<div class="toast okc" role="status">${icon("check", 20)}<div><b>${done.title}</b><small>${done.text}</small></div></div>` : "";
+  return done
+    ? html`<div class="toast okc" role="status">
+        ${icon("check", 20)}
+        <div><b>${done.title}</b><small>${done.text}</small></div>
+      </div>`
+    : "";
 }
 
 export function studiosView(state, match, now = new Date()) {
@@ -84,7 +224,8 @@ export function studiosView(state, match, now = new Date()) {
     return loadingCard();
   }
   const today = isoDate(now);
-  const rows = admin.studios.filter(studio => matchesQuery(admin.query, studio.name, studio.description, studio.address)).map(studio => studioRow(studio, admin, state.master, today));
-  return html`${doneCard(admin.studioDone)}${rows}
-${newStudioSection(admin, state.master)}`;
+  const rows = admin.studios
+    .filter(studio => matchesQuery(admin.query, studio.name, studio.description, studio.address))
+    .map(studio => studioRow(studio, admin, state.master, today));
+  return html`${doneCard(admin.studioDone)}${rows} ${newStudioSection(admin, state.master)}`;
 }

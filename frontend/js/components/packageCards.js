@@ -13,7 +13,20 @@ export function priceTag(master, item) {
 
 // satu kartu per paket aktif; selectedId = paket pilihan pelanggan (tag "Dipilih"). Satu Safe (juga dipakai template lama landing.js)
 export function packageStrip(master, selectedId) {
-  const cards = master.packages.map(item => html`<div class="pk"><div class="row sp"><h4>${item.name}</h4>${item.id == selectedId ? html`<span class="tag">Dipilih</span>` : ""}</div><div class="price">${priceTag(master, item)}</div>
-<ul><li>${item.photo_count} foto · ${item.dur} menit</li><li>Strip ${item.strip_size || "-"} · ${item.strip_material || "-"}</li><li>Galeri online 30 hari</li></ul></div>`);
+  const cards = master.packages.map(
+    item =>
+      html`<div class="pk">
+        <div class="row sp">
+          <h4>${item.name}</h4>
+          ${item.id == selectedId ? html`<span class="tag">Dipilih</span>` : ""}
+        </div>
+        <div class="price">${priceTag(master, item)}</div>
+        <ul>
+          <li>${item.photo_count} foto · ${item.dur} menit</li>
+          <li>Strip ${item.strip_size || "-"} · ${item.strip_material || "-"}</li>
+          <li>Galeri online 30 hari</li>
+        </ul>
+      </div>`,
+  );
   return html`${cards}`;
 }

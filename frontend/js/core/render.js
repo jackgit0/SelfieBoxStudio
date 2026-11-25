@@ -27,11 +27,14 @@ export function shellMarkup({ layout, route, session }) {
     return html`<main id="outlet" class="authwrap"></main>`;
   }
   if (layout === "admin") {
-    return html`<div class="adm">${adminSidebar(route)}<main id="outlet" class="amain"></main></div>`;
+    return html`<div class="adm">
+      ${adminSidebar(route)}
+      <main id="outlet" class="amain"></main>
+    </div>`;
   }
   return html`${navbar(route, session)}
-<main id="outlet" class="page"></main>
-${bottomBar(route, session)}`;
+    <main id="outlet" class="page"></main>
+    ${bottomBar(route, session)}`;
 }
 
 // isi outlet: landing dan form masuk apa adanya (form masuk menampilkan toast-nya sendiri); customer = toast + isi; admin = header + toast + isi
@@ -95,7 +98,9 @@ export function createRenderer({ root, resolve, shell, outlet, before = () => {}
 
 // params rute berupa angka (id booking/studio) menjadi Number, seperti S.p.id lama
 function numericParams(params) {
-  return Object.fromEntries(Object.entries(params).map(([key, value]) => [key, /^\d+$/.test(value) ? Number(value) : value]));
+  return Object.fromEntries(
+    Object.entries(params).map(([key, value]) => [key, /^\d+$/.test(value) ? Number(value) : value]),
+  );
 }
 
 // Kait halaman untuk createRenderer (main.js): before = catat rute aktif di runtime.route (dibaca view dan controller), mode form masuk,
@@ -110,7 +115,9 @@ export function createPageHooks({ store, syncReschedule }) {
     before(match) {
       const route = match.route;
       const params = numericParams(match.params);
-      const runtime = { route: { name: route.name, path: match.path, params, query: match.query, title: route.title, tab: route.tab } };
+      const runtime = {
+        route: { name: route.name, path: match.path, params, query: match.query, title: route.title, tab: route.tab },
+      };
       if (route.name === "auth") {
         runtime.auth = { ...store.get().runtime.auth, mode: route.params.mode };
       }
@@ -125,14 +132,26 @@ export function createPageHooks({ store, syncReschedule }) {
     },
     shell(match) {
       const persisted = store.get().persisted;
-      return shellMarkup({ layout: layoutNow(), route: match.route, session: { user: persisted.me ? persisted.user : null, staff: persisted.staff } });
+      return shellMarkup({
+        layout: layoutNow(),
+        route: match.route,
+        session: { user: persisted.me ? persisted.user : null, staff: persisted.staff },
+      });
     },
     outlet(match) {
       const state = store.get();
       const layout = layoutNow();
       const content = typeof match.route.view === "function" ? match.route.view(state, match) : "";
       const admin = state.admin || {};
-      const header = layout === "admin" ? adminHeader({ route: match.route, title: adminTitle(match.route, admin), mustChange: Boolean(admin.me && admin.me.must_change), query: admin.query }) : "";
+      const header =
+        layout === "admin"
+          ? adminHeader({
+              route: match.route,
+              title: adminTitle(match.route, admin),
+              mustChange: Boolean(admin.me && admin.me.must_change),
+              query: admin.query,
+            })
+          : "";
       return composeOutlet({ layout, content, toast: state.runtime.toast, header });
     },
   };

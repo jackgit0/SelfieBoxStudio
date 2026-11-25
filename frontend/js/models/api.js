@@ -11,7 +11,11 @@ function readToken(storage) {
   }
 }
 
-export function createApi({ base = "", fetch: fetchFunction = (...args) => globalThis.fetch(...args), storage = null } = {}) {
+export function createApi({
+  base = "",
+  fetch: fetchFunction = (...args) => globalThis.fetch(...args),
+  storage = null,
+} = {}) {
   let token = readToken(storage);
   let staffToken = "";
 
@@ -48,7 +52,11 @@ export function createApi({ base = "", fetch: fetchFunction = (...args) => globa
       if (staffToken) {
         headers["X-Staff-Token"] = staffToken;
       }
-      const response = await fetchFunction(base + "/api" + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+      const response = await fetchFunction(base + "/api" + path, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      });
       let data = {};
       try {
         data = await response.json();

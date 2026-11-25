@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Safe } from "../../js/core/html.js";
 import { accountView } from "../../js/views/customer/account.js";
 import { sampleState } from "../helpers/fixtures.js";
+import { flat } from "../helpers/markup.js";
 
 const links = { invoiceUrl: (id, download) => `/api/bookings/${id}/invoice?t=tok${download ? "&dl=1" : ""}` };
 const matchFor = tab => ({ route: { name: "account", params: { tab } }, params: {}, query: {}, path: tab === "pay" ? "/account/payments" : "/account" });
@@ -11,7 +12,7 @@ function view(tab, bookings = []) {
   value.data.bookings = bookings;
   const markup = accountView(value, matchFor(tab), links);
   assert.ok(markup instanceof Safe);
-  return String(markup);
+  return flat(markup);
 }
 
 test("account: dua tab lewat data-route, Edit Profil aktif di /account, Keluar lewat auth:logout", () => {

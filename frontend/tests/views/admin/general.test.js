@@ -6,9 +6,10 @@ import { dashboardView } from "../../../js/views/admin/dashboard.js";
 import { usersView } from "../../../js/views/admin/users.js";
 import { transactionsView } from "../../../js/views/admin/transactions.js";
 import { sampleState } from "../../helpers/fixtures.js";
+import { flat } from "../../helpers/markup.js";
 
 const stateWith = admin => ({ ...sampleState(), admin: { ...createAdminState(), ...admin } });
-const render = view => String(view);
+const render = view => flat(view);
 const total = (total, n) => ({ total, n });
 const revenue = { today: total(50000, 1), week: total(140000, 3), month: total(1600000, 20), all: total(2290000, 30), first_date: "2026-10-01", daily: [{ date: "2026-11-25", n: 1, total: 50000 }] };
 const operations = { period: "month", booking_revenue: 1600000, other_income: 0, gross: 1600000, costs: 200000, net: 1400000, items: [{ id: 4, date: "2026-11-20", label: "Sewa <b>studio</b>", kind: "biaya", amount: 200000, note: "" }] };

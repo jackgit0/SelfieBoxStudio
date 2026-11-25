@@ -14,10 +14,37 @@ export function cancelView(state, match) {
   }
   const { reason, detail } = runtime.cancel;
   const paid = booking.paid;
-  const reasons = CANCEL_REASONS.map(item => html`<button class="reason ${reason === item ? "on" : ""}" data-action="booking:setCancelReason" data-reason="${item}"><i></i>${item}</button>`);
-  return html`<div class="panel"><button class="back" data-route="/bookings/${booking.id}">${icon("left", 16)} Kembali</button><h1 class="h1">Pembatalan Booking</h1><p class="sub">${studioOf(master, booking.studio).name} · ${formatDate(parseSlot(booking.date).date)} · ${slotRange(booking.date)}</p>
-<div class="card" style="margin-top:16px"><h3 class="h3">Alasan Pembatalan</h3><div class="reasons">${reasons}</div>
-${reason === "Pembatalan lainnya" ? html`<textarea placeholder="Tuliskan alasan pembatalan kamu" data-input="booking:setCancelDetail">${detail}</textarea>` : ""}
-${paid ? html`<p class="sm m" style="margin:10px 0">${icon("clock", 14)} Refund diproses otomatis jika pembatalan dilakukan minimal ${master.policy.refund_hours} jam sebelum sesi dimulai.</p>` : ""}
-<button class="btn block" style="margin-top:8px" ${reason ? "" : "disabled"} data-action="booking:cancel" data-id="${booking.id}">${paid ? "Refund" : "Batalkan Booking"}</button></div></div>`;
+  const reasons = CANCEL_REASONS.map(
+    item =>
+      html`<button
+        class="reason ${reason === item ? "on" : ""}"
+        data-action="booking:setCancelReason"
+        data-reason="${item}"
+      >
+        <i></i>${item}
+      </button>`,
+  );
+  return html`<div class="panel">
+    <button class="back" data-route="/bookings/${booking.id}">${icon("left", 16)} Kembali</button>
+    <h1 class="h1">Pembatalan Booking</h1>
+    <p class="sub">
+      ${studioOf(master, booking.studio).name} · ${formatDate(parseSlot(booking.date).date)} ·
+      ${slotRange(booking.date)}
+    </p>
+    <div class="card" style="margin-top:16px">
+      <h3 class="h3">Alasan Pembatalan</h3>
+      <div class="reasons">${reasons}</div>
+      ${reason === "Pembatalan lainnya" ? html`<textarea placeholder="Tuliskan alasan pembatalan kamu" data-input="booking:setCancelDetail">${detail}</textarea>` : ""}
+      ${paid ? html`<p class="sm m" style="margin:10px 0">${icon("clock", 14)} Refund diproses otomatis jika pembatalan dilakukan minimal ${master.policy.refund_hours} jam sebelum sesi dimulai.</p>` : ""}
+      <button
+        class="btn block"
+        style="margin-top:8px"
+        ${reason ? "" : "disabled"}
+        data-action="booking:cancel"
+        data-id="${booking.id}"
+      >
+        ${paid ? "Refund" : "Batalkan Booking"}
+      </button>
+    </div>
+  </div>`;
 }

@@ -4,7 +4,10 @@
 // foto yang belum punya URL gambar memakai /api/photos/:id/img (api.imageUrl menambahkan token)
 export async function listMine(api) {
   const sessions = await api.get("/sessions");
-  return sessions.map(session => ({ ...session, photos: session.photos.map(photo => ({ ...photo, img: photo.img || api.imageUrl(photo.id) })) }));
+  return sessions.map(session => ({
+    ...session,
+    photos: session.photos.map(photo => ({ ...photo, img: photo.img || api.imageUrl(photo.id) })),
+  }));
 }
 
 // Check-in & Mulai Sesi dari Detail Booking: jawaban = sesi baru { id, … }

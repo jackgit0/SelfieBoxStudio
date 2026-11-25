@@ -6,6 +6,7 @@ import { createInitialState } from "../../js/core/state.js";
 import { createFakeStorage } from "../helpers/fakeStorage.js";
 import { ROUTES } from "../../js/core/router.js";
 import { html } from "../../js/core/html.js";
+import { flat } from "../helpers/markup.js";
 
 // elemen palsu: mencatat setiap penulisan innerHTML; root.querySelector("#outlet") memberi outlet yang dibuat saat shell dipasang
 function fakeDom() {
@@ -124,25 +125,25 @@ test("layoutOf: landing, form masuk, admin, customer", () => {
 
 test("shellMarkup: setiap layout punya satu outlet; customer dengan navbar dan bilah bawah, admin dengan sidebar", () => {
   const session = { user: { name: "Dewi" }, staff: false };
-  const count = markup => (String(markup).match(/id="outlet"/g) || []).length;
+  const count = markup => (flat(markup).match(/id="outlet"/g) || []).length;
   const landing = shellMarkup({ layout: "landing", route: routeOf("/"), session });
   const auth = shellMarkup({ layout: "auth", route: routeOf("/login"), session });
   const customer = shellMarkup({ layout: "customer", route: routeOf("/browse"), session });
   const admin = shellMarkup({ layout: "admin", route: routeOf("/admin"), session });
   for (const markup of [landing, auth, customer, admin]) assert.equal(count(markup), 1);
-  assert.equal(String(landing), '<div id="outlet"></div>');
-  assert.equal(String(auth), '<main id="outlet" class="authwrap"></main>');
-  assert.match(String(customer), /^<header class="top">[^]*<main id="outlet" class="page"><\/main>\n<nav class="bottom">/);
-  assert.match(String(admin), /^<div class="adm"><aside class="side">[^]*<\/aside><main id="outlet" class="amain"><\/main><\/div>$/);
+  assert.equal(flat(landing), '<div id="outlet"></div>');
+  assert.equal(flat(auth), '<main id="outlet" class="authwrap"></main>');
+  assert.match(flat(customer), /^<header class="top">[^]*<main id="outlet" class="page"><\/main><nav class="bottom">/);
+  assert.match(flat(admin), /^<div class="adm"><aside class="side">[^]*<\/aside><main id="outlet" class="amain"><\/main><\/div>$/);
 });
 
 test("composeOutlet: toast di atas isi; admin dengan header lebih dulu", () => {
   const content = html`<p>isi</p>`;
   const toast = { message: "OK", error: "" };
-  assert.equal(String(composeOutlet({ layout: "landing", content, toast })), "<p>isi</p>");
-  assert.equal(String(composeOutlet({ layout: "auth", content, toast })), "<p>isi</p>");
-  assert.equal(String(composeOutlet({ layout: "customer", content, toast })), '<div class="toast">OK</div><p>isi</p>');
-  assert.equal(String(composeOutlet({ layout: "admin", content, toast, header: html`<h1>H</h1>` })), '<h1>H</h1><div class="toast">OK</div><p>isi</p>');
+  assert.equal(flat(composeOutlet({ layout: "landing", content, toast })), "<p>isi</p>");
+  assert.equal(flat(composeOutlet({ layout: "auth", content, toast })), "<p>isi</p>");
+  assert.equal(flat(composeOutlet({ layout: "customer", content, toast })), '<div class="toast">OK</div><p>isi</p>');
+  assert.equal(flat(composeOutlet({ layout: "admin", content, toast, header: html`<h1>H</h1>` })), '<h1>H</h1><div class="toast">OK</div><p>isi</p>');
 });
 
 test("ui:toggleMenu membuka/menutup menu akun; klik di luar menutupnya", () => {
@@ -210,13 +211,13 @@ test("createPageHooks before: notifikasi Studio berhasil ditambahkan hanya berta
 test("createPageHooks shell: layout dari rute + peran; nama user hanya bila masuk", () => {
   const customer = pageSetup({ user: { name: "Dewi" } });
   customer.hooks.before(matchOf("/browse"));
-  assert.match(String(customer.hooks.shell(matchOf("/browse"))), /Dewi[^]*<main id="outlet" class="page">/);
+  assert.match(flat(customer.hooks.shell(matchOf("/browse"))), /Dewi[^]*<main id="outlet" class="page">/);
   const guest = pageSetup();
   guest.hooks.before(matchOf("/browse"));
-  assert.doesNotMatch(String(guest.hooks.shell(matchOf("/browse"))), /Dewi/);
+  assert.doesNotMatch(flat(guest.hooks.shell(matchOf("/browse"))), /Dewi/);
   const admin = pageSetup({ admin: true });
   admin.hooks.before(matchOf("/admin/studios"));
-  assert.match(String(admin.hooks.shell(matchOf("/admin/studios"))), /class="adm"/);
+  assert.match(flat(admin.hooks.shell(matchOf("/admin/studios"))), /class="adm"/);
 });
 
 test("createPageHooks outlet: isi view rute + toast; admin dengan header (judul + jumlah, kotak cari)", () => {
@@ -224,10 +225,10 @@ test("createPageHooks outlet: isi view rute + toast; admin dengan header (judul 
   const match = { ...matchOf("/admin/studios"), route: { ...routeOf("/admin/studios"), view: state => html`<p>${state.admin.query}</p>` } };
   admin.hooks.before(match);
   admin.store.get().runtime.toast.message = "Studio disimpan.";
-  const markup = String(admin.hooks.outlet(match));
+  const markup = flat(admin.hooks.outlet(match));
   assert.match(markup, /<h1>Daftar Studio \(2\)<\/h1>[^]*value="mawar"[^]*<div class="toast">Studio disimpan.<\/div><p>mawar<\/p>$/);
   const customer = pageSetup();
   const plain = matchOf("/packages");
   customer.hooks.before(plain);
-  assert.equal(String(customer.hooks.outlet(plain)), "");
+  assert.equal(flat(customer.hooks.outlet(plain)), "");
 });

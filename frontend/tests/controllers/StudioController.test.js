@@ -132,6 +132,7 @@ test("prefetchAvailability: tanggal filter yang sudah lewat diganti hari ini", a
 // ---------- sisi admin: Studio + Ringkasan Studio + Detail Sesi (refactor MVC fase 8b) ----------
 import { createAdminController, createAdminState } from "../../js/controllers/AdminController.js";
 import * as adminModels from "../../js/models/admin/index.js";
+import { flat } from "../helpers/markup.js";
 
 const masterAnswer = { body: { PKG: [], ALLPKG: [], FAV_PKG: null, DISC: { pct: 0, label: "" }, PEOPLE: [], BUDGET: [], STUDIOS: [{ id: 1, name: "Baru" }], ALLSTUDIOS: [{ id: 1, name: "Baru" }], PROP: [], POSES: {}, POLICY: {} } };
 const studioRow = (overrides = {}) => ({ id: 3, name: "Melati", status: "AVAILABLE", description: "", address: "", price: 0, people_range_id: 1, budget_range_id: 1, img: "/media/m.jpg", sessions: 2, bookings: 1, active_bookings: 1, impact: { sessions: 2, active_bookings: 1, paid_bookings: 0, refund_total: 0 }, ...overrides });
@@ -239,7 +240,7 @@ test("admin save: 403 \"Hanya admin\" → Akses ditolak dengan kalimat menambahk
   const { controller, ui } = setupStudioAdmin({ admin: { studios: [], newStudio: { name: "x", price: 0 }, studioSummary: true }, responses: { "POST /admin/studios": apiFailure(403, "Hanya admin") } });
   await controller.save();
   assert.equal(ui.modals[0].title, "Akses ditolak");
-  assert.match(String(ui.modals[0].body), /Hanya admin yang dapat menambahkan studio\./);
+  assert.match(flat(ui.modals[0].body), /Hanya admin yang dapat menambahkan studio\./);
 });
 
 test("admin backToForm (Ubah) kembali ke form dengan isian tetap; cancelNew mengosongkan semuanya", () => {
@@ -300,8 +301,8 @@ test("admin delete studio: dialog dampak lewat withConfirm, 409 dampak baru → 
   });
   await controller.delete({ id: "3" });
   assert.deepEqual(ui.modals.map(modal => modal.title), ["Hapus Melati?", "Hapus Melati?"]);
-  assert.match(String(ui.modals[0].body), /Studio ini memiliki 2 sesi dan 1 booking aktif\. Setelah dikonfirmasi, seluruh booking aktif dibatalkan dan dana yang sudah dibayar dikembalikan 100% kepada pelanggan\. Studio beserta sesinya tidak lagi tampil, tetapi riwayat booking tetap tersimpan\./);
-  assert.match(String(ui.modals[1].body), /\(1 sudah dibayar, total refund Rp90\.000\)/);
+  assert.match(flat(ui.modals[0].body), /Studio ini memiliki 2 sesi dan 1 booking aktif\. Setelah dikonfirmasi, seluruh booking aktif dibatalkan dan dana yang sudah dibayar dikembalikan 100% kepada pelanggan\. Studio beserta sesinya tidak lagi tampil, tetapi riwayat booking tetap tersimpan\./);
+  assert.match(flat(ui.modals[1].body), /\(1 sudah dibayar, total refund Rp90\.000\)/);
   assert.deepEqual(ui.modals[0].buttons.map(button => button.label), ["Kembali", "Ya, Hapus Studio"]);
   assert.deepEqual(requests(), ["DELETE /admin/studios/3", "DELETE /admin/studios/3?confirm=1", "GET /master"]);
   assert.equal(toast().message, 'Studio "Melati" dihapus. 2 booking dibatalkan, 1 di-refund, 1 refund gagal (tindak lanjuti manual di menu Transaksi).');
@@ -412,7 +413,7 @@ test("admin saveSession: tanpa dialog awal; 409 needs_confirm → dialog Ubah se
   });
   await controller.saveSession({ studio: "3", id: "7" }, { date: "2026-11-27", start: "10:00", end: "10:50" });
   assert.deepEqual(ui.modals.map(modal => modal.title), ["Ubah sesi 09:00 - 09:50?"]);
-  assert.match(String(ui.modals[0].body), /Sesi ini memiliki 1 booking aktif \(Budi\)\. Setelah dikonfirmasi, jadwal sesi diubah dan pelanggan menerima email berisi jadwal baru\./);
+  assert.match(flat(ui.modals[0].body), /Sesi ini memiliki 1 booking aktif \(Budi\)\. Setelah dikonfirmasi, jadwal sesi diubah dan pelanggan menerima email berisi jadwal baru\./);
   assert.deepEqual(ui.modals[0].buttons.map(button => button.label), ["Kembali", "Ya, Ubah Sesi"]);
   assert.deepEqual(requests(), ["PATCH /admin/sessions/7", "PATCH /admin/sessions/7?confirm=1", "GET /admin/studios"]);
   assert.deepEqual(api.calls[1].body, { date: "2026-11-27", start: "10:00", end: "10:50" });
@@ -435,13 +436,13 @@ test("admin deleteSession: dialog dampak lewat withConfirm lebih dulu, lalu DELE
   const { controller, ui, requests, toast, admin } = setupStudioAdmin({ modalAnswers: [true], admin: { studios: [], editingSession: 7, sessions: { "3|2026-11": [session] } }, responses: { "DELETE /admin/sessions/7": { body: { ok: true, cancelled: 1, refunded: 1 } }, "GET /admin/studios": { body: [] } } });
   await controller.deleteSession({ studio: "3", id: "7" });
   assert.equal(ui.modals[0].title, "Hapus sesi 2026-11-26 09:00 - 09:50?");
-  assert.match(String(ui.modals[0].body), /Sesi ini memiliki 1 booking aktif \(Budi\), 1 sudah dibayar \(total refund Rp90\.000\)\. Setelah dikonfirmasi, booking tersebut dibatalkan, dana yang sudah dibayar dikembalikan 100%, dan pelanggan diberi tahu lewat email\./);
+  assert.match(flat(ui.modals[0].body), /Sesi ini memiliki 1 booking aktif \(Budi\), 1 sudah dibayar \(total refund Rp90\.000\)\. Setelah dikonfirmasi, booking tersebut dibatalkan, dana yang sudah dibayar dikembalikan 100%, dan pelanggan diberi tahu lewat email\./);
   assert.deepEqual(requests(), ["DELETE /admin/sessions/7", "GET /admin/studios"]);
   assert.equal(toast().message, "Sesi dihapus. 1 booking dibatalkan, 1 di-refund.");
   assert.equal(admin().editingSession, null);
   const free = setupStudioAdmin({ modalAnswers: [false], admin: { sessions: { "3|2026-11": [{ ...session, impact: { active_bookings: 0 } }] } } });
   await free.controller.deleteSession({ studio: "3", id: "7" });
-  assert.match(String(free.ui.modals[0].body), /Sesi ini belum memiliki booking aktif dan akan dihapus dari daftar sesi\./);
+  assert.match(flat(free.ui.modals[0].body), /Sesi ini belum memiliki booking aktif dan akan dihapus dari daftar sesi\./);
   assert.deepEqual(free.requests(), []);
 });
 

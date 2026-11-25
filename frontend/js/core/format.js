@@ -59,7 +59,15 @@ export function formatTime(milliseconds) {
     return "-";
   }
   return new Date(milliseconds)
-    .toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    .toLocaleString("id-ID", {
+      timeZone: "Asia/Jakarta",
+      day: "numeric",
+      month: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
     .replace(/\./g, ":")
     .replace(",", " -");
 }

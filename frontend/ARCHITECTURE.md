@@ -187,3 +187,15 @@ cd backend && npm test                         # dan file tes backend lain, liha
 ```
 
 Tes unit memakai API, UI, dan storage palsu dari `frontend/tests/helpers/`, jadi tidak perlu server atau browser.
+
+## Format kode
+
+`js/` dirapikan dengan Prettier (`.prettierrc.json`), termasuk HTML di dalam `html`…`` yang ditata seperti berkas HTML biasa. Prettier tidak dipasang sebagai dependensi; perintahnya memakai `npx` dengan versi yang dikunci:
+
+```
+cd frontend
+npm run format          # rapikan js/
+npm run format:check    # hanya periksa (gagal bila ada berkas yang belum rapi)
+```
+
+Baris baru dan indentasi yang ditambahkan Prettier ikut masuk ke string keluaran view, tetapi diabaikan browser. Karena itu tes view mencocokkan markup lewat `flat()` dari `tests/helpers/markup.js`, yang membuang spasi tersebut sebelum regex dicocokkan. Tulis tes view baru dengan `flat(view(...))`, bukan `String(view(...))`.

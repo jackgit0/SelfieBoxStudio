@@ -6,7 +6,10 @@ export function loadCustomers(api) {
 }
 
 export async function loadCustomerDetail(api, id) {
-  const [history, photos] = await Promise.all([api.get(`/admin/customers/${id}/bookings`), api.get(`/admin/customers/${id}/photos`)]);
+  const [history, photos] = await Promise.all([
+    api.get(`/admin/customers/${id}/bookings`),
+    api.get(`/admin/customers/${id}/photos`),
+  ]);
   return { customer: history.customer, bookings: history.bookings, photos: photos.photos };
 }
 

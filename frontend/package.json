@@ -1,4 +1,8 @@
 {
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "format": "npx --yes prettier@3.10.1 --write \"js/**/*.js\"",
+    "format:check": "npx --yes prettier@3.10.1 --check \"js/**/*.js\""
+  }
 }

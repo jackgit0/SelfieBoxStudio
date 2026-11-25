@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { createAdminState } from "../../../js/controllers/AdminController.js";
 import { bookingsView } from "../../../js/views/admin/bookings.js";
 import { sampleState } from "../../helpers/fixtures.js";
+import { flat } from "../../helpers/markup.js";
 
 const row = (overrides = {}) => ({ id: 5, customer: "Budi <b>", email: "budi@x.id", studio: "Melati", package: "Basic", slot: "2026-11-26 9:00", amount: 50000, status: "Menunggu Pembayaran", cancel_reason: "", pay_status: "pending", method: "QRIS", ...overrides });
 const detail = (overrides = {}) => ({
@@ -12,7 +13,7 @@ const detail = (overrides = {}) => ({
   payment: { status: "pending", paid_at: null, method: "QRIS", refunded_at: null, expire_at: Date.UTC(2026, 10, 25, 2, 15), amount: 50000 },
   invoice: "INV-5", items_price: 50000, studio_fee: 0, main_disc: 5000, amount: 45000, allowed: ["Terbayar", "Dibatalkan"], packages: [{ id: 1, name: "Basic", price: 50000 }, { id: 2, name: "Standard", price: 90000 }], delete_block: "", impact: {}, ...overrides,
 });
-const render = admin => String(bookingsView({ ...sampleState(), admin: { ...createAdminState(), ...admin } }));
+const render = admin => flat(bookingsView({ ...sampleState(), admin: { ...createAdminState(), ...admin } }));
 
 test("booking: Memuat… sampai daftar ada", () => {
   assert.match(render({}), /Memuat…/);
@@ -53,8 +54,8 @@ test("booking: panel Detail Booking (baris terpilih, data pelanggan di-escape, s
 test("booking: form Ubah Booking (data-submit), status sekarang + tujuan server, paket bisa diubah sebelum dibayar", () => {
   const out = render({ bookings: [row()], bookingDetail: detail() });
   assert.match(out, /<form novalidate data-submit="adminBooking:save" data-id="5"><h4 class="bh">Ubah Booking<\/h4>/);
-  assert.match(out, /<input type="radio" name="status" value="Menunggu Pembayaran" checked> Menunggu Pembayaran \(sekarang\)/);
-  assert.match(out, /<input type="radio" name="status" value="Terbayar" > Terbayar<\/label>/);
+  assert.match(out, /<input type="radio" name="status" value="Menunggu Pembayaran" checked> ?Menunggu Pembayaran \(sekarang\)/);
+  assert.match(out, /<input type="radio" name="status" value="Terbayar" ?> ?Terbayar<\/label>/);
   assert.match(out, /<select id="be-pkg" name="package_id" ><option value="1" selected>Basic · Rp50\.000<\/option><option value="2" >Standard · Rp90\.000<\/option>/);
   assert.ok(out.includes("Paket hanya dapat diubah sebelum booking dibayar; total dihitung ulang (paket + biaya studio − diskon)."));
   assert.match(out, /type="submit" style="margin-top:10px;width:100%">Simpan Perubahan<\/button>/);

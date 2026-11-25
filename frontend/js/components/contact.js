@@ -12,5 +12,10 @@ export function contactCustomerService(config, ui) {
     ui.openUrl("mailto:" + config.email, { newTab: false });
     return;
   }
-  ui.modal({ title: "Hubungi Customer Service", body: html`<p>Silakan hubungi staf di studio atau kontak Customer Service Anda. (Atur nomor di frontend/js/config.js)</p>` });
+  ui.modal({
+    title: "Hubungi Customer Service",
+    body: html`<p>
+      Silakan hubungi staf di studio atau kontak Customer Service Anda. (Atur nomor di frontend/js/config.js)
+    </p>`,
+  });
 }

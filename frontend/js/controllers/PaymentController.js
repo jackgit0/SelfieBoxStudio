@@ -44,7 +44,11 @@ export function createPaymentController({ api, store, ui, router, models, bookin
         return booking.requireLogin();
       }
       try {
-        const created = await bookingModel.create(api, { packageId: persisted.pkg, studioId: draft.studio, slot: draft.slot });
+        const created = await bookingModel.create(api, {
+          packageId: persisted.pkg,
+          studioId: draft.studio,
+          slot: draft.slot,
+        });
         await paymentModel.pay(api, created.id, persisted.method || DEFAULT_METHOD);
         booking.clearBooking();
         await refresh();
@@ -66,7 +70,9 @@ export function createPaymentController({ api, store, ui, router, models, bookin
       const toast = { message: "", error: "" };
       try {
         const answer = await paymentModel.emailInvoice(api, Number(dataset.id));
-        toast.message = answer.dev ? "Mode pengembangan: SMTP belum diatur, email disimpan di folder backend/outbox." : "Invoice dikirim ke email Anda.";
+        toast.message = answer.dev
+          ? "Mode pengembangan: SMTP belum diatur, email disimpan di folder backend/outbox."
+          : "Invoice dikirim ke email Anda.";
       } catch (error) {
         toast.error = error.message;
       }

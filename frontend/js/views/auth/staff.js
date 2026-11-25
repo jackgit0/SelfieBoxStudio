@@ -5,8 +5,13 @@ import { html } from "../../core/html.js";
 export function staffPinModal() {
   return {
     title: "Masuk Mode Staf",
-    body: html`<p>Masukkan PIN staf untuk mengaktifkan Mode Staf.</p><label for="staff-pin">PIN staf</label><input id="staff-pin" type="password" inputmode="numeric" autocomplete="off">`,
-    buttons: [{ label: "Batal", value: null, style: "ghost" }, { label: "Masuk", value: "ok" }],
+    body: html`<p>Masukkan PIN staf untuk mengaktifkan Mode Staf.</p>
+      <label for="staff-pin">PIN staf</label
+      ><input id="staff-pin" type="password" inputmode="numeric" autocomplete="off" />`,
+    buttons: [
+      { label: "Batal", value: null, style: "ghost" },
+      { label: "Masuk", value: "ok" },
+    ],
     initialFocus: "#staff-pin",
     returnFocus: ".avatar",
     enterValue: "ok",

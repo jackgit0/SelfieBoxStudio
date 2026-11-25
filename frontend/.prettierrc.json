@@ -1,0 +1,6 @@
+{
+  "printWidth": 120,
+  "embeddedLanguageFormatting": "auto",
+  "htmlWhitespaceSensitivity": "css",
+  "arrowParens": "avoid"
+}

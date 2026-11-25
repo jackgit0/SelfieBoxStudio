@@ -22,7 +22,9 @@ export function createGalleryController({ api, store, ui, models, drive, files, 
   function toggleForDelete(sessionId, photoId) {
     const item = photoOf(sessionId, photoId);
     if (item.fav) {
-      return setToast({ message: "Foto favorit tidak dapat dihapus massal. Hilangkan bintangnya dulu bila ingin menghapusnya." });
+      return setToast({
+        message: "Foto favorit tidak dapat dihapus massal. Hilangkan bintangnya dulu bila ingin menghapusnya.",
+      });
     }
     const selection = photo().deleteSelection;
     if (selection.has(item.id)) {
@@ -115,7 +117,12 @@ export function createGalleryController({ api, store, ui, models, drive, files, 
         photo().deleteSelection = new Set();
         photo().deleteMode = false;
         await refreshData();
-        setToast({ message: `${answer.deleted} foto dihapus${answer.skipped_favorites ? `, ${answer.skipped_favorites} foto favorit dilewati` : ""}.` }, { silent: true });
+        setToast(
+          {
+            message: `${answer.deleted} foto dihapus${answer.skipped_favorites ? `, ${answer.skipped_favorites} foto favorit dilewati` : ""}.`,
+          },
+          { silent: true },
+        );
       } catch (error) {
         setToast({ error: error.message }, { silent: true });
       }
@@ -135,7 +142,9 @@ export function createGalleryController({ api, store, ui, models, drive, files, 
 
     // Unduh Foto Terpilih: satu unduhan per foto yang dipilih untuk dicetak
     download({ session: sessionId }) {
-      sessionById(sessionId).photos.filter(item => item.sel).forEach(item => files.download(gallery.downloadUrl(api, item.id), gallery.downloadName(brand, item.id)));
+      sessionById(sessionId)
+        .photos.filter(item => item.sel)
+        .forEach(item => files.download(gallery.downloadUrl(api, item.id), gallery.downloadName(brand, item.id)));
     },
   };
 }

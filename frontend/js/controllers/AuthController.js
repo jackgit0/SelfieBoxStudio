@@ -50,10 +50,16 @@ export function createAuthController({ api, store, ui, router, models, booking, 
     async register({ name = "", phone = "", email = "", password = "" }) {
       const fields = { name: name.trim(), phone: phone.trim(), email: email.trim() };
       if (!fields.name || !EMAIL.test(fields.email) || !PHONE.test(fields.phone) || password.length < 6) {
-        return showError("Lengkapi data: email valid, telepon 8-15 digit, password min. 6 karakter.", "register", fields);
+        return showError(
+          "Lengkapi data: email valid, telepon 8-15 digit, password min. 6 karakter.",
+          "register",
+          fields,
+        );
       }
       try {
-        await controller.afterAuth(await auth.register(api, { name: fields.name, email: fields.email, phone: fields.phone, password }));
+        await controller.afterAuth(
+          await auth.register(api, { name: fields.name, email: fields.email, phone: fields.phone, password }),
+        );
       } catch (error) {
         showError(error.message, "register", fields);
       }
@@ -104,7 +110,11 @@ export function createAuthController({ api, store, ui, router, models, booking, 
     async adminLogin(username, password) {
       const answer = await auth.adminLogin(api, { username, password });
       api.token = answer.token;
-      store.update("persisted", { admin: true, draft: null, user: { name: "Admin", id: 0 }, me: "admin" }, { silent: true });
+      store.update(
+        "persisted",
+        { admin: true, draft: null, user: { name: "Admin", id: 0 }, me: "admin" },
+        { silent: true },
+      );
       store.update("admin", { me: answer.admin }, { silent: true });
       forgetTyped();
       router.navigate(answer.admin.must_change ? "/admin/account" : "/admin");

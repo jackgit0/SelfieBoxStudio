@@ -34,7 +34,16 @@ export function createAdminBookingController({ api, store, ui, models, admin: ad
 
   // booking berubah: daftar, ringkasan, studio (jumlah sesi), pelanggan dan sesi studio tertaut ikut dimuat ulang
   function invalidateAfterChange() {
-    updateAdmin({ bookings: null, revenue: null, operations: null, transactions: null, studios: null, customers: null, customerDetail: null, sessions: {} });
+    updateAdmin({
+      bookings: null,
+      revenue: null,
+      operations: null,
+      transactions: null,
+      studios: null,
+      customers: null,
+      customerDetail: null,
+      sessions: {},
+    });
   }
 
   const controller = {
@@ -92,9 +101,17 @@ export function createAdminBookingController({ api, store, ui, models, admin: ad
         async () => {
           let confirmed = true;
           if (body.status == "Dibatalkan") {
-            confirmed = await adminCore.confirm({ title: "Batalkan booking ini?", body: cancelBookingBody(detail, hours), okLabel: "Ya, Batalkan Booking" });
+            confirmed = await adminCore.confirm({
+              title: "Batalkan booking ini?",
+              body: cancelBookingBody(detail, hours),
+              okLabel: "Ya, Batalkan Booking",
+            });
           } else if (["Sesi Berjalan", "Selesai"].includes(body.status)) {
-            confirmed = await adminCore.confirm({ title: `Ubah status menjadi ${body.status}?`, body: statusChangeBody(body.status), okLabel: "Ya, Ubah Status" });
+            confirmed = await adminCore.confirm({
+              title: `Ubah status menjadi ${body.status}?`,
+              body: statusChangeBody(body.status),
+              okLabel: "Ya, Ubah Status",
+            });
           }
           if (!confirmed) {
             updateAdmin({ drafts: { ...adminState().drafts, [draftKey]: values } });
@@ -106,8 +123,14 @@ export function createAdminBookingController({ api, store, ui, models, admin: ad
           if (answer.refund && answer.refund.state == "failed") {
             setToast({ error: "Booking dibatalkan, tetapi refund gagal. Tindak lanjuti secara manual." });
           } else {
-            const refunded = answer.refund && answer.refund.state == "refunded" ? ` Dana ${formatRupiah(answer.refund.amount)} dikembalikan 100%.` : "";
-            setToast({ message: "Booking diperbarui." + refunded + (answer.notified ? " Pelanggan diberi tahu lewat email." : "") });
+            const refunded =
+              answer.refund && answer.refund.state == "refunded"
+                ? ` Dana ${formatRupiah(answer.refund.amount)} dikembalikan 100%.`
+                : "";
+            setToast({
+              message:
+                "Booking diperbarui." + refunded + (answer.notified ? " Pelanggan diberi tahu lewat email." : ""),
+            });
           }
         },
         "",
@@ -125,7 +148,13 @@ export function createAdminBookingController({ api, store, ui, models, admin: ad
       const hours = bookingModel.slotHours(detail.slot);
       return adminCore.run(async () => {
         const answer = await models.admin.confirmable
-          .withConfirm(confirmed => bookingModel.deleteBooking(api, id, confirmed), { ui, title: "Hapus booking ini?", okLabel: "Ya, Hapus Booking", describeImpact: impact => deleteBookingBody(detail, hours, impact), known: detail.impact })
+          .withConfirm(confirmed => bookingModel.deleteBooking(api, id, confirmed), {
+            ui,
+            title: "Hapus booking ini?",
+            okLabel: "Ya, Hapus Booking",
+            describeImpact: impact => deleteBookingBody(detail, hours, impact),
+            known: detail.impact,
+          })
           .catch(error => failWith(id, error));
         if (!answer) {
           return CANCELLED;
@@ -137,7 +166,12 @@ export function createAdminBookingController({ api, store, ui, models, admin: ad
           return;
         }
         updateAdmin({ bookingDetail: null });
-        setToast({ message: answer.refund == "refunded" ? `Booking dihapus. Dana ${formatRupiah(answer.refund_amount)} dikembalikan 100%.` : "Booking dihapus." });
+        setToast({
+          message:
+            answer.refund == "refunded"
+              ? `Booking dihapus. Dana ${formatRupiah(answer.refund_amount)} dikembalikan 100%.`
+              : "Booking dihapus.",
+        });
       });
     },
   };

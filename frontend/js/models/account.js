@@ -8,5 +8,7 @@ export function updateProfile(api, { name, phone }) {
 
 // pembayaran yang pernah terjadi (lunas, refunded, refund gagal), terbaru dulu; daftar asli tidak diubah
 export function paymentHistory(bookings) {
-  return bookings.filter(booking => booking.pay_status && !["pending", "batal"].includes(booking.pay_status)).sort((first, second) => (second.paid_at || 0) - (first.paid_at || 0));
+  return bookings
+    .filter(booking => booking.pay_status && !["pending", "batal"].includes(booking.pay_status))
+    .sort((first, second) => (second.paid_at || 0) - (first.paid_at || 0));
 }
