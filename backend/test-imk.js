@@ -226,34 +226,19 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!uiGradient(JS), 'frontend (JS) tanpa gradient (admin)'); }
   await down(srv);
 
-  // ===== Refactor MVC fase 1 (imk/dev/frontend-mvc-plan): global yang di-assign ulang dikumpulkan ke objek bernama, agar fase 2 bisa memakai ES module =====
-  // asg(names) = pola penugasan ulang sebuah global (bukan properti: "x.err =" tidak dihitung), termasuk di dalam atribut onclick="…"
-  { const JS = allJs(), asg = names => new RegExp(`(^|[;{(,\\s"'\`])(${names})\\s*=[^=]`, 'm');
-    ok(!asg('PKG|ALLPKG|FAV_PKG|DISC|PEOPLE|BUDGET|STUDIOS|ALLSTUDIOS|PROP|POSES|POLICY|_mj').test(JS) && !/\(\{\s*PKG/.test(JS), 'frontend: data master hanya di objek M (tanpa global PKG/STUDIOS/… yang di-assign ulang)'); // kode: diganti di fase 9
-    ok(!asg('B|Q|editId').test(JS), 'frontend: booking berjalan hanya di objek BK (tanpa B/Q/editId yang di-assign ulang)'); // kode: diganti di fase 9
-    ok(!asg('msg|err|AV|CAL|CR|CD|authMode|resetTok|LP|aDenyOpen').test(JS), 'frontend: state runtime hanya di objek R (tanpa msg/err/AV/CAL/CR/CD/authMode/resetTok/LP yang di-assign ulang)'); // kode: diganti di fase 9
-    ok(!/S\.(bookings|sessions)\b/.test(JS), 'frontend: booking dan sesi foto user di objek D, tidak lagi di S (state tersimpan)'); // kode: diganti di fase 9
-    ok(!asg('drive|curSes|poseI|tick|poseT|stream|gSes|dMode|dSel').test(JS), 'frontend: state sesi foto dan galeri hanya di objek P (tanpa drive/curSes/tick/gSes/dSel/… yang di-assign ulang)'); // kode: diganti di fase 9
-    // nama global lama juga tidak lagi dibaca, termasuk setelah spread (...PKG, [...dSel]); err/drive/stream tidak ikut karena juga dipakai sebagai kelas CSS, URL Drive dan kunci objek
-    const old = /(?<![.\w$])(PKG|ALLPKG|FAV_PKG|DISC|PEOPLE|BUDGET|STUDIOS|ALLSTUDIOS|PROP|POSES|POLICY|_mj|B|Q|editId|msg|AV|CAL|CR|CD|authMode|resetTok|LP|aDenyOpen|curSes|poseI|tick|poseT|gSes|dMode|dSel)(?![\w$])/.exec(JS.replace(/\.\.\./g, '… '));
-    ok(!old, 'frontend: tidak ada lagi rujukan ke nama global lama' + (old ? ` (masih ada "${old[0]}")` : '')); // kode: diganti di fase 9
-  }
-
   // ===== Refactor MVC fase 4: shell tanpa dialog bawaan browser (decisions.md 4, 27, 41) =====
   { const JS = allJs();
     ok(!/\bprompt\(/.test(JS), 'frontend: tanpa prompt() bawaan browser (PIN staf lewat modal)');
     for (const s of ['Masuk Mode Staf', 'Masukkan PIN staf', 'inputmode="numeric"', 'Hubungi Customer Service', 'Silakan hubungi staf di studio atau kontak Customer Service Anda.']) ok(JS.includes(s), `frontend memuat "${s}"`);
   }
 
-  // ===== Refactor MVC fase 6: sisi pelanggan tanpa confirm() bawaan browser (decisions.md 4, 27, 57) =====
-  { const JS = allJs(), rest = fs.readdirSync(path.join(FRONT, 'js'), { recursive: true }).filter(f => f.endsWith('.js') && !/legacy[\\/](session|admin)\.js$/.test(f)).map(f => fs.readFileSync(path.join(FRONT, 'js', f), 'utf8')).join('\n');
-    ok(!/\bconfirm\(["'`]/.test(rest), 'frontend (selain sesi foto dan admin): tanpa confirm() bawaan browser'); // kode: diganti di fase 9 (semua berkas)
+  // ===== Refactor MVC fase 6: teks modal pengganti confirm() di sisi pelanggan (decisions.md 4, 27, 57; tanpa confirm() dicek di blok fase 8a–8b untuk semua berkas) =====
+  { const JS = allJs();
     for (const s of ['Konfirmasi Pembatalan', 'Yakin membatalkan booking ini?', 'Ya, Batalkan', 'Konfirmasi Pembayaran', 'Bayar sekarang via QRIS (simulasi)?']) ok(JS.includes(s), `frontend memuat "${s}"`);
   }
 
   // ===== Refactor MVC fase 7: sesi foto dan galeri tanpa confirm()/alert() bawaan browser (decisions.md 4, 27, 63) =====
-  { const rest = fs.readdirSync(path.join(FRONT, 'js'), { recursive: true }).filter(f => f.endsWith('.js') && !/legacy[\\/]admin\.js$/.test(f)).map(f => fs.readFileSync(path.join(FRONT, 'js', f), 'utf8')).join('\n'), JS = allJs();
-    ok(!/\bconfirm\(["'`]/.test(rest), 'frontend (selain admin): tanpa confirm() bawaan browser'); // kode: diganti di fase 9 (semua berkas)
+  { const JS = allJs();
     ok(!/\balert\(/.test(JS), 'frontend: tanpa alert() bawaan browser');
     ok(!/gradient/i.test(JS), 'frontend (JS): tanpa gradient sama sekali, juga foto simulasi canvas di sesi foto (decisions.md 64)');
     for (const s of ['Konfirmasi Hentikan Sesi', 'Hentikan sesi?', 'Konfirmasi Hapus Foto', 'Hapus foto ini secara permanen?', 'foto terpilih secara permanen? Foto favorit tidak ikut terhapus.', 'Foto Gagal Dihapus']) ok(JS.includes(s), `frontend memuat "${s}"`);
