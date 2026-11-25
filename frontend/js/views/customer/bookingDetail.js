@@ -1,6 +1,6 @@
 // Detail Booking (/bookings/:id): jadwal, status, aksi (Reschedule, Batalkan, Bayar, Check-in, Buka Sesi), detail booking dan pembayaran,
 // alasan pembatalan, unduh/kirim invoice. View murni (dulu V.bdetail di customer.js). links = { invoiceUrl(id, download) } dari main.js.
-// Check-in dan Buka Sesi (data-action photo:*) masih ditangani js/legacy/session.js sampai fase 7.
+// Check-in dan Buka Sesi (data-action photo:start / photo:open) ditangani PhotoSessionController.
 import { html } from "../../core/html.js";
 import { formatDate, parseSlot, slotRange } from "../../core/format.js";
 import { isStudioShown, studioOf } from "../../models/master.js";

@@ -1,12 +1,11 @@
-// ===== INTI (sisa): utilitas, ikon, navigasi go()/goPath(), kait render, modal dan toast untuk kode lama landing.js, session.js, admin.js =====
-import { BK, CONTROLLERS, D, M, R, RENDERER, ROUTER, S, V, save, saveBooking } from "./state.js";
+// ===== INTI (sisa): utilitas, ikon, navigasi go()/goPath(), kait render, modal dan toast untuk kode lama session.js (galeri) dan admin.js =====
+import { BK, CONTROLLERS, M, R, RENDERER, ROUTER, S, V, save, saveBooking } from "./state.js";
 import { raw } from "../core/html.js";
 import { icon, iconFilled } from "../components/icon.js";
 import { openModal } from "../components/modal.js";
 import { renderToasts } from "../components/toast.js";
 import * as masterModel from "../models/master.js";
 import { legacyPath } from "../core/router.js";
-import { P, stopSessionTimers } from "./session.js";
 import { AD } from "./admin.js";
 import { composeOutlet, layoutOf, shellMarkup } from "../core/render.js";
 import { adminHeader, adminTitle } from "../components/adminSidebar.js";
@@ -29,13 +28,12 @@ const icf = (n, s = 20) => iconFilled(n, s).markup;
 // ---------- navigasi ----------
 // halaman = rute di core/router.js (path history); tamu boleh melihat studio, paket dan mengisi form booking, login diminta saat Check Out (keputusan 34–35).
 // go(view, params) lama tetap dipakai atribut onclick (lewat jembatan window): kunci view lama → path lewat legacyPath(); fase 4–8b menggantinya dengan data-route / router.navigate
-const activeSessionId = () => P.session || (D.sessions.filter(x => x.user_id == S.me && x.status == "Aktif").pop() || {}).id;
 // goPath(path) = pindah halaman seperti go() lama (toast dan cache slot dibersihkan, state disimpan, gulir ke atas); dipakai juga oleh data-route (main.js)
 function goPath(path) {
   R.toast.message = R.toast.error = ""; R.availability = {}; save();
   window.scrollTo({ top: 0, behavior: "instant" }); ROUTER.navigate(path);
 }
-function go(v, p = {}) { goPath(legacyPath(v, p, { rescheduleId: BK.rescheduleId, loginMode: R.auth.mode, sessionId: v === "session" ? activeSessionId() : null })); }
+function go(v, p = {}) { goPath(legacyPath(v, p, { rescheduleId: BK.rescheduleId, loginMode: R.auth.mode })); }
 // rute aktif setelah guard → R.route (id angka seperti S.p.id lama); mode form masuk, tab Booking Saya dan tab Akun mengikuti URL
 const numeric = params => Object.fromEntries(Object.entries(params).map(([k, v]) => [k, /^\d+$/.test(v) ? +v : v]));
 function syncRoute(m) {
@@ -54,7 +52,6 @@ const render = () => RENDERER.render();
 const layoutNow = () => layoutOf(R.route.name, { admin: S.admin });
 function renderBefore(m) {
   syncRoute(m); saveBooking(); const view = R.route.name;
-  if (view !== "session" && typeof stopSessionTimers === "function") stopSessionTimers();
   if (layoutNow() === "admin" && view !== "astudio") AD.stdone = null; // notifikasi "Studio berhasil ditambahkan" hanya di halaman Studio
 }
 const renderShell = m => shellMarkup({ layout: layoutNow(), route: m.route, session: { user: S.me ? me() : null, staff: S.staff } });

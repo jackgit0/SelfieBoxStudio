@@ -1,7 +1,7 @@
 // Titik masuk aplikasi (satu-satunya <script type="module"> di index.html).
 // Menyiapkan API, store, router, renderer dan event data-*, membungkus objek state kode lama (js/legacy) dengan store, memasang jembatan window
 // untuk atribut onclick lama, lalu menjalankan isi boot.js lama: muat data master, tautan #reset= (router), pulihkan login (AuthController), render pertama.
-import { API_BASE, CS_EMAIL, CS_WA } from "./config.js";
+import { API_BASE, CS_EMAIL, CS_WA, GOOGLE_CLIENT_ID } from "./config.js";
 import { createStore } from "./core/store.js";
 import { ROUTES, createRouter } from "./core/router.js";
 import { createEvents, formValues } from "./core/events.js";
@@ -15,8 +15,10 @@ import * as photoSessionModel from "./models/photoSession.js";
 import * as accountModel from "./models/account.js";
 import * as authModel from "./models/auth.js";
 import * as contactModel from "./models/contact.js";
+import * as driveModel from "./models/drive.js";
 import { openModal } from "./components/modal.js";
 import { createLandingPage } from "./components/landingPage.js";
+import { createBeeper, createSessionScreen } from "./components/sessionScreen.js";
 import { createStudioController } from "./controllers/StudioController.js";
 import { createPackageController } from "./controllers/PackageController.js";
 import { createBookingController } from "./controllers/BookingController.js";
@@ -25,6 +27,8 @@ import { createAccountController } from "./controllers/AccountController.js";
 import { createAuthController } from "./controllers/AuthController.js";
 import { createLandingController } from "./controllers/LandingController.js";
 import { landingView } from "./views/landing.js";
+import { createPhotoSessionController } from "./controllers/PhotoSessionController.js";
+import { photoSessionView } from "./views/session/photoSession.js";
 import { browseView } from "./views/customer/browse.js";
 import { studioView } from "./views/customer/studio.js";
 import { packagesView } from "./views/customer/packages.js";
@@ -74,7 +78,7 @@ function createUi(store) {
 
 // halaman yang sudah MVC: view (state, match) → Safe dan kait after(match) per path rute; rute lain masih memakai V.<view> lama.
 // links = { invoiceUrl } untuk view yang menautkan invoice (token tetap di models/api.js, decisions.md 50)
-function pagesFor({ studio, payment, landing }, links) {
+function pagesFor({ studio, payment, landing, photo }, links) {
   const showAvailability = () => studio.prefetchAvailability();
   return {
     // landing page (LandingController): scroll-spy dipasang setiap render dan dilepas saat halaman ditinggalkan
@@ -107,12 +111,19 @@ function pagesFor({ studio, payment, landing }, links) {
     "/register": { view: registerView },
     "/forgot-password": { view: forgotView },
     "/reset-password": { view: resetView },
+    // Sesi Foto (PhotoSessionController): kamera dan timer berjalan selama halaman terbuka, berhenti saat ditinggalkan
+    "/sessions/:id": { view: photoSessionView, after: () => photo.enter(), leave: () => photo.stopTimers() },
   };
 }
 
 // aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
-function controllerActions({ studio, package: packages, booking, payment, account, auth, landing }) {
+function controllerActions({ studio, package: packages, booking, payment, account, auth, landing, photo }) {
   return {
+    "photo:start": photo.start,
+    "photo:open": photo.open,
+    "photo:shoot": photo.shoot,
+    "photo:nextPose": photo.nextPose,
+    "photo:staffAction": photo.staffAction,
     "landing:scrollTo": landing.scrollTo,
     "landing:toggleMenu": landing.toggleMenu,
     "landing:openAuth": landing.openAuth,
@@ -160,7 +171,7 @@ async function start() {
   const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: P, admin: AD }, { storage, persistKey: "snapia", session });
   const ui = createUi(store);
   const navigation = { navigate: path => goPath(path) };
-  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel, contact: contactModel };
+  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel, contact: contactModel, drive: driveModel };
   const studio = createStudioController({ api, store, ui, router: navigation, models });
   const packages = createPackageController({ store, ui, router: navigation, config: { wa: CS_WA, email: CS_EMAIL }, refreshMaster: studio.refreshMaster });
   const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster });
@@ -168,7 +179,20 @@ async function start() {
   const account = createAccountController({ api, store, models });
   const auth = createAuthController({ api, store, ui, router: navigation, models, booking, resetAdmin: () => adminReset(), accessDenied: () => aDenied() });
   const landing = createLandingController({ api, store, router: navigation, models, page: createLandingPage({ document, window }), timers: { setTimeout: (callback, delay) => window.setTimeout(callback, delay) } });
-  const controllers = { studio, package: packages, booking, payment, account, auth, landing };
+  const photo = createPhotoSessionController({
+    api,
+    store,
+    ui,
+    router: navigation,
+    models,
+    screen: createSessionScreen({ document }),
+    media: navigator.mediaDevices ? { getUserMedia: constraints => navigator.mediaDevices.getUserMedia(constraints) } : null,
+    timers: { setInterval: (callback, delay) => window.setInterval(callback, delay), clearInterval: id => window.clearInterval(id), setTimeout: (callback, delay) => window.setTimeout(callback, delay) },
+    sound: createBeeper(window.AudioContext),
+    drive: { clientId: GOOGLE_CLIENT_ID, google: () => window.google, fetch: (...request) => window.fetch(...request) },
+    refreshData: booking.refreshData,
+  });
+  const controllers = { studio, package: packages, booking, payment, account, auth, landing, photo };
   const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({

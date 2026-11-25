@@ -1,22 +1,9 @@
-// ===== SESI FOTO (kamera, timer, Google Drive) & GALERI =====
-import { API, D, M, R, S, V } from "./state.js";
-import { GOOGLE_CLIENT_ID } from "../config.js";
+// ===== GALERI (sesi foto, kamera, timer dan Google Drive sudah di PhotoSessionController, fase 7) =====
+import { API, CONTROLLERS, D, R, S, V } from "./state.js";
 import { esc } from "../core/html.js";
-import { $, go, ic, modal, pkOf, refresh, render } from "./core.js";
+import { go, ic, modal, pkOf, refresh, render } from "./core.js";
 // state sesi foto & galeri (tidak disimpan): token/folder Google Drive, sesi yang sedang dibuka, indeks pose, timer, stream kamera, sesi yang dipilih di Galeri, mode hapus + foto yang dipilih untuk dihapus
 const P = { drive: { token: null, folder: null }, session: null, poseIndex: 0, tickTimer: null, poseTimer: null, stream: null, gallerySession: null, deleteMode: false, deleteSelection: new Set() };
-function stopSessionTimers() { clearInterval(P.tickTimer); clearInterval(P.poseTimer); stopCam(); }
-V.session = () => {
-  const s = sesOf() || D.sessions.filter(x => x.user_id == S.me && x.status == "Aktif").pop();
-  if (!s) return `<div class="panel"><div class="card center"><h1 class="h2">Belum ada sesi aktif</h1><p class="m">Mulai dari menu Booking → pilih booking → Check-in & Mulai Sesi.</p><button class="btn" style="margin-top:12px" onclick="go('my')">Ke Booking Saya</button></div></div>`;
-  P.session = s.id; const p = pkOf(s.pkg);
-  return `<div class="panel" style="max-width:1100px"><div class="row sp"><div><h1 class="h1">Sesi Foto</h1><p class="sub">Paket ${esc(p.name)} · target ${p.photo_count} foto (maks. ambil ${p.photo_count * 2}) · ${p.dur} menit</p></div><button class="btn ghost sm" data-action="package:contactCs">Customer Service</button></div>
-<div class="sess" style="margin-top:14px"><div class="card"><div id="tm" class="timer"></div><video id="v" autoplay playsinline muted></video><canvas id="cv" hidden></canvas>
-<div class="row" style="margin-top:12px"><button class="btn" id="shot" onclick="shoot()">${ic("camera", 18)} Ambil Foto</button><span id="cnt" class="m"></span></div><small id="ds" class="m"></small><div id="strip" class="strip"></div></div>
-<div class="stack"><div class="card"><h3 class="h3">Pose Rekomendasi</h3><p id="pose" style="font-size:17px;margin:10px 0"></p><button class="btn sm ghost" onclick="nextPose()">Pose lain</button></div>
-<div class="card"><h3 class="h3" style="margin-bottom:10px">Background & Properti</h3><p class="m sm">Background dan properti tersedia di studio, pakai sesukamu.</p></div>
-${S.staff ? `<div class="card"><h3 class="h3" style="margin-bottom:10px">Kendali Staf</h3><div class="row"><button class="btn sm ghost" onclick="staffAct('pause')">⏸ Jeda</button><button class="btn sm ghost" onclick="staffAct('resume')">▶ Lanjut</button><button class="btn sm danger" onclick="staffAct('stop')">⏹ Hentikan</button></div>${S.log.length ? `<p class="sm m" style="margin-top:8px">Log: ${esc(S.log.slice(-3).join(" · "))}</p>` : ""}</div>` : ""}</div></div></div>`;
-};
 V.gallery = () => {
   const L = D.sessions.filter(s => s.user_id == S.me);
   if (!L.length) return `<div class="panel"><h1 class="h1">Galeri</h1><div class="card center m" style="margin-top:14px">Belum ada sesi foto.<div style="margin-top:12px"><button class="btn" onclick="go('my')">Ke Booking Saya</button></div></div></div>`;
@@ -29,40 +16,6 @@ V.gallery = () => {
 ${grp.map((g, i) => `<h3 class="h3" style="margin:14px 0 8px">Kelompok ${i + 1} ${g.length > 1 ? '<small class="m">(foto mirip)</small>' : ""}</h3><div class="gal">${g.map(p => `<div class="ph ${P.deleteMode ? (P.deleteSelection.has(p.id) ? "dsel" : "") : (p.sel ? "sel" : "")}" onclick="selPh(${s.id},${p.id})"><img src="${p.img}" alt=""><span class="f" onclick="event.stopPropagation();fav(${s.id},${p.id})">${p.fav ? "⭐" : "☆"}</span><span class="f d" title="Hapus foto" onclick="event.stopPropagation();delPhoto(${s.id},${p.id})">🗑</span><small>Drive: ${p.drive || "lokal"}</small></div>`).join("")}</div>`).join("") || '<p class="m">Belum ada foto pada sesi ini.</p>'}
 <div class="row" style="margin-top:16px"><button class="btn" onclick="confirmSel(${s.id})">Konfirmasi Pilihan</button>${s.confirmed ? `<button class="btn ghost" onclick="dl(${s.id})">${ic("download", 16)} Unduh Foto Terpilih</button>` : ""}</div></div></div>`;
 };
-// ===== GOOGLE DRIVE =====
-function driveAuth(){return new Promise(res=>{if(!GOOGLE_CLIENT_ID||!window.google){return res(false)}
- google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:"https://www.googleapis.com/auth/drive.file",callback:r=>{P.drive.token=r.access_token;res(!!r.access_token)}}).requestAccessToken()})}
-async function driveFolder(){if(P.drive.folder)return P.drive.folder;const h={Authorization:"Bearer "+P.drive.token,"Content-Type":"application/json"};
- const r=await(await fetch("https://www.googleapis.com/drive/v3/files",{method:"POST",headers:h,body:JSON.stringify({name:"Snapia Studio - "+new Date().toLocaleDateString("id-ID"),mimeType:"application/vnd.google-apps.folder"})})).json();return P.drive.folder=r.id}
-async function uploadDrive(ph){if(!P.drive.token)return"lokal";try{const folder=await driveFolder(),bd="snapia",meta=JSON.stringify({name:"foto-"+ph.id+".jpg",parents:[folder]});
- const body=`--${bd}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${bd}\r\nContent-Type: image/jpeg\r\nContent-Transfer-Encoding: base64\r\n\r\n${ph.img.split(",")[1]}\r\n--${bd}--`;
- const r=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:"Bearer "+P.drive.token,"Content-Type":"multipart/related; boundary="+bd},body});
- if(r.ok){ph.driveId=(await r.json()).id;return"drive"}return"gagal"}catch(e){return"gagal"}}
-// ===== SESI (US-13..21) =====
-const sesOf=()=>D.sessions.find(s=>s.id==P.session);
-async function startSession(id){try{const s=await API.post(`/bookings/${id}/start`);await refresh();P.session=s.id}catch(e){R.toast.error=e.message;return render()}
- driveAuth().then(ok=>{R.toast.message=ok?"Google Drive terhubung: foto otomatis dikirim ke Drive Anda.":"Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server.";go("session")})}
-V.session_after=()=>{const s=sesOf();if(!s)return;
- if(s.status=="Aktif"&&navigator.mediaDevices)navigator.mediaDevices.getUserMedia({video:true}).then(m=>{P.stream=m;const v=$("#v");if(v)v.srcObject=m}).catch(()=>{const v=$("#v");if(v)v.outerHTML='<div class="m">Kamera tidak tersedia — foto simulasi digunakan.</div>'});
- nextPose(0);clearInterval(P.poseTimer);P.poseTimer=setInterval(()=>nextPose(1),8000);
- let n=0;clearInterval(P.tickTimer);P.tickTimer=setInterval(()=>{if(s.status=="Aktif"&&!s.paused){s.left--;if(s.left==60)warn();if(s.left<=0)syncS(s)}upd(s);if(++n%5==0&&s.status=="Aktif")syncS(s)},1000);upd(s)};
-async function syncS(s){try{const r=await API.get("/sessions/"+s.id),was=s.status;s.left=r.left;s.paused=r.paused;s.status=r.status;if(was=="Aktif"&&r.status!="Aktif"){stopCam();R.toast.message="Sesi telah berakhir.";render()}else upd(s)}catch(e){}}
-function upd(s){const t=$("#tm");if(!t)return;const m=Math.max(0,s.left);t.textContent=String(m/60|0).padStart(2,"0")+":"+String(m%60).padStart(2,"0");t.classList.toggle("warn",s.left<=60&&s.status=="Aktif");
- const p=pkOf(s.pkg);$("#cnt").textContent=`Foto: ${s.photos.length}/${p.photo_count*2} · sisa ${p.photo_count*2-s.photos.length}`;
- $("#shot").disabled=s.status!="Aktif"||s.paused||s.photos.length>=p.photo_count*2;
- const sp=$("#strip");if(sp){const k=s.photos.map(p=>p.id).join();if(sp.dataset.k!=k){sp.dataset.k=k;sp.innerHTML=s.photos.map(p=>`<div class="th"><img src="${p.img}"><button title="Hapus foto" onclick="delPhoto(${s.id},${p.id})">🗑</button></div>`).join("")}}
- $("#ds").textContent=s.status!="Aktif"?"Sesi telah berakhir. Silakan pilih foto di Galeri.":s.paused?"Sesi dijeda staf — waktu tidak berkurang.":s.left<=60?"⚠ Waktu hampir habis!":""}
-function beep(){try{const a=new AudioContext(),o=a.createOscillator();o.connect(a.destination);o.frequency.value=880;o.start();o.stop(a.currentTime+.4)}catch(e){}}
-function warn(){beep();setTimeout(beep,600)}
-function nextPose(a){const l=M.poses[1];P.poseIndex=(P.poseIndex+(a===0?0:1))%l.length;const e=$("#pose");if(e)e.textContent="🧍 "+l[P.poseIndex]}
-async function shoot(){const s=sesOf();if(s.status!="Aktif"||s.paused)return;const c=$("#cv"),v=$("#v");const W=640,H=(v&&v.videoWidth)?Math.round(W*v.videoHeight/v.videoWidth):480;c.width=W;c.height=H;const x=c.getContext("2d"); // rasio foto = rasio kamera (tidak gepeng)
- if(v&&v.videoWidth){x.drawImage(v,0,0,W,H)}else{const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,"hsl("+Math.random()*360+",70%,60%)");g.addColorStop(1,"#222");x.fillStyle=g;x.fillRect(0,0,W,H);x.font="90px serif";x.fillText("😄",W/2-45,H/2+30)}
- const st=s.setup;if(st){x.font="40px serif";st.acc.forEach((id,i)=>x.fillText((M.properties.find(p=>p.id==id)||{}).e||"",20+i*50,50))}
-try{const data=c.toDataURL("image/jpeg",.8),r=await API.post(`/sessions/${s.id}/photos`,{img:data}),ph={id:r.id,t:r.t,fav:false,sel:false,drive:"…",img:data};s.photos.push(ph);upd(s);
-  ph.drive=await uploadDrive(ph);API.patch("/photos/"+ph.id,{drive:ph.drive}).catch(()=>{})}catch(e){R.toast.error=e.message;await syncS(s);render()}}
-async function staffAct(a){const s=sesOf();if(!S.staff||!s)return;if(a=="stop"&&(await modal({title:"Konfirmasi Hentikan Sesi",body:"<p>Hentikan sesi?</p>",buttons:[{label:"Batal",value:false,style:"ghost"},{label:"Hentikan",value:true,style:"danger"}]}))!==true)return;
- try{const r=await API.post(`/sessions/${s.id}/control`,{action:a});S.log.push(a+" "+new Date().toLocaleTimeString());s.left=r.left;s.paused=r.paused;s.status=r.status;if(r.status!="Aktif"){stopCam();R.toast.message="Sesi dihentikan staf."}}catch(e){R.toast.error=e.message}render()}
-function stopCam(){if(P.stream){P.stream.getTracks().forEach(t=>t.stop());P.stream=null}}
 // ===== GALERI (US-22..24) =====
 const ph=(sid,pid)=>D.sessions.find(s=>s.id==sid).photos.find(p=>p.id==pid);
 function selPh(sid,pid){if(P.deleteMode)return togDel(sid,pid);const s=D.sessions.find(s=>s.id==sid),p=ph(sid,pid);p.sel=!p.sel;s.confirmed=false;render();API.patch("/photos/"+pid,{sel:p.sel}).catch(e=>{R.toast.error=e.message;render()})}
@@ -75,7 +28,7 @@ async function delPhoto(sid,pid){
   if(p.driveId&&P.drive.token)fetch("https://www.googleapis.com/drive/v3/files/"+p.driveId,{method:"DELETE",headers:{Authorization:"Bearer "+P.drive.token}}).catch(()=>{});
   s.photos=s.photos.filter(x=>x.id!=pid);if(p.sel)s.confirmed=false;
  }catch(e){return modal({title:"Foto Gagal Dihapus",body:"<p>"+esc(e.message)+"</p>"})}
- if(R.route.name=="session")upd(s);else{R.toast.message="Foto dihapus.";render()}
+ if(R.route.name=="session")CONTROLLERS.photo.showSession(sid);else{R.toast.message="Foto dihapus.";render()}
 }
 const toggleDel=()=>{P.deleteMode=!P.deleteMode;P.deleteSelection=new Set();R.toast.message=R.toast.error="";render()};
 function togDel(sid,pid){const p=ph(sid,pid);if(p.fav){R.toast.message="Foto favorit tidak dapat dihapus massal. Hilangkan bintangnya dulu bila ingin menghapusnya.";return render()}R.toast.message="";P.deleteSelection.has(pid)?P.deleteSelection.delete(pid):P.deleteSelection.add(pid);render()}
@@ -84,4 +37,4 @@ async function bulkDel(){if(!P.deleteSelection.size||(await modal({title:"Konfir
  try{const r=await API.post("/photos/bulk-delete",{ids:[...P.deleteSelection]});P.deleteSelection=new Set();P.deleteMode=false;await refresh();R.toast.message=`${r.deleted} foto dihapus${r.skipped_favorites?`, ${r.skipped_favorites} foto favorit dilewati`:""}.`}catch(e){R.toast.error=e.message}render()}
 async function confirmSel(sid){try{await API.post(`/sessions/${sid}/confirm`);D.sessions.find(s=>s.id==sid).confirmed=true;R.toast.message="Pilihan dikonfirmasi."}catch(e){R.toast.error=e.message}render()}
 function dl(sid){const s=D.sessions.find(s=>s.id==sid);s.photos.filter(p=>p.sel).forEach(p=>{const a=document.createElement("a");a.href=API.imageUrl(p.id)+"&dl=1";a.download="snapia-"+p.id+".jpg";document.body.appendChild(a);a.click();a.remove()})}
-export { P, bulkDel, confirmSel, delPhoto, dl, fav, nextPose, ph, selAllNonFav, selPh, shoot, staffAct, startSession, stopSessionTimers, toggleDel, warn };
+export { P, bulkDel, confirmSel, delPhoto, dl, fav, ph, selAllNonFav, selPh, toggleDel };
