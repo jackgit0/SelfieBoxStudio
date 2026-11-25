@@ -58,7 +58,7 @@ function fakeStream(name, log) {
 
 const activeSession = (extra = {}) => ({ id: 41, user_id: 5, pkg: 1, status: "Aktif", left: 62, paused: false, photos: [], ...extra });
 
-function setup({ responses = {}, sessions = [activeSession()], staff = false, modalAnswers = [], cameraFails = false, current = null, clearToastOnNavigate = false } = {}) {
+function setup({ responses = {}, sessions = [activeSession()], staff = false, modalAnswers = [], cameraFails = false, current = null, clearToastOnNavigate = false, driveFetch = null } = {}) {
   const log = [];
   const state = sampleState({ persisted: { me: 5, user: { id: 5, name: "Ana" }, staff, log: [] }, master: { poses: { 1: ["Pose A", "Pose B", "Pose C"] } } });
   state.data.sessions = sessions;
@@ -89,7 +89,8 @@ function setup({ responses = {}, sessions = [activeSession()], staff = false, mo
   const controller = createPhotoSessionController({
     api, store, ui, router, timers, screen, media, sound, refreshData,
     models: { photoSession: photoSessionModel, drive: driveModel },
-    drive: { clientId: "", google: () => undefined, fetch: async () => assert.fail("Drive tidak boleh dipanggil tanpa token") },
+    drive: { clientId: "", google: () => undefined, fetch: driveFetch || (async () => assert.fail("Drive tidak boleh dipanggil tanpa token")) },
+    brand: "SelfieBox Studio",
   });
   return { store, api, ui, log, timers, screen, controller };
 }
@@ -292,4 +293,19 @@ test("enter memakai sesi di URL: sesi yang sudah selesai dibuka tanpa kamera, wa
   await settle();
   assert.equal(store.get().photo.session, 40);
   assert.ok(!log.some(entry => entry.startsWith("getUserMedia")));
+});
+
+test("shoot dengan Google Drive: folder bernama dari merek aplikasi, foto terkirim ke Drive", async () => {
+  const requests = [];
+  const driveFetch = async (url, options) => {
+    requests.push({ url, body: options.body });
+    return { ok: true, json: async () => ({ id: requests.length === 1 ? "folder1" : "file9" }) };
+  };
+  const { store, controller } = setup({ current: 41, driveFetch, responses: { "POST /sessions/41/photos": { body: { id: 90, t: 1000 } }, "PATCH /photos/90": { body: {} } } });
+  store.get().photo.drive.token = "tok";
+  await controller.shoot();
+  assert.match(JSON.parse(requests[0].body).name, /^SelfieBox Studio - /);
+  assert.equal(store.get().photo.drive.folder, "folder1");
+  const photo = store.get().data.sessions[0].photos[0];
+  assert.deepEqual([photo.drive, photo.driveId], ["drive", "file9"]);
 });

@@ -36,6 +36,11 @@ export function groupSimilar(photos) {
   return groups;
 }
 
+// nama berkas unduhan: kata pertama merek aplikasi + id foto, mis. "selfiebox-12.jpg" (dulu "snapia-12.jpg", nama lama aplikasi)
+export function downloadName(brand, photoId) {
+  return brand.split(" ")[0].toLowerCase() + "-" + photoId + ".jpg";
+}
+
 // URL unduhan satu foto (api.imageUrl menambahkan token)
 export function downloadUrl(api, photoId) {
   return api.imageUrl(photoId) + "&dl=1";

@@ -33,3 +33,7 @@ test("groupSimilar: foto yang diambil < 20 detik dari foto sebelumnya satu kelom
 test("downloadUrl: URL gambar dengan dl=1", () => {
   assert.equal(gallery.downloadUrl({ imageUrl: id => `/api/photos/${id}/img?t=tok` }, 9), "/api/photos/9/img?t=tok&dl=1");
 });
+
+test("downloadName: kata pertama merek, huruf kecil, plus id", () => {
+  assert.equal(gallery.downloadName("SelfieBox Studio", 12), "selfiebox-12.jpg");
+});

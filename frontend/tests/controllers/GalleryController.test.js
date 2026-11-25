@@ -36,6 +36,7 @@ function setup({ responses = {}, modalAnswers = [], route = "gallery", deleteMod
     files: { download: (url, name) => log.push(`download ${url} ${name}`) },
     photoSession: { showSession: id => log.push(`showSession ${id}`) },
     refreshData: async () => log.push("refreshData"),
+    brand: "SelfieBox Studio",
   });
   const session = () => store.get().data.sessions[1];
   return { store, api, ui, log, driveCalls, session, controller };
@@ -178,8 +179,8 @@ test("confirmSelection memposting pilihan, sesi dikonfirmasi, toast; galat → t
   assert.equal(failing.store.get().runtime.toast.error, "Pilihan melebihi kuota");
 });
 
-test("download: satu unduhan per foto terpilih", () => {
+test("download: satu unduhan per foto terpilih, bernama dari merek aplikasi (bukan snapia)", () => {
   const { log, controller } = setup();
   controller.download({ session: "41" });
-  assert.deepEqual(log, ["download /api/photos/2/img?t=tok&dl=1 snapia-2.jpg"]);
+  assert.deepEqual(log, ["download /api/photos/2/img?t=tok&dl=1 selfiebox-2.jpg"]);
 });

@@ -5,7 +5,7 @@
 // photoSession: PhotoSessionController (strip layar sesi), refreshData: BookingController.refreshData.
 import { deletePhotoModal, deleteSelectedModal, deleteFailedModal } from "../views/session/gallery.js";
 
-export function createGalleryController({ api, store, ui, models, drive, files, photoSession, refreshData }) {
+export function createGalleryController({ api, store, ui, models, drive, files, photoSession, refreshData, brand }) {
   const gallery = models.gallery;
   const state = () => store.get();
   const photo = () => state().photo;
@@ -135,7 +135,7 @@ export function createGalleryController({ api, store, ui, models, drive, files, 
 
     // Unduh Foto Terpilih: satu unduhan per foto yang dipilih untuk dicetak
     download({ session: sessionId }) {
-      sessionById(sessionId).photos.filter(item => item.sel).forEach(item => files.download(gallery.downloadUrl(api, item.id), "snapia-" + item.id + ".jpg"));
+      sessionById(sessionId).photos.filter(item => item.sel).forEach(item => files.download(gallery.downloadUrl(api, item.id), gallery.downloadName(brand, item.id)));
     },
   };
 }

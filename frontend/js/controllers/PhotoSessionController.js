@@ -3,7 +3,7 @@
 // fitur teman sekelompok, perilaku dipertahankan kecuali yang dicatat di Progress fase 7).
 // Adaptor dari main.js (decisions.md 60): screen: components/sessionScreen.js, media: { getUserMedia } (null tanpa kamera),
 // timers: { setInterval, clearInterval, setTimeout }, sound: { beep }, drive: { clientId, google(), fetch }.
-// refreshData = BookingController.refreshData (booking + sesi foto user).
+// refreshData = BookingController.refreshData (booking + sesi foto user); brand = nama aplikasi (folder Google Drive).
 // Sesi di slice data diubah di tempat (sisa waktu tiap detik, foto baru) tanpa render ulang, seperti kode lama; layar diperbarui lewat screen.
 import { packageOf } from "../models/master.js";
 import { sessionStatus, photoStrip, stopSessionModal } from "../views/session/photoSession.js";
@@ -13,7 +13,7 @@ export function createPhotoState() {
   return { drive: { token: null, folder: null }, session: null, poseIndex: 0, tickTimer: null, poseTimer: null, stream: null, gallerySession: null, deleteMode: false, deleteSelection: new Set() };
 }
 
-export function createPhotoSessionController({ api, store, ui, router, models, screen, media, timers, sound, drive, refreshData }) {
+export function createPhotoSessionController({ api, store, ui, router, models, screen, media, timers, sound, drive, refreshData, brand }) {
   const sessions = models.photoSession;
   const state = () => store.get();
   const photo = () => state().photo;
@@ -114,7 +114,7 @@ export function createPhotoSessionController({ api, store, ui, router, models, s
 
   async function uploadToDrive(item) {
     const token = photo().drive.token;
-    const result = await models.drive.upload({ fetch: drive.fetch, token, folder: photo().drive.folder, folderName: "Snapia Studio - " + new Date().toLocaleDateString("id-ID"), photo: item });
+    const result = await models.drive.upload({ fetch: drive.fetch, token, folder: photo().drive.folder, folderName: brand + " - " + new Date().toLocaleDateString("id-ID"), photo: item });
     photo().drive.folder = result.folder;
     if (result.driveId) {
       item.driveId = result.driveId;

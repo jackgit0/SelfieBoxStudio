@@ -1,7 +1,7 @@
 // Titik masuk aplikasi (satu-satunya <script type="module"> di index.html).
 // Menyiapkan API, store, router, renderer dan event data-*, membungkus objek state kode lama (js/legacy) dengan store, memasang jembatan window
 // untuk atribut onclick lama, lalu menjalankan isi boot.js lama: muat data master, tautan #reset= (router), pulihkan login (AuthController), render pertama.
-import { API_BASE, CS_EMAIL, CS_WA, GOOGLE_CLIENT_ID } from "./config.js";
+import { API_BASE, BRAND, CS_EMAIL, CS_WA, GOOGLE_CLIENT_ID } from "./config.js";
 import { createStore } from "./core/store.js";
 import { ROUTES, createRouter } from "./core/router.js";
 import { createEvents, formValues } from "./core/events.js";
@@ -214,8 +214,9 @@ async function start() {
     sound: createBeeper(window.AudioContext),
     drive: { clientId: GOOGLE_CLIENT_ID, google: () => window.google, fetch: (...request) => window.fetch(...request) },
     refreshData: booking.refreshData,
+    brand: BRAND,
   });
-  const gallery = createGalleryController({ api, store, ui, models, drive: { fetch: (...request) => window.fetch(...request) }, files: { download: downloadFile }, photoSession: photo, refreshData: booking.refreshData });
+  const gallery = createGalleryController({ api, store, ui, models, drive: { fetch: (...request) => window.fetch(...request) }, files: { download: downloadFile }, photoSession: photo, refreshData: booking.refreshData, brand: BRAND });
   const controllers = { studio, package: packages, booking, payment, account, auth, landing, photo, gallery };
   const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
