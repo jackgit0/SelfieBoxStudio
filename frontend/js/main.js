@@ -1,6 +1,6 @@
 // Titik masuk aplikasi (satu-satunya <script type="module"> di index.html).
 // Menyiapkan API, store, router, renderer dan event data-*, membungkus objek state kode lama (js/legacy) dengan store, memasang jembatan window
-// untuk atribut onclick lama, lalu menjalankan isi boot.js lama: muat data master, tautan #reset= (router), pulihkan login, render pertama.
+// untuk atribut onclick lama, lalu menjalankan isi boot.js lama: muat data master, tautan #reset= (router), pulihkan login (AuthController), render pertama.
 import { API_BASE, CS_EMAIL, CS_WA } from "./config.js";
 import { createStore } from "./core/store.js";
 import { ROUTES, createRouter } from "./core/router.js";
@@ -20,6 +20,7 @@ import { createPackageController } from "./controllers/PackageController.js";
 import { createBookingController } from "./controllers/BookingController.js";
 import { createPaymentController } from "./controllers/PaymentController.js";
 import { createAccountController } from "./controllers/AccountController.js";
+import { createAuthController } from "./controllers/AuthController.js";
 import { browseView } from "./views/customer/browse.js";
 import { studioView } from "./views/customer/studio.js";
 import { packagesView } from "./views/customer/packages.js";
@@ -32,11 +33,15 @@ import { bookingDetailView } from "./views/customer/bookingDetail.js";
 import { cancelView } from "./views/customer/cancel.js";
 import { refundView } from "./views/customer/refund.js";
 import { accountView } from "./views/customer/account.js";
+import { loginView } from "./views/auth/login.js";
+import { registerView } from "./views/auth/register.js";
+import { forgotView } from "./views/auth/forgot.js";
+import { resetView } from "./views/auth/reset.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
-import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell, logout } from "./legacy/core.js";
+import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell } from "./legacy/core.js";
 import "./legacy/landing.js";
 import { P } from "./legacy/session.js";
-import { AD, aDenied } from "./legacy/admin.js";
+import { AD, aDenied, adminReset } from "./legacy/admin.js";
 import { installLegacyBridge } from "./legacy-bridge.js";
 import { registerLegacyActions } from "./legacy-actions.js";
 
@@ -92,12 +97,23 @@ function pagesFor({ studio, payment }, links) {
     // Pengaturan Akun: Edit Profil dan Riwayat Pembayaran (AccountController)
     "/account": { view: (state, match) => accountView(state, match, links) },
     "/account/payments": { view: (state, match) => accountView(state, match, links) },
+    // Masuk, Daftar, Lupa Sandi, Buat Sandi Baru (AuthController)
+    "/login": { view: loginView },
+    "/register": { view: registerView },
+    "/forgot-password": { view: forgotView },
+    "/reset-password": { view: resetView },
   };
 }
 
 // aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
-function controllerActions({ studio, package: packages, booking, payment, account }) {
+function controllerActions({ studio, package: packages, booking, payment, account, auth }) {
   return {
+    "auth:login": (dataset, event) => auth.login(formValues(event.target)),
+    "auth:register": (dataset, event) => auth.register(formValues(event.target)),
+    "auth:forgot": (dataset, event) => auth.forgot(formValues(event.target)),
+    "auth:reset": (dataset, event) => auth.reset(formValues(event.target)),
+    "auth:logout": auth.logout,
+    "auth:staffToggle": auth.toggleStaff,
     "account:saveProfile": (dataset, event) => account.saveProfile(formValues(event.target)),
     "account:requestPasswordChange": account.requestPasswordChange,
     "payment:selectPackage": payment.selectPackage,
@@ -140,7 +156,8 @@ async function start() {
   const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster });
   const payment = createPaymentController({ api, store, ui, router: navigation, models, booking, refresh: booking.refreshData });
   const account = createAccountController({ api, store, models });
-  const controllers = { studio, package: packages, booking, payment, account };
+  const auth = createAuthController({ api, store, ui, router: navigation, models, booking, resetAdmin: () => adminReset(), accessDenied: () => aDenied() });
+  const controllers = { studio, package: packages, booking, payment, account, auth };
   const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({
@@ -190,27 +207,10 @@ async function start() {
   // back/forward dan tautan #reset= (diubah menjadi /reset-password)
   router.start();
 
-  // pulihkan login (Mode Staf tidak ikut dipulihkan)
-  S.staff = false;
-  if (api.token && S.user) {
-    try {
-      S.me = S.admin ? "admin" : S.user.id;
-      if (S.admin) {
-        AD.me = await api.get("/admin/me");
-      } else {
-        await booking.refreshData();
-      }
-    } catch (error) {
-      if (S.admin && error.status == 403 && /Hanya admin/.test(error.message)) {
-        return aDenied(); // token yang tersimpan bukan token admin: dialog Akses Ditolak
-      }
-      logout();
-      return;
-    }
-  } else {
-    S.me = null;
+  // pulihkan login tersimpan (Mode Staf tidak ikut dipulihkan); token pelanggan di sesi admin → dialog Akses Ditolak (AuthController)
+  if (await auth.restoreSession()) {
+    render();
   }
-  render();
 }
 
 start();

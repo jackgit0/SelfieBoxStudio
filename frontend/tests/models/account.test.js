@@ -29,3 +29,28 @@ test("auth.forgot: POST /auth/forgot dengan email", async () => {
   assert.equal((await auth.forgot(api, "d@x.id")).message, "Jika email terdaftar…");
   assert.deepEqual(api.calls, [{ method: "POST", path: "/auth/forgot", body: { email: "d@x.id" } }]);
 });
+
+test("auth: register, login, adminLogin, reset, staffLogin, adminMe memakai endpoint dan isi yang sama dengan kode lama", async () => {
+  const api = createFakeApi({
+    "POST /auth/register": { body: { token: "t1" } },
+    "POST /auth/login": { body: { token: "t2" } },
+    "POST /admin/login": { body: { token: "t3" } },
+    "POST /auth/reset": { body: { ok: true } },
+    "POST /staff/login": { body: { token: "s1" } },
+    "GET /admin/me": { body: { username: "adminstudio" } },
+  });
+  await auth.register(api, { name: "Dewi", email: "d@x.id", phone: "0812345678", password: "secret1" });
+  await auth.login(api, { email: "d@x.id", password: "secret1" });
+  await auth.adminLogin(api, { username: "adminstudio", password: "rahasia" });
+  await auth.reset(api, { token: "a".repeat(64), password: "baru123" });
+  assert.equal((await auth.staffLogin(api, "1234")).token, "s1");
+  assert.equal((await auth.adminMe(api)).username, "adminstudio");
+  assert.deepEqual(api.calls, [
+    { method: "POST", path: "/auth/register", body: { name: "Dewi", email: "d@x.id", phone: "0812345678", password: "secret1" } },
+    { method: "POST", path: "/auth/login", body: { email: "d@x.id", password: "secret1" } },
+    { method: "POST", path: "/admin/login", body: { username: "adminstudio", password: "rahasia" } },
+    { method: "POST", path: "/auth/reset", body: { token: "a".repeat(64), password: "baru123" } },
+    { method: "POST", path: "/staff/login", body: { pin: "1234" } },
+    { method: "GET", path: "/admin/me", body: undefined },
+  ]);
+});

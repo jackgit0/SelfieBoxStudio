@@ -184,9 +184,9 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     { const r = await B({ studio_id: 2 }, U2); ok(r.s === 400 && r.j.error === 'Studio tidak tersedia', 'booking studio tidak tersedia: "Studio tidak tersedia" (Sesi Tidak Tersedia)'); }
     ok((await call('POST', '/quote', { package_id: 1, studio_id: 2 })).j.error === 'Studio tidak tersedia', 'quote studio tidak tersedia: "Studio tidak tersedia"');
     // 3. guard tamu: frontend/tests/core/router.test.js (tabel guard rute × tamu/customer/admin, refactor MVC fase 3)
-    const JS = allJs(), core = src('js/legacy/core.js'), lj = src('js/legacy/landing.js');
+    const JS = allJs(), lj = src('js/legacy/landing.js');
     // navbar: tamu tanpa nama user dengan Masuk (/login) dan Daftar (/register), nama customer di-escape sekali: frontend/tests/components/navbar.test.js (refactor MVC fase 4)
-    ok(/async function afterAuth[^\n]*S\.draft/.test(core), 'core.js: afterAuth melanjutkan draf booking (kembali ke Paket & Pembayaran)'); // kode: diganti di fase 6 (test-map.md)
+    // masuk dengan draf booking tamu kembali ke Paket & Pembayaran: frontend/tests/controllers/AuthController.test.js (refactor MVC fase 6)
     // 4. pemetaan galat dan lima popup (judul dan pesan dari Figma)
     // satu tabel pemetaan galat → popup (BOOKING_ERRORS di BookingController.handleError): frontend/tests/controllers/BookingController.test.js (refactor MVC fase 5b)
     for (const s of ['Input Tidak Valid', 'Input booking tidak lengkap atau tidak valid. Pilih tanggal dan sesi terlebih dahulu.', 'Sesi Tidak Tersedia', 'tidak lagi tersedia. Silakan pilih sesi lain.',
@@ -210,7 +210,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     { const r = await call('PATCH', '/admin/account', { current_password: 'salah' }, AD); ok(r.s === 403 && r.j.error === 'Password saat ini salah', '403 lain di admin ("Password saat ini salah") bukan Akses Ditolak'); }
     { const r = await call('POST', '/admin/studios', SB({ name: 'Studio Senja', description: 'Cahaya alami' }), AD); ok(r.s === 200 && r.j.id, 'fixture: admin menambah Studio Senja'); }
     // 2. frontend admin.js: teks Figma
-    const JS = allJs(), aj = src('js/legacy/admin.js'), core = src('js/legacy/core.js'), boot = src('js/main.js');
+    const JS = allJs(), aj = src('js/legacy/admin.js');
     for (const s of ['Ringkasan Studio', 'Detail Studio Baru', 'Isi data studio. Nama dan gambar wajib diisi, dan nama tidak boleh sama dengan studio lain.', 'Simpan Studio', 'Ubah',
       'Input studio tidak valid. Periksa field yang ditandai.', 'Nama studio wajib diisi.', 'Gambar studio wajib diunggah.', 'Nama studio sudah digunakan oleh studio lain.', 'Nama studio sudah digunakan. Gunakan nama lain.',
       'Studio berhasil ditambahkan', 'tersedia dan tampil di daftar studio pelanggan.',
@@ -220,7 +220,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     for (const f of ['async function aLoad', 'async function aDo', 'async function sessLoad']) ok(/aAuthErr\(/.test(aj.slice(aj.indexOf(f), aj.indexOf('\n', aj.indexOf(f) + f.length + 200))), `admin.js: ${f.split(' ').pop()} memakai aAuthErr`); // kode: diganti di fase 8a (aLoad, aDo) dan 8b (sessLoad) (test-map.md)
     ok(/e\.status == 403 && \/Ganti password\/\.test\(e\.message\)\) \{ AD\.loading\[k\] = 0; if \(AD\.me\) AD\.me\.must_change = true; return go\('aacct'\); \}/.test(aj), 'admin.js: alur 403 ganti password bawaan tetap ke Akun Admin'); // kode: diganti di fase 8a (test-map.md)
     ok(/studioSave = id =>/.test(aj) && /stSummary|AD\.stsum/.test(aj), 'admin.js: tambah studio lewat langkah ringkasan'); // kode: diganti di fase 8b (test-map.md)
-    ok(/aDenied/.test(boot), 'main.js (dulu boot.js): sesi admin dengan token bukan admin juga memunculkan Akses Ditolak'); // kode: diganti di fase 6 (test-map.md)
+    // sesi admin dengan token bukan admin memunculkan Akses Ditolak saat dibuka (restoreSession): frontend/tests/controllers/AuthController.test.js (refactor MVC fase 6)
     ok(/if \(key === "sN"\) AD\.sterr = null;/.test(aj), 'admin.js: unggah gambar studio baru menghapus tanda galat lama (dicek ulang di Lihat Ringkasan)'); // kode: diganti di fase 8b (test-map.md)
     ok(/sudah dipakai\/\.test\(e\.message\)\) \{ AD\.sterr = \{ top: ST_DUP, name: ST_DUPF \}; AD\.studios = null;/.test(aj), 'admin.js: nama ganda dari server memuat ulang daftar studio'); // kode: diganti di fase 8b (test-map.md)
     ok(!uiGradient(JS), 'frontend (JS) tanpa gradient (admin)'); }

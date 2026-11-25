@@ -10,7 +10,7 @@ import * as admin from "./legacy/admin.js";
 
 const BRIDGED = {
   state: ["R", "S"],
-  core: ["doReset", "forgot", "go", "ic", "login", "logout", "me", "modal", "refresh", "reg", "render"],
+  core: ["go", "ic", "logout", "me", "modal", "refresh", "render"],
   session: ["P", "bulkDel", "confirmSel", "delPhoto", "dl", "fav", "nextPose", "ph", "selAllNonFav", "selPh", "shoot", "staffAct", "startSession", "toggleDel", "warn"],
   landing: ["lpMenu", "openAuth", "sendContact", "toSec"],
   admin: ["AD", "acctSave", "bookDel", "bookSave", "delCust", "discSave", "loading", "opDel", "opEdit", "opSave", "openBook", "openCust", "pkActive", "pkAdd", "pkDel", "pkSave", "poseDel", "poseSave", "propDel", "propSave", "pthumb", "sAdd", "sDay", "sDel", "sNav", "sSave", "sel", "stCancel", "stEdit", "stReview", "stSave", "stat", "studioDel", "studioSave", "upImg"],
