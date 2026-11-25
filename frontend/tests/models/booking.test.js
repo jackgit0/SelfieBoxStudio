@@ -112,3 +112,9 @@ test("cancel: POST /bookings/:id/cancel dengan reason dan detail", async () => {
   assert.deepEqual(api.calls, [{ method: "POST", path: "/bookings/12/cancel", body: { reason: "Pembatalan lainnya", detail: "Sakit" } }]);
   assert.equal(answer.refund.state, "refunded");
 });
+
+test("groupByDay: jam tanpa nol di depan (\"8:00\") diurutkan menurut jam, bukan menurut teks", () => {
+  const list = [{ id: 1, date: "2026-11-27 10:00" }, { id: 2, date: "2026-11-27 8:00" }, { id: 3, date: "2026-11-27 9:00" }];
+  assert.deepEqual(booking.groupByDay(list, "up")[0].bookings.map(item => item.id), [2, 3, 1]);
+  assert.deepEqual(booking.groupByDay(list, "hist")[0].bookings.map(item => item.id), [1, 3, 2]);
+});

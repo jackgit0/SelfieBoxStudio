@@ -87,11 +87,17 @@ export function myBookings(bookings, { userId, tab, now }) {
     .filter(booking => UPCOMING_STATUSES.includes(booking.status) === (tab === "up"));
 }
 
+// kunci urut sebuah slot: tanggal + jam dua digit, karena slot lama tersimpan tanpa nol di depan ("2026-11-27 8:00")
+function slotKey(slot) {
+  const { date, h } = parseSlot(slot);
+  return date + " " + String(h).padStart(2, "0");
+}
+
 // [{ date, bookings }]: Mendatang naik (terdekat dulu), Riwayat turun (terbaru dulu)
 export function groupByDay(bookings, tab) {
   const ascending = tab === "up";
   const sorted = [...bookings].sort((first, second) => {
-    const earlier = first.date < second.date;
+    const earlier = slotKey(first.date) < slotKey(second.date);
     return ascending === earlier ? -1 : 1;
   });
   const groups = [];
