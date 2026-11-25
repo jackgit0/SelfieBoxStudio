@@ -56,7 +56,7 @@ Admin: Dashboard, Pengguna, Studio (Detail Studio + Detail Sesi), Booking (dafta
 
 ## Akun
 - **Customer**: login email + password. Lupa sandi / Ubah sandi -> tautan dikirim ke email.
-- **Admin**: link "Masuk sebagai admin" di halaman masuk. Akun admin disimpan di **database** (tabel `admin`, password di-hash scrypt + salt), bukan di kode — lihat bagian Keamanan admin.
+- **Admin**: masuk lewat form yang sama dengan customer, isi **username** admin (bukan email) di kolom "Email atau username"; setelah masuk langsung ke panel admin. Akun admin disimpan di **database** (tabel `admin`, password di-hash scrypt + salt), bukan di kode — lihat bagian Keamanan admin.
 - **Staf**: menu avatar -> Mode Staf (PIN dari `STAFF_PIN`).
 
 ## Aturan penting

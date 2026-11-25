@@ -16,7 +16,7 @@ const e = k => (process.env[k] || '').trim(), errs = [];
 const admin = { user: e('DEMO_ADMIN_USER'), pass: e('DEMO_ADMIN_PASS') };
 const cust = { name: e('DEMO_CUSTOMER_NAME'), email: e('DEMO_CUSTOMER_EMAIL').toLowerCase(), phone: e('DEMO_CUSTOMER_PHONE'), pass: e('DEMO_CUSTOMER_PASS') };
 const wantCust = Object.values(cust).some(Boolean);
-if (!admin.user) errs.push('DEMO_ADMIN_USER wajib diisi');
+if (!/^[A-Za-z0-9_.-]{3,30}$/.test(admin.user)) errs.push('DEMO_ADMIN_USER wajib diisi: 3-30 karakter (huruf, angka, _ . -), tanpa "@" karena form masuk membedakan admin dari email customer');
 if (!(admin.pass.length >= 8 && /[a-z]/i.test(admin.pass) && /\d/.test(admin.pass))) errs.push('DEMO_ADMIN_PASS minimal 8 karakter, berisi huruf dan angka');
 if (wantCust) { // aturan sama dengan /api/auth/register
   if (!cust.name) errs.push('DEMO_CUSTOMER_NAME wajib diisi');

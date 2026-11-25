@@ -106,9 +106,8 @@ V.auth = () => {
   const key = 'onkeydown="if(event.key===\'Enter\')';
   if (authMode == "reset") return wrap(`<h2 class="h2">Buat Sandi Baru</h2><label>Password baru</label><input id="pw" type="password" autocomplete="new-password"><label>Ulangi password</label><input id="pw2" type="password" autocomplete="new-password" ${key}doReset()"><div style="margin-top:18px"><button class="btn block" onclick="doReset()">Simpan Sandi</button></div>`);
   if (authMode == "forgot") return wrap(`<h2 class="h2">Lupa Sandi</h2><p class="m sm">Masukkan email akun Anda. Tautan untuk membuat sandi baru akan dikirim ke email tersebut.</p><label>Email</label><input id="e" type="email" ${key}forgot()"><div class="row" style="margin-top:18px"><button class="btn grow" onclick="forgot()">Kirim Tautan</button><button class="btn ghost" onclick="authMode='login';msg=err='';render()">Kembali</button></div>`);
-  if (authMode == "admin") return wrap(`<h2 class="h2">Login Admin</h2><label>Username</label><input id="au" autocomplete="username"><label>Password</label><input id="pw" type="password" autocomplete="current-password" ${key}adminLogin()"><div style="margin-top:18px"><button class="btn block" onclick="adminLogin()">Masuk Admin</button></div><p class="center sm" style="margin-top:14px"><a href="#" onclick="authMode='login';msg=err='';render();return false">← Kembali ke login customer</a></p>`);
   if (authMode == "register") return wrap(tabs + `<label>Nama</label><input id="n" autocomplete="name"><label>Telepon</label><input id="p" inputmode="numeric" autocomplete="tel"><label>Email</label><input id="e" type="email" autocomplete="email"><label>Password (min. 6 karakter)</label><input id="pw" type="password" autocomplete="new-password" ${key}reg()"><div style="margin-top:18px"><button class="btn block" onclick="reg()">Daftar</button></div>`);
-  return wrap(tabs + `<label>Email</label><input id="e" type="email" autocomplete="email"><label>Password</label><input id="pw" type="password" autocomplete="current-password" ${key}login()"><div class="row sp" style="margin-top:18px"><button class="btn grow" onclick="login()">Masuk</button></div><p class="center sm" style="margin-top:14px"><a href="#" onclick="authMode='forgot';msg=err='';render();return false">Lupa sandi?</a> · <a href="#" onclick="authMode='admin';msg=err='';render();return false">Masuk sebagai admin</a></p>`);
+  return wrap(tabs + `<label>Email atau username</label><input id="e" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"><label>Password</label><input id="pw" type="password" autocomplete="current-password" ${key}login()"><div class="row sp" style="margin-top:18px"><button class="btn grow" onclick="login()">Masuk</button></div><p class="center sm" style="margin-top:14px"><a href="#" onclick="authMode='forgot';msg=err='';render();return false">Lupa sandi?</a></p>`);
 };
 const fixS = s => { s.photos.forEach(p => p.img = p.img || API.imgUrl(p.id)); return s; };
 async function refresh() {
@@ -123,9 +122,11 @@ async function reg() {
   if (!n || !/\S+@\S+\.\S+/.test(e) || !/^\d{8,15}$/.test(p) || pw.length < 6) { err = "Lengkapi data: email valid, telepon 8-15 digit, password min. 6 karakter."; return render(); }
   try { await afterAuth(await API.post("/auth/register", { name: n, email: e, phone: p, password: pw })); } catch (x) { err = x.message; render(); }
 }
+// satu form masuk: isian berisi "@" = email customer, selain itu = username admin (username admin tidak boleh memuat "@")
 async function login() {
-  const e = $("#e").value.trim(), pw = $("#pw").value; if (!e || !pw) { err = "Isi email dan password."; return render(); }
-  try { await afterAuth(await API.post("/auth/login", { email: e, password: pw })); } catch (x) { err = x.message; render(); }
+  const e = $("#e").value.trim(), pw = $("#pw").value; if (!e || !pw) { err = "Isi email/username dan password."; return render(); }
+  try { if (e.includes("@")) await afterAuth(await API.post("/auth/login", { email: e, password: pw })); else await adminLogin(e, pw); }
+  catch (x) { err = x.status == 401 ? "Email/username atau password salah" : x.message; render(); }
 }
 async function forgot() {
   const e = $("#e").value.trim(); if (!/\S+@\S+\.\S+/.test(e)) { err = "Masukkan email yang valid."; return render(); }
@@ -135,9 +136,8 @@ async function doReset() {
   const a = $("#pw").value, b = $("#pw2").value; if (a.length < 6 || a != b) { err = "Password min. 6 karakter dan kedua isian harus sama."; return render(); }
   try { await API.post("/auth/reset", { token: resetTok, password: a }); resetTok = ""; authMode = "login"; msg = "Sandi berhasil diubah. Silakan masuk dengan sandi baru."; } catch (x) { err = x.message; } render();
 }
-async function adminLogin() {
-  try { const r = await API.post("/admin/login", { username: $("#au").value.trim(), password: $("#pw").value }); API.token = r.token; localStorage.setItem("snapia_t", r.token); S.admin = true; S.user = { name: "Admin", id: 0 }; S.me = "admin"; AD.me = r.admin; go(r.admin.must_change ? "aacct" : "adash"); }
-  catch (x) { err = x.message; render(); }
+async function adminLogin(username, password) {
+  const r = await API.post("/admin/login", { username, password }); API.token = r.token; localStorage.setItem("snapia_t", r.token); S.admin = true; S.user = { name: "Admin", id: 0 }; S.me = "admin"; AD.me = r.admin; go(r.admin.must_change ? "aacct" : "adash");
 }
 async function changePw() { try { await API.post("/auth/forgot", { email: me().email }); msg = "Tautan untuk mengubah sandi telah dikirim ke " + me().email; } catch (x) { err = x.message; } render(); }
 function csContact() { const wa = window.CS_WA, mail = window.CS_EMAIL; if (wa) window.open("https://wa.me/" + wa, "_blank"); else if (mail) location.href = "mailto:" + mail; else alert("Silakan hubungi staf di studio atau kontak Customer Service Anda. (Atur nomor di frontend/js/config.js)"); }
