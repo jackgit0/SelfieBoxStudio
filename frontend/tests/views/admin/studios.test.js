@@ -36,8 +36,21 @@ test("studios: kotak cari menyaring nama, deskripsi, alamat", () => {
   assert.ok(!out.includes("Melati"));
 });
 
-test("studios: studio terbuka → form Detail Studio (data-submit studio:edit), pilihan terpilih, unggah gambar, catatan booking, panel sesi", () => {
+test("studios: studio terbuka → Detail Studio hanya-baca (data, gambar, catatan booking, Ubah) tanpa form dan tanpa Simpan, panel sesi tetap", () => {
   const out = render({ studios: [studio({ status: "UNAVAILABLE", free_slots: 0 })], openStudios: { 3: true } });
+  assert.ok(out.includes("<h4>Detail Studio</h4>"));
+  assert.doesNotMatch(out, /data-submit="studio:edit"|data-change="studio:uploadImage"|name="name"/);
+  assert.ok(!out.includes(">Simpan<"));
+  for (const row of ["<dt>Nama</dt><dd>Melati &lt;b&gt;</dd>", "<dt>Deskripsi</dt><dd>Terang</dd>", "<dt>Status</dt><dd>Tidak tersedia</dd>", "<dt>Biaya sewa studio</dt><dd>Rp15.000</dd>", "<dt>Kapasitas</dt><dd>3-5 orang</dd>", "<dt>Rentang budget</dt><dd>&lt; 100rb</dd>"]) assert.ok(out.includes(row), row);
+  assert.match(out, /<div class="thumb" style="background-image:url\('\/media\/m\.jpg'\)" role="img" aria-label="Gambar Melati &lt;b&gt;">/);
+  assert.match(out, /data-action="admin:startEdit" data-key="studio-3" aria-label="Ubah Melati &lt;b&gt;"><svg[^]*<\/svg> Ubah<\/button>/);
+  assert.ok(out.includes("2 booking aktif dari 5 booking (tanpa yang batal) · Status dihitung otomatis: Tersedia bila masih ada slot kosong dalam 14 hari ke depan."));
+  assert.ok(out.includes("Detail Sesi"));
+  assert.match(render({ studios: [studio({ img: "" })], openStudios: { 3: true } }), /role="img" aria-label="Gambar Melati &lt;b&gt;">Belum ada gambar<\/div>/);
+});
+
+test("studios: Ubah → form Detail Studio (data-submit studio:edit), pilihan terpilih, unggah gambar, Batal + Simpan, catatan booking, panel sesi", () => {
+  const out = render({ studios: [studio({ status: "UNAVAILABLE", free_slots: 0 })], openStudios: { 3: true }, editing: "studio-3" });
   assert.ok(out.includes("Detail Studio"));
   assert.ok(!out.includes("Detail Studio Baru"));
   assert.match(out, /<form[^>]*novalidate data-submit="studio:edit" data-id="3"/);
@@ -50,14 +63,15 @@ test("studios: studio terbuka → form Detail Studio (data-submit studio:edit), 
   assert.match(out, /type="file" accept="image\/\*" hidden data-change="studio:uploadImage" data-studio="3"/);
   assert.ok(out.includes("Unggah gambar"));
   assert.match(out, /background-image:url\('\/media\/m\.jpg'\)/);
-  assert.match(out, /<button class="btn" type="submit">Simpan<\/button>/);
+  assert.match(out, /<button class="btn ghost" type="button" data-action="admin:cancelEdit">Batal<\/button><button class="btn" type="submit">Simpan<\/button>/);
+  assert.match(out, /name="name"[^>]*data-edit-focus/);
   assert.ok(out.includes("2 booking aktif dari 5 booking (tanpa yang batal) · Status dihitung otomatis: Tersedia bila masih ada slot kosong dalam 14 hari ke depan."));
   assert.ok(out.includes("Detail Sesi"));
   assert.match(out, /data-action="studio:toggleStudio" data-id="3"[^>]*aria-expanded="true"/);
 });
 
 test("studios: form ubah memakai draf yang gagal disimpan dan gambar yang baru diunggah", () => {
-  const out = render({ studios: [studio()], openStudios: { 3: true }, drafts: { "studio-3": { name: "Draf", description: "", price: "abc", people_range_id: "1", budget_range_id: "2" } }, images: { 3: "/media/baru.jpg" } });
+  const out = render({ studios: [studio()], openStudios: { 3: true }, editing: "studio-3", drafts: { "studio-3": { name: "Draf", description: "", price: "abc", people_range_id: "1", budget_range_id: "2" } }, images: { 3: "/media/baru.jpg" } });
   assert.match(out, /name="name"[^>]*value="Draf"/);
   assert.match(out, /name="price"[^>]*value="abc"/);
   assert.match(out, /background-image:url\('\/media\/baru\.jpg'\)/);

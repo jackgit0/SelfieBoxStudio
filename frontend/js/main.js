@@ -122,6 +122,8 @@ function createUi(store) {
 // links = { invoiceUrl } untuk view yang menautkan invoice (token tetap di models/api.js, decisions.md 50)
 function pagesFor({ studio, payment, landing, photo, gallery, admin, adminBooking }, links) {
   const showAvailability = () => studio.prefetchAvailability();
+  // halaman admin yang punya mode ubah: form yang masih terbuka ditutup saat halaman ditinggalkan (kembali hanya-baca)
+  const stopEditing = () => admin.stopEditing();
   return {
     // landing page (LandingController): scroll-spy dipasang setiap render dan dilepas saat halaman ditinggalkan
     "/": { view: landingView, after: () => landing.startScrollSpy(), leave: () => landing.stopScrollSpy() },
@@ -156,20 +158,20 @@ function pagesFor({ studio, payment, landing, photo, gallery, admin, adminBookin
     // Galeri (GalleryController)
     "/gallery": { view: galleryView },
     // panel admin (AdminController; Studio + Detail Sesi = StudioController; Booking = AdminBookingController)
-    "/admin": { view: dashboardView, after: () => admin.loadDashboard() },
-    "/admin/studios": { view: studiosView, after: () => studio.loadStudios() },
+    "/admin": { view: dashboardView, after: () => admin.loadDashboard(), leave: stopEditing },
+    "/admin/studios": { view: studiosView, after: () => studio.loadStudios(), leave: stopEditing },
     // Session Assistant di tablet studio (PhotoSessionController): kamera dan timer berjalan selama halaman terbuka, berhenti saat ditinggalkan
     "/admin/studios/:id/live": {
       view: liveSessionView,
       after: match => photo.enter(match),
       leave: () => photo.stopTimers(),
     },
-    "/admin/bookings": { view: adminBookingsView, after: () => adminBooking.load() },
-    "/admin/props": { view: propertiesView, after: () => admin.loadProperties() },
-    "/admin/poses": { view: posesView, after: () => admin.loadPoses() },
+    "/admin/bookings": { view: adminBookingsView, after: () => adminBooking.load(), leave: stopEditing },
+    "/admin/props": { view: propertiesView, after: () => admin.loadProperties(), leave: stopEditing },
+    "/admin/poses": { view: posesView, after: () => admin.loadPoses(), leave: stopEditing },
     "/admin/users": { view: (state, match) => usersView(state, match, links), after: () => admin.loadUsers() },
     "/admin/transactions": { view: transactionsView, after: () => admin.loadTransactions() },
-    "/admin/packages": { view: adminPackagesView, after: () => admin.loadPackagesPage() },
+    "/admin/packages": { view: adminPackagesView, after: () => admin.loadPackagesPage(), leave: stopEditing },
     "/admin/account": { view: adminAccountView },
   };
 }
@@ -190,6 +192,8 @@ export function controllerActions({
 }) {
   return {
     "admin:search": (dataset, event) => admin.setSearch(event.target.value),
+    "admin:startEdit": admin.startEdit,
+    "admin:cancelEdit": admin.cancelEdit,
     "admin:setOperationsPeriod": (dataset, event) => admin.setOperationsPeriod(event.target.value),
     "admin:editOperation": admin.editOperation,
     "admin:cancelOperationEdit": admin.cancelOperationEdit,
@@ -336,6 +340,7 @@ async function start() {
     run: (...args) => admin.run(...args),
     load: (...args) => admin.load(...args),
     handleAccessError: (...args) => admin.handleAccessError(...args),
+    stopEditing: (...args) => admin.stopEditing(...args),
   };
   const files = { readImage: file => shrinkImage(file, window) };
   const studio = createStudioController({ api, store, ui, router: navigation, models, admin: adminCore, files });

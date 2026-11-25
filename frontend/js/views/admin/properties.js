@@ -1,5 +1,6 @@
-// Daftar Properti admin (/admin/props): foto, nama, kategori, qty per baris, lalu baris tambah. View murni (dulu pthumb, propRow, V.aprop di admin.js).
-// Setiap baris punya <form> sendiri (input terikat lewat atribut form=, form tidak boleh membungkus <tr>); foto diunggah lewat
+// Daftar Properti admin (/admin/props): foto, nama, kategori, qty per baris, lalu tombol + Tambah properti. View murni (dulu pthumb, propRow, V.aprop di admin.js).
+// Baris tampil hanya-baca dengan Ubah dan Hapus; hanya baris admin.editing ("property-<id|new>") yang menjadi form dengan Simpan/Tambah dan Batal
+// (dev/admin-edit-mode-plan.md). Form baris memakai <form> sendiri (input terikat lewat atribut form=, form tidak boleh membungkus <tr>); foto diunggah lewat
 // data-change="admin:uploadPropertyImage". Gambar baru di admin.images["property-<id|new>"], isian yang gagal/sedang diisi di admin.drafts.
 import { html } from "../../core/html.js";
 import { CATEGORIES } from "../../models/admin/properties.js";
@@ -8,7 +9,28 @@ import { backgroundImage } from "../../components/propertyVisual.js";
 import { icon } from "../../components/icon.js";
 import { loadingCard, selectField } from "../../components/adminWidgets.js";
 
-function propertyRow(property, admin) {
+// baris hanya-baca: foto, nama, kategori, qty (tag Habis bila 0), Ubah dan Hapus
+function propertyView(property) {
+  const image = property.img;
+  return html`<tr>
+    <td>
+      <span class="pthumb ro" style="${image ? backgroundImage(image) : ""}" role="img" aria-label="Foto ${property.name}"
+        >${image ? "" : icon("images", 20)}</span
+      >
+    </td>
+    <td>${property.name}</td>
+    <td>${property.category}</td>
+    <td>${property.qty}${Number(property.qty) === 0 ? html` <span class="tag no">Habis</span>` : ""}</td>
+    <td style="white-space:nowrap">
+      <button class="btn sm ghost" type="button" data-action="admin:startEdit" data-key="property-${property.id}" aria-label="Ubah ${property.name}">
+        Ubah</button
+      > <button class="btn sm ghost" type="button" data-action="admin:deleteProperty" data-id="${property.id}">Hapus</button>
+    </td>
+  </tr>`;
+}
+
+// baris form (record yang diubah, atau baris tambah bila property kosong)
+function propertyForm(property, admin) {
   const key = property.id || "new";
   const formId = "property-form-" + key;
   const values = admin.drafts["property-" + key] || property;
@@ -16,11 +38,6 @@ function propertyRow(property, admin) {
   const submit = property.id
     ? html`<form id="${formId}" novalidate data-submit="admin:saveProperty" data-id="${property.id}"></form>`
     : html`<form id="${formId}" novalidate data-submit="admin:addProperty"></form>`;
-  const remove = property.id
-    ? html` <button class="btn sm ghost" type="button" data-action="admin:deleteProperty" data-id="${property.id}">
-        Hapus
-      </button>`
-    : "";
   return html`<tr>
     <td>
       <label class="pthumb" style="${image ? backgroundImage(image) : ""}"
@@ -38,6 +55,7 @@ function propertyRow(property, admin) {
       <input
         form="${formId}"
         name="name"
+        data-edit-focus
         value="${values.name || ""}"
         placeholder="Nama properti"
         aria-label="Nama properti"
@@ -58,8 +76,8 @@ function propertyRow(property, admin) {
       />
     </td>
     <td style="white-space:nowrap">
-      ${submit}<button class="btn sm" type="submit" form="${formId}">${property.id ? "Simpan" : "+ Tambah"}</button
-      >${remove}
+      ${submit}<button class="btn sm" type="submit" form="${formId}">${property.id ? "Simpan" : "Tambah"}</button
+      > <button class="btn sm ghost" type="button" data-action="admin:cancelEdit">Batal</button>
     </td>
   </tr>`;
 }
@@ -71,7 +89,10 @@ export function propertiesView(state) {
   }
   const rows = admin.properties
     .filter(property => matchesQuery(admin.query, property.name, property.category))
-    .map(property => propertyRow(property, admin));
+    .map(property =>
+      admin.editing == "property-" + property.id ? propertyForm(property, admin) : propertyView(property),
+    );
+  const adding = admin.editing == "property-new";
   return html`<div class="card">
     <div class="tbl">
       <table>
@@ -82,9 +103,14 @@ export function propertiesView(state) {
           <th>Qty</th>
           <th></th>
         </tr>
-        ${rows}${propertyRow({}, admin)}
+        ${rows}${adding ? propertyForm({}, admin) : ""}
       </table>
     </div>
+    ${adding
+      ? ""
+      : html`<button class="btn sm" type="button" style="margin-top:12px" data-action="admin:startEdit" data-key="property-new">
+          ${icon("plus", 16)} Tambah properti
+        </button>`}
     <p class="sm m" style="margin-top:8px">
       Qty 0 = properti ditampilkan "Habis" di halaman studio. Kategori "Background" menjadi background, selain itu
       aksesori.

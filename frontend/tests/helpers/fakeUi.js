@@ -20,6 +20,10 @@ export function createFakeUi({ modalAnswers = [] } = {}) {
     toggle(selector, flag) {
       ui.toggles.push([selector, flag]);
     },
+    focuses: [],
+    focus(selector) {
+      ui.focuses.push(selector);
+    },
   };
   return ui;
 }

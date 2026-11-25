@@ -32,3 +32,16 @@ test("setiap data-action/change/input/enter/submit di views/, components/ dan co
   const missing = [...used].filter(([name]) => !registered.has(name)).map(([name, file]) => `${name} (${file})`);
   assert.deepEqual(missing, []);
 });
+
+// StudioController dan PhotoSessionController dibuat sebelum AdminController dan menerima proksi adminCore di main.js (bukan AdminController
+// utuh seperti di tes controller): setiap adminCore.<metode> yang mereka panggil harus ada di proksi itu (galat nyata: stopEditing hilang)
+test("proksi adminCore di main.js memuat setiap metode yang dipanggil controller penerimanya", () => {
+  const main = fs.readFileSync(path.join(js, "main.js"), "utf8");
+  const block = main.match(/const adminCore = \{([^}]*)\};/);
+  assert.ok(block, "blok const adminCore = { … } ditemukan");
+  const proxied = new Set([...block[1].matchAll(/^\s*(\w+):/gm)].map(found => found[1]));
+  for (const file of ["StudioController.js", "PhotoSessionController.js"]) {
+    const text = fs.readFileSync(path.join(js, "controllers", file), "utf8");
+    for (const found of text.matchAll(/adminCore\.(\w+)/g)) assert.ok(proxied.has(found[1]), `${file}: adminCore.${found[1]} tidak ada di proksi main.js`);
+  }
+});

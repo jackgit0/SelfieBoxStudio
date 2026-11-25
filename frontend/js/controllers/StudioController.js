@@ -172,8 +172,12 @@ export function createStudioController({
       return loading;
     },
 
+    // menutup studio yang sedang diubah = Batal (isian dan gambar yang belum disimpan dibuang)
     toggleStudio({ id }) {
       const open = adminState().openStudios;
+      if (open[id] && adminState().editing == "studio-" + id) {
+        adminCore.stopEditing();
+      }
       updateAdmin({ openStudios: { ...open, [id]: !open[id] } }, { silent: false });
     },
 
@@ -286,7 +290,7 @@ export function createStudioController({
       );
     },
 
-    // simpan form Detail Studio sebuah studio (satu langkah); gagal → isian baris itu disimpan sebagai draf
+    // simpan form Detail Studio sebuah studio (satu langkah), lalu kembali hanya-baca; gagal → isian baris itu disimpan sebagai draf, form tetap terbuka
     edit({ id }, values) {
       const key = "studio-" + id;
       return adminCore.run(
@@ -299,6 +303,7 @@ export function createStudioController({
             drafts: without(adminState().drafts, key),
             studios: null,
           });
+          adminCore.stopEditing();
           await reloadMaster();
         },
         "Studio disimpan.",

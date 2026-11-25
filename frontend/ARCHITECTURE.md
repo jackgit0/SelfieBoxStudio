@@ -52,7 +52,7 @@ Satu store (`core/store.js`) dengan bagian-bagian berikut:
 
 Token login tetap di `localStorage["snapia_t"]` dan hanya dibaca `models/api.js`.
 
-Isi awal setiap bagian ada di `core/state.js` (`photo` dan `admin` dari controller pemiliknya). Perubahan store hanya me-render ulang isi `<main id="outlet">`; navbar/sidebar dipasang ulang hanya saat halaman atau isinya berubah. Form ditulis sebagai `<form novalidate data-submit="controller:method">` dengan field bernama; `main.js` meneruskan `formValues(form)` ke controller, dan isian yang gagal disimpan dikembalikan ke form sebagai draf. Mengetik tanpa mengirim memakai `store.update(…, { silent: true })` agar tidak me-render ulang.
+Isi awal setiap bagian ada di `core/state.js` (`photo` dan `admin` dari controller pemiliknya). Perubahan store hanya me-render ulang isi `<main id="outlet">`; navbar/sidebar dipasang ulang hanya saat halaman atau isinya berubah. Form ditulis sebagai `<form novalidate data-submit="controller:method">` dengan field bernama; `main.js` meneruskan `formValues(form)` ke controller, dan isian yang gagal disimpan dikembalikan ke form sebagai draf. Mengetik tanpa mengirim memakai `store.update(…, { silent: true })` agar tidak me-render ulang. Halaman admin menampilkan data hanya-baca; form satu record dibuka dengan `admin:startEdit` (kunci di `admin.editing`, sama dengan kunci draf) dan ditutup dengan `admin:cancelEdit`, setelah Simpan berhasil, atau oleh kait `leave` rute (`AdminController.stopEditing`).
 
 ## HTML dan event
 

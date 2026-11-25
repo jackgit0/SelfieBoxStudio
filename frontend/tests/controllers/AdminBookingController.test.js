@@ -52,6 +52,24 @@ test("open: detail dimuat, draf lama dibuang, panel ditampilkan (layar sempit me
   assert.equal(admin().bookingDetail, null);
 });
 
+test("mode ubah booking: Simpan berhasil, tutup panel atau buka booking lain → hanya-baca; gagal / dialog Kembali → form tetap terbuka", async () => {
+  let s = setup({ admin: { bookingDetail: detail(), editing: "booking-5" }, responses: { "PATCH /admin/bookings/5": { body: detail({ package_id: 2, notified: false }) } } });
+  await s.controller.save({ id: "5" }, { status: "Menunggu Pembayaran", package_id: "2" });
+  assert.equal(s.admin().editing, null);
+  s = setup({ admin: { bookingDetail: detail(), editing: "booking-5" }, responses: { "PATCH /admin/bookings/5": { status: 409, body: { error: "Status booking sudah berubah" } }, "GET /admin/bookings/5": { body: detail() } } });
+  await s.controller.save({ id: "5" }, { status: "Menunggu Pembayaran", package_id: "2" });
+  assert.equal(s.admin().editing, "booking-5");
+  s = setup({ modalAnswers: [false], admin: { bookingDetail: detail(), editing: "booking-5" } });
+  await s.controller.save({ id: "5" }, { status: "Dibatalkan", package_id: "1" });
+  assert.equal(s.admin().editing, "booking-5");
+  s = setup({ admin: { bookingDetail: detail(), editing: "booking-5", drafts: { "booking-5": { status: "Terbayar" } } } });
+  s.controller.close();
+  assert.deepEqual([s.admin().editing, s.admin().drafts], [null, {}]);
+  s = setup({ admin: { bookingDetail: detail(), editing: "booking-5" }, responses: { "GET /admin/bookings/6": { body: detail({ id: 6 }) } } });
+  await s.controller.open({ id: "6" });
+  assert.equal(s.admin().editing, null);
+});
+
 test("save: tanpa perubahan → toast galat Tidak ada perubahan, tanpa permintaan", async () => {
   const { controller, requests, toast } = setup({ admin: { bookingDetail: detail() } });
   await controller.save({ id: "5" }, { status: "Menunggu Pembayaran", package_id: "1" });

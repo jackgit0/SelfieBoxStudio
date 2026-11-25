@@ -495,3 +495,95 @@ test("run: aksi yang dibatalkan (CANCELLED) → tanpa render dan tanpa toast, fo
   assert.ok(!log.includes("render"));
   assert.notEqual(store.get().runtime.toast.message, "Tidak tampil");
 });
+
+// ---------- Mode ubah (dev/admin-edit-mode-plan.md): data hanya-baca dulu, Simpan hanya di form record yang dibuka lewat Ubah ----------
+test("createAdminState: editing kosong (semua record hanya-baca)", () => {
+  assert.equal(createAdminState().editing, null);
+});
+
+test("startEdit: record dibuka, render, fokus ke isian pertama; membuka record lain membuang draf dan gambar record pertama tanpa bertanya", () => {
+  const { controller, store, log, ui } = setupAdmin({ admin: { drafts: { "property-4": { name: "ketikan" }, discount: { pct: "5" } }, images: { "property-4": "/media/a.jpg", 3: "/media/s.jpg" } } });
+  controller.startEdit({ key: "property-4" });
+  assert.equal(store.get().admin.editing, "property-4");
+  assert.deepEqual(log, ["render"]);
+  assert.deepEqual(ui.focuses, ["[data-edit-focus]"]);
+  assert.equal(ui.modals.length, 0);
+  controller.startEdit({ key: "studio-3" });
+  assert.equal(store.get().admin.editing, "studio-3");
+  assert.deepEqual(store.get().admin.drafts, { discount: { pct: "5" } });
+  assert.deepEqual(store.get().admin.images, { 3: "/media/s.jpg" });
+  controller.startEdit({ key: "pose-new" });
+  assert.deepEqual(store.get().admin.images, {}, "gambar studio memakai id saja (admin.images[3])");
+});
+
+test("cancelEdit: kembali hanya-baca, draf dan gambar record itu dibuang, yang lain tetap; Ubah item rekap ikut ditutup", () => {
+  const { controller, store, log } = setupAdmin({ admin: { operations: operationsData, editing: "pose-7", drafts: { "pose-7": { people_range_id: "2" }, "package-1": { name: "x" } }, images: { "pose-7": "/media/b.jpg" } } });
+  controller.cancelEdit();
+  assert.equal(store.get().admin.editing, null);
+  assert.deepEqual(store.get().admin.drafts, { "package-1": { name: "x" } });
+  assert.deepEqual(store.get().admin.images, {});
+  assert.deepEqual(log, ["render"]);
+  controller.editOperation({ id: "4" });
+  assert.equal(store.get().admin.editing, "operation");
+  controller.cancelOperationEdit();
+  assert.equal(store.get().admin.editing, null);
+  assert.equal(store.get().admin.editingOperation, null);
+});
+
+test("stopEditing (kait leave halaman): menutup form tanpa render; tanpa form terbuka tidak mengubah apa-apa", () => {
+  const { controller, store, log } = setupAdmin({ admin: { editing: "discount", drafts: { discount: { pct: "120" } } } });
+  controller.stopEditing();
+  assert.equal(store.get().admin.editing, null);
+  assert.deepEqual(store.get().admin.drafts, {});
+  assert.deepEqual(log, []);
+  const before = store.get().admin;
+  controller.stopEditing();
+  assert.equal(store.get().admin, before);
+});
+
+test("startEdit lalu Tambah item rekap: editing \"operation\" tanpa item; Ubah item menutup form record lain", () => {
+  const { controller, store } = setupAdmin({ admin: { operations: operationsData, editing: "package-1", drafts: { "package-1": { name: "x" }, operation: { label: "lama" } } } });
+  controller.startEdit({ key: "operation" });
+  assert.equal(store.get().admin.editing, "operation");
+  assert.equal(store.get().admin.editingOperation, null);
+  assert.deepEqual(store.get().admin.drafts, { operation: { label: "lama" } });
+  controller.startEdit({ key: "package-1" });
+  controller.editOperation({ id: "4" });
+  assert.equal(store.get().admin.editing, "operation");
+  assert.equal(store.get().admin.editingOperation.id, 4);
+  assert.deepEqual(store.get().admin.drafts, {});
+});
+
+test("simpan berhasil → kembali hanya-baca (paket, paket baru, diskon, item rekap); gagal → form tetap terbuka dengan draf", async () => {
+  let setup = setupAdmin({ admin: { packages: [{ id: 1 }], editing: "package-1" }, responses: { "PATCH /admin/packages/1": { body: { ok: true } } } });
+  await setup.controller.savePackage({ id: "1" }, packageValues);
+  assert.equal(setup.store.get().admin.editing, null);
+  setup = setupAdmin({ admin: { packages: [{ id: 1 }], editing: "package-1" }, responses: { "PATCH /admin/packages/1": { status: 400, body: { error: "Harga tidak valid" } } } });
+  await setup.controller.savePackage({ id: "1" }, packageValues);
+  assert.equal(setup.store.get().admin.editing, "package-1");
+  assert.deepEqual(setup.store.get().admin.drafts["package-1"], packageValues);
+  setup = setupAdmin({ admin: { packages: [], editing: "package-new" }, responses: { "POST /admin/packages": { body: { id: 5 } } } });
+  await setup.controller.addPackage(packageValues);
+  assert.equal(setup.store.get().admin.editing, null);
+  setup = setupAdmin({ admin: { discount: { pct: 0, label: "" }, editing: "discount" }, responses: { "PUT /admin/discount": { body: { ok: true } } } });
+  await setup.controller.saveDiscount({ pct: "15", label: "Akhir Tahun" });
+  assert.equal(setup.store.get().admin.editing, null);
+  setup = setupAdmin({ admin: { discount: { pct: 0, label: "" }, editing: "discount" }, responses: { "PUT /admin/discount": { status: 400, body: { error: "Diskon 0-100" } } } });
+  await setup.controller.saveDiscount({ pct: "150", label: "" });
+  assert.equal(setup.store.get().admin.editing, "discount");
+  setup = setupAdmin({ admin: { operations: operationsData, editing: "operation" }, responses: { "POST /admin/ops": { body: { id: 9 } } } });
+  await setup.controller.saveOperation({ date: "2026-11-25", label: "Listrik", kind: "biaya", amount: "30000", note: "" });
+  assert.equal(setup.store.get().admin.editing, null);
+});
+
+test("properti dan pose: simpan/tambah berhasil → hanya-baca; gagal → mode ubah tetap", async () => {
+  let setup = setupCatalog({ admin: { properties: [], editing: "property-4" }, responses: { "PATCH /admin/properties/4": { body: {} } } });
+  await setup.controller.saveProperty({ id: "4" }, { name: "Topi", category: "Topi", qty: "3" });
+  assert.equal(setup.admin().editing, null);
+  setup = setupCatalog({ admin: { properties: [], editing: "property-new" }, responses: { "POST /admin/properties": { status: 400, body: { error: "Nama properti wajib diisi" } } } });
+  await setup.controller.addProperty({ name: "", category: "Topi", qty: "1" });
+  assert.equal(setup.admin().editing, "property-new");
+  setup = setupCatalog({ admin: { poses: [], editing: "pose-6" }, responses: { "PATCH /admin/poses/6": { body: {} } } });
+  await setup.controller.savePose({ id: "6" }, { people_range_id: "2" });
+  assert.equal(setup.admin().editing, null);
+});

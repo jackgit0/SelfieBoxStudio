@@ -4,6 +4,8 @@
 // - handleError: 401 → keluar; 403 "Hanya admin" → dialog Akses ditolak; 403 "Ganti password" → Akun Admin; selain itu toast galat
 // logout = AuthController.logout (main.js). Studio + Detail Sesi = StudioController, Booking = AdminBookingController (memakai inti ini);
 // Properti dan Pose di sini (fase 8b). files.readImage(file) → data URL yang sudah diperkecil (components/imageFile.js)
+// - startEdit / cancelEdit / stopEditing: data admin tampil hanya-baca dulu; Ubah membuka form satu record (admin.editing), Simpan hanya di form itu
+//   (dev/admin-edit-mode-plan.md). Membuka record lain menutup yang pertama dan membuang isian serta gambar yang belum disimpan.
 import {
   DEFAULT_DENIED,
   accessDeniedModal,
@@ -25,6 +27,9 @@ export function createAdminState() {
     me: null,
     loading: {},
     drafts: {},
+    // record yang sedang diubah, kunci sama dengan kunci draf: "property-4", "property-new", "pose-<id|new>", "package-<id|new>",
+    // "discount", "studio-3", "booking-12", "operation" (Tambah item, atau Ubah item bila editingOperation terisi); null = semua hanya-baca
+    editing: null,
     query: "",
     revenue: null,
     operations: null,
@@ -74,6 +79,19 @@ export function createAdminController({ api, store, ui, router, models, logout, 
   function withoutDraft(key) {
     const { [key]: dropped, ...rest } = admin().drafts;
     return rest;
+  }
+
+  // gambar unggahan milik record yang diubah: studio memakai id saja (admin.images[3]), properti dan pose memakai kunci draf
+  const imageKeyFor = key => (key.startsWith("studio-") ? key.slice("studio-".length) : key);
+
+  // patch yang menutup form yang terbuka: isian dan gambar yang belum disimpan dibuang
+  function closedEditPatch() {
+    const key = admin().editing;
+    if (!key) {
+      return { editing: null, editingOperation: null };
+    }
+    const { [imageKeyFor(key)]: droppedImage, ...images } = admin().images;
+    return { editing: null, editingOperation: null, drafts: withoutDraft(key), images };
   }
 
   function setLoading(key, flag) {
@@ -174,6 +192,25 @@ export function createAdminController({ api, store, ui, router, models, logout, 
       return true;
     },
 
+    // ---------- mode ubah (semua halaman admin) ----------
+    // tombol Ubah / + Tambah … (data-key = kunci draf record itu): form lain yang terbuka ditutup tanpa bertanya
+    startEdit({ key }) {
+      store.update("admin", { ...closedEditPatch(), editing: key });
+      focusEditForm();
+    },
+
+    // tombol Batal: kembali hanya-baca, isian dan gambar yang belum disimpan dibuang
+    cancelEdit() {
+      store.update("admin", closedEditPatch());
+    },
+
+    // setelah Simpan berhasil, saat panel ditutup dan saat halaman ditinggalkan (kait leave di main.js); tidak me-render ulang
+    stopEditing() {
+      if (admin().editing || admin().editingOperation) {
+        store.update("admin", closedEditPatch(), { silent: true });
+      }
+    },
+
     // kotak cari di header admin (data-change="admin:search")
     setSearch(query) {
       store.update("admin", { query });
@@ -197,12 +234,15 @@ export function createAdminController({ api, store, ui, router, models, logout, 
 
     editOperation({ id }) {
       const item = admin().operations.items.find(entry => entry.id == id);
-      store.update("admin", { editingOperation: item, drafts: withoutDraft("operation") });
+      const patch = closedEditPatch();
+      const { operation: droppedDraft, ...drafts } = patch.drafts || admin().drafts;
+      store.update("admin", { ...patch, drafts, editing: "operation", editingOperation: item });
       ui.scrollToEnd();
+      focusEditForm();
     },
 
     cancelOperationEdit() {
-      store.update("admin", { editingOperation: null, drafts: withoutDraft("operation") });
+      controller.cancelEdit();
     },
 
     // values = isian form Tambah/Ubah item (data-submit, formValues)
@@ -213,7 +253,7 @@ export function createAdminController({ api, store, ui, router, models, logout, 
           await pages.dashboard.saveOperation(api, editing && editing.id, pages.dashboard.operationBody(values));
           store.update(
             "admin",
-            { editingOperation: null, operations: null, drafts: withoutDraft("operation") },
+            { editing: null, editingOperation: null, operations: null, drafts: withoutDraft("operation") },
             { silent: true },
           );
         },
@@ -235,7 +275,7 @@ export function createAdminController({ api, store, ui, router, models, logout, 
       }
       await controller.run(async () => {
         await pages.dashboard.deleteOperation(api, id);
-        store.update("admin", { operations: null, editingOperation: null }, { silent: true });
+        store.update("admin", { operations: null, ...(admin().editingOperation ? closedEditPatch() : {}) }, { silent: true });
       }, "Item dihapus.");
     },
 
@@ -359,7 +399,7 @@ export function createAdminController({ api, store, ui, router, models, logout, 
       return controller.run(
         async () => {
           await pages.packages.saveDiscount(api, pages.packages.discountBody(values));
-          store.update("admin", { discount: null, drafts: withoutDraft("discount") }, { silent: true });
+          store.update("admin", { discount: null, drafts: withoutDraft("discount"), editing: null }, { silent: true });
         },
         "Diskon utama disimpan.",
         undefined,
@@ -467,6 +507,13 @@ export function createAdminController({ api, store, ui, router, models, logout, 
     },
   };
 
+  // fokus ke isian pertama form yang baru dibuka (view menandainya dengan data-edit-focus), agar fokus tidak hilang saat tombol Ubah diganti form
+  function focusEditForm() {
+    if (ui.focus) {
+      ui.focus("[data-edit-focus]");
+    }
+  }
+
   // unggah foto satu baris tabel admin (properti, pose); key = "property-<id|new>" / "pose-<id|new>"
   async function uploadRowImage(key, file, values) {
     if (!file) {
@@ -503,7 +550,7 @@ export function createAdminController({ api, store, ui, router, models, logout, 
       async () => {
         await pages.properties.saveProperty(api, id, pages.properties.propertyBody(values, admin().images[key]));
         const { [key]: droppedImage, ...images } = admin().images;
-        store.update("admin", { images, drafts: withoutDraft(key) }, { silent: true });
+        store.update("admin", { images, drafts: withoutDraft(key), editing: null }, { silent: true });
         await reloadProperties();
       },
       "Properti disimpan.",
@@ -519,7 +566,7 @@ export function createAdminController({ api, store, ui, router, models, logout, 
       async () => {
         await pages.poses.savePose(api, id, pages.poses.poseBody(values, admin().images[key]));
         const { [key]: droppedImage, ...images } = admin().images;
-        store.update("admin", { images, drafts: withoutDraft(key) }, { silent: true });
+        store.update("admin", { images, drafts: withoutDraft(key), editing: null }, { silent: true });
         await reloadPoses();
       },
       "Pose disimpan.",
@@ -533,7 +580,7 @@ export function createAdminController({ api, store, ui, router, models, logout, 
     return controller.run(
       async () => {
         await request();
-        store.update("admin", { packages: null, drafts: withoutDraft(key) }, { silent: true });
+        store.update("admin", { packages: null, drafts: withoutDraft(key), editing: null }, { silent: true });
       },
       okMessage,
       undefined,
