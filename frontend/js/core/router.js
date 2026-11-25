@@ -5,7 +5,9 @@
 // access: public = tamu dan customer (admin dialihkan ke /admin); guest = hanya tamu (yang sudah masuk ke berandanya);
 //         customer = harus masuk sebagai customer; admin = hanya admin.
 // params = parameter tetap milik rute (mis. mode form masuk); title dan tab = judul navbar dan tab yang menyala (dulu TITLES/TABGROUP).
-// after (opsional) = fungsi yang dijalankan setelah outlet dirender (dipakai mulai fase 4).
+// after (opsional) = fungsi yang dijalankan setelah outlet dirender (core/render.js).
+// Rute admin: menu = { label, icon } di sidebar (dulu AMENU), searchable = kotak cari di header (dulu SEARCHABLE),
+//             count = slice admin yang jumlahnya ditambahkan ke judul, mis. "Daftar Studio (4)" (components/adminSidebar.js).
 export const ROUTES = [
   { path: "/", name: "landing", access: "public", title: "", tab: null },
   { path: "/login", name: "auth", access: "guest", title: "", tab: null, params: { mode: "login" } },
@@ -28,15 +30,15 @@ export const ROUTES = [
   { path: "/account/payments", name: "account", access: "customer", title: "Akun", tab: null, params: { tab: "pay" } },
   { path: "/gallery", name: "gallery", access: "customer", title: "Galeri", tab: "gallery" },
   { path: "/sessions/:id", name: "session", access: "customer", title: "Sesi Foto", tab: "gallery" },
-  { path: "/admin", name: "adash", access: "admin", title: "Administrasi Pendapatan", tab: null },
-  { path: "/admin/users", name: "acust", access: "admin", title: "Daftar Pengguna", tab: null },
-  { path: "/admin/studios", name: "astudio", access: "admin", title: "Daftar Studio", tab: null },
-  { path: "/admin/bookings", name: "abook", access: "admin", title: "Daftar Booking", tab: null },
-  { path: "/admin/props", name: "aprop", access: "admin", title: "Daftar Properti", tab: null },
-  { path: "/admin/poses", name: "apose", access: "admin", title: "Daftar Pose", tab: null },
-  { path: "/admin/transactions", name: "atrx", access: "admin", title: "Transaksi", tab: null },
-  { path: "/admin/packages", name: "apkg", access: "admin", title: "Paket & Diskon", tab: null },
-  { path: "/admin/account", name: "aacct", access: "admin", title: "Akun Admin", tab: null },
+  { path: "/admin", name: "adash", access: "admin", title: "Administrasi Pendapatan", tab: null, menu: { label: "Dashboard", icon: "dash" } },
+  { path: "/admin/users", name: "acust", access: "admin", title: "Daftar Pengguna", tab: null, menu: { label: "Pengguna", icon: "users" }, searchable: true },
+  { path: "/admin/studios", name: "astudio", access: "admin", title: "Daftar Studio", tab: null, menu: { label: "Studio", icon: "studio" }, searchable: true, count: "studios" },
+  { path: "/admin/bookings", name: "abook", access: "admin", title: "Daftar Booking", tab: null, menu: { label: "Booking", icon: "calendar" }, searchable: true },
+  { path: "/admin/props", name: "aprop", access: "admin", title: "Daftar Properti", tab: null, menu: { label: "Properti", icon: "glasses" }, searchable: true },
+  { path: "/admin/poses", name: "apose", access: "admin", title: "Daftar Pose", tab: null, menu: { label: "Pose", icon: "run" }, searchable: true },
+  { path: "/admin/transactions", name: "atrx", access: "admin", title: "Transaksi", tab: null, menu: { label: "Transaksi", icon: "card" }, searchable: true },
+  { path: "/admin/packages", name: "apkg", access: "admin", title: "Paket & Diskon", tab: null, menu: { label: "Paket & Diskon", icon: "tag" } },
+  { path: "/admin/account", name: "aacct", access: "admin", title: "Akun Admin", tab: null, menu: { label: "Akun Admin", icon: "settings" } },
 ];
 
 const RESET_HASH = /^#reset=([a-f0-9]{64})$/;
