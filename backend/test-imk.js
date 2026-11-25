@@ -305,6 +305,36 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
   }
   await down(srv);
 
+  // ===== Pose = foto + jumlah orang, tanpa nama (imk/dev/pose-photo-plan.md) =====
+  srv = start('po'); await up();
+  { const PH = '/img/pose-placeholder.jpg', cols = () => { const D = new DatabaseSync(DB('po')); const c = D.prepare('PRAGMA table_info(pose)').all().map(r => r.name); D.close(); return c; };
+    const AD = (await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token;
+    ok(!cols().includes('nama') && cols().includes('img_url'), 'database baru: tabel pose tanpa kolom nama, dengan img_url');
+    { const L = (await call('GET', '/admin/poses', null, AD)).j; ok(L.length === 12 && L.every(p => p.img_url === PH && !('nama' in p)), 'seed: 12 pose dengan foto placeholder, tanpa nama'); }
+    { const m = (await call('GET', '/master')).j.POSES; ok([1, 2, 3].every(k => m[k].length === 4 && m[k].every(u => u === PH)), 'GET /api/master: POSES = url foto per jumlah orang'); }
+    { const r = await fetch(`http://localhost:${PORT}${PH}`); ok(r.status === 200 && r.headers.get('content-type') === 'image/jpeg', 'foto placeholder pose disajikan (200 image/jpeg)'); }
+    { const r = await call('POST', '/admin/poses', { people_range_id: 2 }, AD); ok(r.s === 400 && r.j.error === 'Foto pose wajib diunggah', 'tambah pose tanpa foto: 400 "Foto pose wajib diunggah"'); }
+    { const r = await call('POST', '/admin/poses', { img: 'javascript:alert(1)', people_range_id: 2 }, AD); ok(r.s === 400, 'tambah pose dengan URL foto tidak valid: 400'); }
+    { const r = await call('POST', '/admin/poses', { img: '/img/studio-1.jpg', people_range_id: 9 }, AD); ok(r.s === 400 && r.j.error === 'Jumlah orang wajib dipilih', 'tambah pose dengan jumlah orang tidak ada: 400'); }
+    const media = (await call('POST', '/admin/media', { data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' }, AD)).j.url;
+    const id = (await call('POST', '/admin/poses', { img: media, people_range_id: 2, nama: 'diabaikan' }, AD)).j.id; ok(id, 'tambah pose dengan foto unggahan (nama dari klien lama diabaikan)');
+    ok((await call('GET', '/master')).j.POSES[2].includes(media), 'pose baru tampil di POSES[2] sebagai url foto');
+    { const r = await call('PATCH', `/admin/poses/${id}`, { people_range_id: 3 }, AD), p = (await call('GET', '/admin/poses', null, AD)).j.find(x => x.id === id); ok(r.s === 200 && p.people_range_id === 3 && p.img_url === media, 'ubah jumlah orang tanpa foto: foto lama tetap'); }
+    { const r = await call('PATCH', `/admin/poses/${id}`, { img: '/img/studio-2.jpg' }, AD), p = (await call('GET', '/admin/poses', null, AD)).j.find(x => x.id === id); ok(r.s === 200 && p.img_url === '/img/studio-2.jpg' && p.people_range_id === 3, 'ubah foto saja: foto baru tersimpan, jumlah orang tetap'); }
+    ok((await call('PATCH', '/admin/poses/9999', { people_range_id: 1 }, AD)).s === 404, 'ubah pose yang tidak ada: 404');
+    ok((await call('DELETE', `/admin/poses/${id}`, null, AD)).s === 200 && !(await call('GET', '/admin/poses', null, AD)).j.some(x => x.id === id), 'hapus pose');
+    await down(srv);
+    // database lama: kolom nama + pose tanpa foto + flag dihapus → semua pose mendapat placeholder, kolom nama dihapus sekali
+    { const D = new DatabaseSync(DB('po')); D.exec("ALTER TABLE pose ADD COLUMN nama TEXT"); D.exec("UPDATE pose SET nama='Pose lama', img_url=NULL"); D.exec("DELETE FROM setting WHERE key='pose_photo_v1'"); D.close(); }
+    srv = start('po'); await up(); await down(srv);
+    { const D = new DatabaseSync(DB('po')); const f = D.prepare("SELECT 1 FROM setting WHERE key='pose_photo_v1'").get(), rows = D.prepare('SELECT img_url FROM pose').all(); D.close();
+      ok(!cols().includes('nama') && f && rows.length === 12 && rows.every(r => r.img_url === PH), 'database lama: kolom nama dihapus, pose tanpa foto mendapat placeholder, flag pose_photo_v1 tercatat'); }
+    srv = start('po'); await up(); ok(!cols().includes('nama') && (await call('GET', '/master')).j.POSES[1].length === 4, 'menyala kedua kali: tetap tanpa nama (migrasi sekali)');
+    { const JS = allJs(); for (const s of ['Nama / deskripsi pose', 'pose.nama', '"🧍 "']) ok(!JS.includes(s), `frontend tanpa "${s}"`);
+      ok(JS.includes('admin:uploadPoseImage'), 'frontend: unggah foto pose di halaman Pose admin'); }
+  }
+  await down(srv);
+
   // ===== Fase refactor 3: fallback SPA (rute frontend dengan path history disajikan index.html) =====
   srv = start('spa'); await up();
   { const index = fs.readFileSync(path.join(FRONT, 'index.html'), 'utf8');

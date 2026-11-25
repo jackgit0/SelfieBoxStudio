@@ -222,6 +222,8 @@ export function controllerActions({
     "admin:addProperty": (dataset, event) => admin.addProperty(formValues(event.target)),
     "admin:uploadPropertyImage": (dataset, event) =>
       admin.uploadPropertyImage(dataset, event.target.files[0], formValues(event.target.form)),
+    "admin:uploadPoseImage": (dataset, event) =>
+      admin.uploadPoseImage(dataset, event.target.files[0], formValues(event.target.form)),
     "admin:deleteProperty": admin.deleteProperty,
     "admin:savePose": (dataset, event) => admin.savePose(dataset, formValues(event.target)),
     "admin:addPose": (dataset, event) => admin.addPose(formValues(event.target)),

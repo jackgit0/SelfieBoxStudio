@@ -41,7 +41,7 @@ function fakeScreen(log) {
     updates: [],
     attachStream: stream => log.push(`attach ${stream.name}`),
     cameraUnavailable: () => log.push("cameraUnavailable"),
-    showPose: text => log.push(`pose ${text}`),
+    showPose: (url, alt) => log.push(`pose ${url} | ${alt}`),
     update(status, strip) {
       this.updates.push({ status, strip });
     },
@@ -60,7 +60,7 @@ const activeSession = (extra = {}) => ({ id: 41, user_id: 5, pkg: 1, status: "Ak
 
 function setup({ responses = {}, sessions = [activeSession()], staff = false, modalAnswers = [], cameraFails = false, current = null, clearToastOnNavigate = false, driveFetch = null } = {}) {
   const log = [];
-  const state = sampleState({ persisted: { me: 5, user: { id: 5, name: "Ana" }, staff, log: [] }, master: { poses: { 1: ["Pose A", "Pose B", "Pose C"] } } });
+  const state = sampleState({ persisted: { me: 5, user: { id: 5, name: "Ana" }, staff, log: [] }, master: { poses: { 1: ["/img/a.jpg", "/media/b.jpg", "/img/c.jpg"] }, peopleRanges: [{ id: 1, range: "1-2" }] } });
   state.data.sessions = sessions;
   state.photo = { ...createPhotoState(), session: current };
   const store = createStore(state, { storage: createFakeStorage(), persistKey: "snapia" });
@@ -131,7 +131,7 @@ test("enter: kamera diminta sekali, pose tiap 8 detik, hitung mundur tiap detik;
   assert.equal(store.get().photo.session, 41);
   assert.equal(log.filter(entry => entry.startsWith("getUserMedia")).length, 1);
   assert.ok(log.includes("attach kamera1"));
-  assert.ok(log.includes("pose 🧍 Pose A"));
+  assert.ok(log.includes("pose /img/a.jpg | Contoh pose untuk 1-2 orang"));
   assert.equal(timers.every(8000).length, 1);
   assert.equal(timers.every(1000).length, 1);
   assert.equal(screen.updates.at(-1).status.timer, "01:02");
@@ -217,7 +217,7 @@ test("nextPose berputar melewati daftar pose", () => {
   controller.nextPose();
   controller.nextPose();
   controller.nextPose();
-  assert.deepEqual(log.filter(entry => entry.startsWith("pose")), ["pose 🧍 Pose A", "pose 🧍 Pose B", "pose 🧍 Pose C", "pose 🧍 Pose A"]);
+  assert.deepEqual(log.filter(entry => entry.startsWith("pose")), ["pose /img/a.jpg | Contoh pose untuk 1-2 orang", "pose /media/b.jpg | Contoh pose untuk 1-2 orang", "pose /img/c.jpg | Contoh pose untuk 1-2 orang", "pose /img/a.jpg | Contoh pose untuk 1-2 orang"]);
 });
 
 test("staffAction: hanya Mode Staf; jeda memanggil model, log staf, status sesi diperbarui", async () => {

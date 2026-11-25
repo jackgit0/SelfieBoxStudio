@@ -2919,7 +2919,7 @@
         ],
         "operationId": "createPose",
         "summary": "Tambah pose",
-        "description": "Perlu token admin (password bawaan sudah diganti).",
+        "description": "`img` dan `people_range_id` wajib; tanpa foto → 400 \"Foto pose wajib diunggah\".\n\nPerlu token admin (password bawaan sudah diganti).",
         "x-role": "admin",
         "security": [
           {
@@ -2966,7 +2966,7 @@
         ],
         "operationId": "updatePose",
         "summary": "Ubah pose",
-        "description": "Kedua field wajib.\n\nPerlu token admin (password bawaan sudah diganti).",
+        "description": "Field yang tidak dikirim memakai nilai lama (foto, jumlah orang).\n\nPerlu token admin (password bawaan sudah diganti).",
         "x-role": "admin",
         "security": [
           {
@@ -4460,14 +4460,9 @@
           "id": {
             "type": "integer"
           },
-          "nama": {
-            "type": "string"
-          },
           "img_url": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "description": "Foto contoh pose (`/img/...` atau `/media/...` hasil `POST /api/admin/media`)"
           },
           "people_range_id": {
             "type": "integer"
@@ -4475,25 +4470,25 @@
         },
         "required": [
           "id",
-          "nama",
           "img_url",
           "people_range_id"
-        ]
+        ],
+        "description": "Pose = foto contoh + rentang jumlah orang, tanpa nama."
       },
       "PoseInput": {
         "type": "object",
         "properties": {
-          "nama": {
+          "img": {
             "type": "string",
-            "minLength": 1
+            "description": "URL foto (`/img/...`, `/media/...` atau http(s)). Wajib saat menambah; saat mengubah, foto lama dipakai bila tidak dikirim. `nama` dari klien lama diabaikan."
           },
           "people_range_id": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "description": "Wajib saat menambah; saat mengubah, nilai lama dipakai bila tidak dikirim."
           }
         },
         "required": [
-          "nama",
           "people_range_id"
         ]
       },
@@ -4576,10 +4571,10 @@
                 "type": "string"
               }
             },
-            "description": "Kunci = id rentang jumlah orang, nilai = daftar nama pose",
+            "description": "Kunci = id rentang jumlah orang, nilai = daftar URL foto pose (pose tanpa foto tidak dikirim)",
             "example": {
               "1": [
-                "Pose tertawa spontan"
+                "/img/pose-placeholder.jpg"
               ]
             }
           }

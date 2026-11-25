@@ -1,13 +1,17 @@
-// Daftar Pose admin (/admin/poses): nama/deskripsi pose dan jumlah orang per baris, lalu baris tambah. View murni (dulu poseRow, V.apose di admin.js).
-// Setiap baris punya <form> sendiri (atribut form=); isian yang gagal disimpan di admin.drafts["pose-<id|new>"].
+// Daftar Pose admin (/admin/poses): foto contoh pose dan jumlah orang per baris (tanpa nama), lalu baris tambah. View murni (dulu poseRow, V.apose di admin.js).
+// Setiap baris punya <form> sendiri (atribut form=); foto diunggah lewat data-change="admin:uploadPoseImage" seperti Properti.
+// Foto baru di admin.images["pose-<id|new>"], isian yang gagal/sedang diisi di admin.drafts["pose-<id|new>"].
 import { html } from "../../core/html.js";
-import { matchesQuery } from "../../models/admin/search.js";
+import { backgroundImage } from "../../components/propertyVisual.js";
+import { icon } from "../../components/icon.js";
 import { loadingCard, selectField } from "../../components/adminWidgets.js";
 
 function poseRow(pose, admin, peopleRanges) {
   const key = pose.id || "new";
   const formId = "pose-form-" + key;
   const values = admin.drafts["pose-" + key] || pose;
+  const image = admin.images["pose-" + key] || pose.img_url;
+  const range = peopleRanges.find(item => item.id == (values.people_range_id || 1));
   const submit = pose.id
     ? html`<form id="${formId}" novalidate data-submit="admin:savePose" data-id="${pose.id}"></form>`
     : html`<form id="${formId}" novalidate data-submit="admin:addPose"></form>`;
@@ -16,17 +20,19 @@ function poseRow(pose, admin, peopleRanges) {
         Hapus
       </button>`
     : "";
-  const ranges = peopleRanges.map(range => [range.id, range.range + " orang"]);
+  const ranges = peopleRanges.map(item => [item.id, item.range + " orang"]);
   return html`<tr>
     <td>
-      <input
-        form="${formId}"
-        name="nama"
-        value="${values.nama || ""}"
-        placeholder="Nama / deskripsi pose"
-        aria-label="Pose"
-        style="min-width:260px"
-      />
+      <label class="pthumb" style="${image ? backgroundImage(image) : ""}"
+        >${image ? "" : icon("upload", 20)}<input
+          type="file"
+          accept="image/*"
+          hidden
+          form="${formId}"
+          data-change="admin:uploadPoseImage"
+          data-key="${key}"
+          aria-label="${pose.id ? `Foto pose ${range ? range.range + " orang" : ""}` : "Foto pose baru"}"
+      /></label>
     </td>
     <td>
       ${selectField({ id: `po${key}r`, name: "people_range_id", options: ranges, current: values.people_range_id || 1, attributes: html`form="${formId}" aria-label="Jumlah orang"` })}
@@ -44,19 +50,20 @@ export function posesView(state) {
     return loadingCard();
   }
   const peopleRanges = state.master.peopleRanges;
-  const rows = admin.poses
-    .filter(pose => matchesQuery(admin.query, pose.nama))
-    .map(pose => poseRow(pose, admin, peopleRanges));
+  const rows = admin.poses.map(pose => poseRow(pose, admin, peopleRanges));
   return html`<div class="card">
     <div class="tbl">
       <table>
         <tr>
-          <th>Pose</th>
+          <th>Foto</th>
           <th>Jumlah orang</th>
           <th></th>
         </tr>
         ${rows}${poseRow({}, admin, peopleRanges)}
       </table>
     </div>
+    <p class="sm m" style="margin-top:8px">
+      Foto wajib diunggah saat menambah pose. Pose tampil di Sesi Foto sebagai contoh gaya sesuai jumlah orang.
+    </p>
   </div>`;
 }

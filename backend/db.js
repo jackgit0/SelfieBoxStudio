@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS people_range(id INTEGER PRIMARY KEY,range TEXT);
 CREATE TABLE IF NOT EXISTS package(id INTEGER PRIMARY KEY,name TEXT UNIQUE,price INTEGER,photo_count INTEGER,strip_size TEXT,strip_material TEXT,dur INTEGER);
 CREATE TABLE IF NOT EXISTS studio(id INTEGER PRIMARY KEY,name TEXT,description TEXT,budget_range_id INTEGER REFERENCES budget_range(id),people_range_id INTEGER REFERENCES people_range(id));
 CREATE TABLE IF NOT EXISTS property(id INTEGER PRIMARY KEY,name TEXT,type TEXT,img_url TEXT,extra TEXT);
-CREATE TABLE IF NOT EXISTS pose(id INTEGER PRIMARY KEY AUTOINCREMENT,nama TEXT,img_url TEXT,people_range_id INTEGER REFERENCES people_range(id));
+CREATE TABLE IF NOT EXISTS pose(id INTEGER PRIMARY KEY AUTOINCREMENT,img_url TEXT,people_range_id INTEGER REFERENCES people_range(id));
 CREATE TABLE IF NOT EXISTS booking(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL REFERENCES user(id),package_id INTEGER NOT NULL REFERENCES package(id),status TEXT NOT NULL,amount INTEGER NOT NULL,created_at INTEGER);
 CREATE TABLE IF NOT EXISTS payment(id INTEGER PRIMARY KEY AUTOINCREMENT,booking_id INTEGER NOT NULL REFERENCES booking(id),amount INTEGER,status TEXT,method TEXT,expire_at INTEGER);
 CREATE TABLE IF NOT EXISTS session(id INTEGER PRIMARY KEY AUTOINCREMENT,booking_id INTEGER NOT NULL REFERENCES booking(id),studio_id INTEGER NOT NULL REFERENCES studio(id),slot TEXT NOT NULL,start_time INTEGER,end_time INTEGER,paused_at INTEGER,status TEXT NOT NULL,confirmed INTEGER DEFAULT 0);
@@ -24,7 +24,7 @@ if (!db.prepare('SELECT 1 FROM package').get()) {
   ins('package', ['id', 'name', 'price', 'photo_count', 'strip_size', 'strip_material', 'dur'], seed.PKG);
   ins('studio', ['id', 'name', 'description', 'people_range_id', 'budget_range_id'], seed.STUDIOS);
   seed.PROP.forEach(p => db.prepare('INSERT INTO property(id,name,type,extra) VALUES(?,?,?,?)').run(p.id, p.name, p.type, p.bg || p.e));
-  Object.entries(seed.POSES).forEach(([pid, l]) => l.forEach(n => db.prepare('INSERT INTO pose(nama,people_range_id) VALUES(?,?)').run(n, +pid)));
+  Object.entries(seed.POSES).forEach(([pid, l]) => l.forEach(img => db.prepare('INSERT INTO pose(img_url,people_range_id) VALUES(?,?)').run(img, +pid))); // pose = foto contoh per jumlah orang
 }
 // ---- migrasi: tabel & kolom baru (aman untuk database lama) ----
 db.exec(`CREATE TABLE IF NOT EXISTS password_reset(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL REFERENCES user(id),token_hash TEXT UNIQUE NOT NULL,expires_at INTEGER NOT NULL,used INTEGER DEFAULT 0);
@@ -73,4 +73,6 @@ if (!flag('drop_studio_address_v1')) { // studio tanpa alamat (satu lokasi usaha
   db.exec('BEGIN'); try { if (hasCol('studio', 'address')) db.exec('ALTER TABLE studio DROP COLUMN address'); setFlag('drop_studio_address_v1'); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } }
 if (!flag('drop_studio_status_v1')) { // status studio tidak lagi diatur admin: dihitung dari slot kosong 14 hari (server.js studioStatus)
   db.exec('BEGIN'); try { if (hasCol('studio', 'status')) db.exec('ALTER TABLE studio DROP COLUMN status'); setFlag('drop_studio_status_v1'); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } }
+if (!flag('pose_photo_v1')) { // pose = foto + jumlah orang, tanpa nama: pose lama mendapat foto placeholder (warna datar), kolom nama dihapus
+  db.exec('BEGIN'); try { db.prepare(`UPDATE pose SET img_url='/img/pose-placeholder.jpg' WHERE img_url IS NULL OR img_url=''`).run(); if (hasCol('pose', 'nama')) db.exec('ALTER TABLE pose DROP COLUMN nama'); setFlag('pose_photo_v1'); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } }
 module.exports = db;

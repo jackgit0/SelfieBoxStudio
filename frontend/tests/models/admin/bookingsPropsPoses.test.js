@@ -56,11 +56,12 @@ test("properties: body dari isian (qty angka, gambar bila ada), path API, katego
 });
 
 test("poses: body dari isian, path API", async () => {
-  assert.deepEqual(poses.poseBody({ nama: "Lompat", people_range_id: "2" }), { nama: "Lompat", people_range_id: 2 });
+  assert.deepEqual(poses.poseBody({ people_range_id: "2" }), { people_range_id: 2 });
+  assert.deepEqual(poses.poseBody({ people_range_id: "3", nama: "diabaikan" }, "/media/p.jpg"), { people_range_id: 3, img: "/media/p.jpg" });
   const api = createFakeApi({ "GET /admin/poses": { body: [] }, "POST /admin/poses": { body: {} }, "PATCH /admin/poses/6": { body: {} }, "DELETE /admin/poses/6": { body: {} } });
   await poses.loadPoses(api);
-  await poses.savePose(api, null, { nama: "A" });
-  await poses.savePose(api, 6, { nama: "B" });
+  await poses.savePose(api, null, { people_range_id: 1, img: "/media/a.jpg" });
+  await poses.savePose(api, 6, { people_range_id: 2 });
   await poses.deletePose(api, 6);
   assert.deepEqual(api.calls.map(call => `${call.method} ${call.path}`), ["GET /admin/poses", "POST /admin/poses", "PATCH /admin/poses/6", "DELETE /admin/poses/6"]);
 });

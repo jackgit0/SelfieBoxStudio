@@ -456,20 +456,35 @@ test("properti: hapus lewat modal Konfirmasi Hapus Properti; Kembali → tanpa p
   assert.equal(toast().message, "Properti dihapus.");
 });
 
-test("pose: muat, simpan (PATCH), tambah (POST), gagal → draf, hapus lewat modal Konfirmasi Hapus Pose", async () => {
-  const { controller, api, requests, admin, toast, ui } = setupCatalog({ modalAnswers: [true], responses: { "GET /admin/poses": { body: [{ id: 6 }] }, "PATCH /admin/poses/6": { body: {} }, "POST /admin/poses": { status: 400, body: { error: "Nama pose wajib diisi" } }, "DELETE /admin/poses/6": { body: {} } } });
+test("pose: muat, simpan (PATCH + foto baru), daftar dan pose master dimuat ulang; tambah tanpa foto gagal → draf; hapus lewat modal Konfirmasi Hapus Pose", async () => {
+  const { controller, api, requests, admin, toast, ui, store } = setupCatalog({ modalAnswers: [true], admin: { images: { "pose-6": "/media/p.jpg" } }, responses: { "GET /admin/poses": { body: [{ id: 6 }] }, "PATCH /admin/poses/6": { body: {} }, "POST /admin/poses": { status: 400, body: { error: "Foto pose wajib diunggah" } }, "DELETE /admin/poses/6": { body: {} } } });
+  store.update("master", { poses: { 1: ["/img/lama.jpg"] } }, { silent: true });
   await controller.loadPoses();
-  await controller.savePose({ id: "6" }, { nama: "Lompat", people_range_id: "2" });
-  assert.deepEqual(api.calls[1].body, { nama: "Lompat", people_range_id: 2 });
+  await controller.savePose({ id: "6" }, { people_range_id: "2" });
+  assert.deepEqual(api.calls[1].body, { people_range_id: 2, img: "/media/p.jpg" });
   assert.equal(toast().message, "Pose disimpan.");
-  assert.equal(admin().poses, null);
-  await controller.addPose({ nama: "", people_range_id: "1" });
-  assert.deepEqual(admin().drafts["pose-new"], { nama: "", people_range_id: "1" });
+  assert.deepEqual([admin().poses, admin().images], [null, {}]);
+  assert.deepEqual(store.get().master.poses, {});
+  await controller.addPose({ people_range_id: "1" });
+  assert.deepEqual(api.calls[3].body, { people_range_id: 1 });
+  assert.equal(toast().error, "Foto pose wajib diunggah");
+  assert.deepEqual(admin().drafts["pose-new"], { people_range_id: "1" });
   await controller.deletePose({ id: "6" });
   assert.equal(ui.modals[0].title, "Konfirmasi Hapus Pose");
   assert.match(flat(ui.modals[0].body), /Hapus pose ini\?/);
-  assert.deepEqual(requests(), ["GET /admin/poses", "PATCH /admin/poses/6", "POST /admin/poses", "DELETE /admin/poses/6"]);
+  assert.deepEqual(requests(), ["GET /admin/poses", "PATCH /admin/poses/6", "GET /master", "POST /admin/poses", "DELETE /admin/poses/6", "GET /master"]);
   assert.equal(toast().message, "Pose dihapus.");
+});
+
+test("pose: unggah foto → isian baris jadi draf, foto di admin.images[\"pose-<key>\"], toast Klik Simpan; tanpa berkas → tanpa permintaan", async () => {
+  const { controller, admin, toast, api } = setupCatalog({ responses: { "POST /admin/media": { body: { url: "/media/q.jpg" } } } });
+  await controller.uploadPoseImage({ key: "new" }, { name: "q.png" }, { people_range_id: "3" });
+  assert.deepEqual(api.calls[0].body, { data: "data:q.png" });
+  assert.equal(admin().images["pose-new"], "/media/q.jpg");
+  assert.deepEqual(admin().drafts["pose-new"], { people_range_id: "3" });
+  assert.equal(toast().message, "Gambar diunggah. Klik Simpan untuk menerapkan.");
+  await controller.uploadPoseImage({ key: "6" }, null, {});
+  assert.equal(api.calls.length, 1);
 });
 
 test("run: aksi yang dibatalkan (CANCELLED) → tanpa render dan tanpa toast, fokus tetap di tombol pembuka dialog", async () => {

@@ -31,7 +31,7 @@ test("peringatan password bawaan hanya bila ditandai", () => {
 
 test("judul halaman dan kotak cari hanya untuk halaman yang bisa dicari", () => {
   const searchable = ROUTES.filter(route => route.searchable).map(route => route.name);
-  assert.deepEqual(searchable, ["acust", "astudio", "abook", "aprop", "apose", "atrx"]);
+  assert.deepEqual(searchable, ["acust", "astudio", "abook", "aprop", "atrx"]); // Pose tanpa kotak cari (foto + jumlah orang, tanpa teks)
   const text = flat(adminHeader({ route: routeOf("/admin/users"), title: "Daftar Pengguna", query: 'a"b' }));
   assert.match(text, /<div class="ahead"><h1>Daftar Pengguna<\/h1><div class="search"><svg[^]*?<\/svg><input placeholder="Search\.\.\." aria-label="Cari" value="a&quot;b" data-change="admin:search"><\/div><\/div>/);
   assert.doesNotMatch(flat(adminHeader({ route: routeOf("/admin"), title: "Administrasi Pendapatan" })), /search/);

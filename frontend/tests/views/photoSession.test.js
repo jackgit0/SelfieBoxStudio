@@ -7,8 +7,9 @@ import { flat } from "../helpers/markup.js";
 
 const match = { route: { name: "session" }, params: { id: "41" }, query: {}, path: "/sessions/41" };
 const session = (extra = {}) => ({ id: 41, user_id: 5, pkg: 1, status: "Aktif", left: 125, paused: false, photos: [{ id: 90, img: "/api/photos/90/img?t=a&b" }], ...extra });
-function stateWith({ sessions = [session()], staff = false, log = [], current = 41 } = {}) {
+function stateWith({ sessions = [session()], staff = false, log = [], current = 41, poses = { 1: ["/img/pose-placeholder.jpg"] } } = {}) {
   const state = sampleState({ persisted: { me: 5, user: { id: 5, name: "Ana" }, staff, log } });
+  state.master = { ...state.master, poses };
   state.data.sessions = sessions;
   state.photo = { session: current };
   return state;
@@ -25,12 +26,18 @@ test("layar sesi: paket, tombol Ambil Foto / Pose lain lewat data-action, tanpa 
   const text = flat(photoSessionView(stateWith(), match));
   assert.match(text, /Paket Basic · target 3 foto \(maks\. ambil 6\) · 15 menit/);
   assert.match(text, /<button class="btn" id="shot" data-action="photo:shoot">/);
-  assert.match(text, /<button class="btn sm ghost" data-action="photo:nextPose">Pose lain<\/button>/);
+  assert.match(text, /<h3 class="h3">Pose Rekomendasi<\/h3><img id="pose" class="pose-img" alt=""><button class="btn sm ghost" data-action="photo:nextPose">Pose lain<\/button>/);
   assert.match(text, /data-action="package:contactCs">Customer Service<\/button>/);
   assert.doesNotMatch(text, /Kendali Staf|onclick=/);
   const staff = flat(photoSessionView(stateWith({ staff: true, log: ["pause 10.00", "resume 10.01", "pause 10.02", "resume <b>"] }), match));
   assert.match(staff, /<button class="btn sm ghost" data-action="photo:staffAction" data-command="pause">⏸ Jeda<\/button><button class="btn sm ghost" data-action="photo:staffAction" data-command="resume">▶ Lanjut<\/button><button class="btn sm danger" data-action="photo:staffAction" data-command="stop">⏹ Hentikan<\/button>/);
   assert.match(staff, /Log: resume 10\.01 · pause 10\.02 · resume &lt;b&gt;/);
+});
+
+test("Pose Rekomendasi tanpa foto pose: teks Belum ada contoh pose, tanpa gambar dan tanpa tombol Pose lain", () => {
+  const text = flat(photoSessionView(stateWith({ poses: {} }), match));
+  assert.match(text, /<h3 class="h3">Pose Rekomendasi<\/h3><p class="m sm" style="margin-top:8px">Belum ada contoh pose\.<\/p>/);
+  assert.doesNotMatch(text, /id="pose"|photo:nextPose/);
 });
 
 test("sessionStatus: timer mm:ss, peringatan ≤ 60 detik, hitungan foto, tombol foto, catatan", () => {

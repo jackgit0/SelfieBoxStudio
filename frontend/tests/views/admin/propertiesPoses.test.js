@@ -1,4 +1,4 @@
-// View Daftar Properti dan Daftar Pose admin: baris dengan form sendiri (atribut form=), unggah foto properti, baris tambah, draf
+// View Daftar Properti dan Daftar Pose admin: baris dengan form sendiri (atribut form=), unggah foto properti dan pose, baris tambah, draf
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createAdminState } from "../../../js/controllers/AdminController.js";
@@ -35,15 +35,26 @@ test("properti: baris tambah (Topi, qty 1, ikon unggah) dengan + Tambah; gambar 
   assert.match(fresh, /name="qty" type="number" min="0" value="1"/);
 });
 
-test("pose: Memuat…; baris dengan form pose-form-<id>, nama di-escape, jumlah orang terpilih, Simpan/Hapus, baris tambah, draf, pencarian", () => {
+test("pose: Memuat…; baris dengan form pose-form-<id>, foto (unggah), jumlah orang terpilih, tanpa nama, Simpan/Hapus", () => {
   assert.match(render(posesView, {}), /Memuat…/);
-  const out = render(posesView, { poses: [{ id: 6, nama: "Lompat <i>", people_range_id: 2 }, { id: 7, nama: "Duduk", people_range_id: 1 }], drafts: { "pose-7": { nama: "Duduk santai", people_range_id: "2" } } });
+  const out = render(posesView, { poses: [{ id: 6, img_url: "/media/a.jpg", people_range_id: 2 }, { id: 7, img_url: "/img/pose-placeholder.jpg", people_range_id: 1 }] });
+  assert.match(out, /<th>Foto<\/th><th>Jumlah orang<\/th><th><\/th>/);
   assert.match(out, /<form id="pose-form-6" novalidate data-submit="admin:savePose" data-id="6"><\/form>/);
-  assert.match(out, /<input form="pose-form-6" name="nama" value="Lompat &lt;i&gt;" placeholder="Nama \/ deskripsi pose" aria-label="Pose" style="min-width:260px">/);
+  assert.match(out, /<label class="pthumb" style="background-image:url\('\/media\/a\.jpg'\)"><input type="file" accept="image\/\*" hidden form="pose-form-6" data-change="admin:uploadPoseImage" data-key="6" aria-label="Foto pose 3-5 orang"><\/label>/);
+  assert.match(out, /<label class="pthumb" style="background-image:url\('\/img\/pose-placeholder\.jpg'\)">/);
   assert.match(out, /<option value="2" selected>3-5 orang<\/option>/);
   assert.match(out, /data-action="admin:deletePose" data-id="6">Hapus<\/button>/);
-  assert.match(out, /name="nama" value="Duduk santai"/);
-  assert.match(out, /<form id="pose-form-new" novalidate data-submit="admin:addPose"><\/form>/);
-  assert.match(out, /form="pose-form-new">\+ Tambah<\/button>/);
-  assert.ok(!render(posesView, { poses: [{ id: 6, nama: "Lompat", people_range_id: 1 }], query: "duduk" }).includes("Lompat"));
+  assert.ok(!out.includes('name="nama"'));
+  assert.ok(out.includes("Foto wajib diunggah saat menambah pose."));
+});
+
+test("pose: baris tambah (ikon unggah, Foto pose baru, + Tambah); foto baru dan draf jumlah orang tampil; kotak cari tidak menyaring", () => {
+  const fresh = render(posesView, { poses: [] });
+  assert.match(fresh, /<form id="pose-form-new" novalidate data-submit="admin:addPose"><\/form>/);
+  assert.match(fresh, /<label class="pthumb" style=""><svg[^]*?data-change="admin:uploadPoseImage" data-key="new" aria-label="Foto pose baru">/);
+  assert.match(fresh, /form="pose-form-new">\+ Tambah<\/button>/);
+  const out = render(posesView, { poses: [{ id: 7, img_url: "/media/a.jpg", people_range_id: 1 }], images: { "pose-new": "/media/n.jpg", "pose-7": "/media/b.jpg" }, drafts: { "pose-7": { people_range_id: "2" } }, query: "apa saja" });
+  assert.match(out, /background-image:url\('\/media\/n\.jpg'\)"><input[^>]*data-key="new"/);
+  assert.match(out, /background-image:url\('\/media\/b\.jpg'\)"><input[^>]*data-key="7"/);
+  assert.match(out, /id="po7r"[^>]*>(?:(?!<\/select>)[^])*<option value="2" selected>/);
 });
