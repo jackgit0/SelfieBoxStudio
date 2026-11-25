@@ -8,7 +8,7 @@ const start = (k, extra = {}) => { const p = spawn('node', ['--disable-warning=E
   p.stderr.on('data', d => process.stderr.write(d)); return p; };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const up = async () => { for (let i = 0; i < 60; i++) { try { await fetch(`http://localhost:${PORT}/api/master`); return; } catch (e) { await wait(100); } } throw new Error('server tidak menyala'); };
-const down = p => new Promise(r => { if (p.exitCode !== null) return r(); p.once('exit', r); p.kill(); });
+const down = p => new Promise(r => { if (p.exitCode !== null || p.signalCode !== null) return r(); p.once('exit', r); p.kill(); }); // sudah berhenti (keluar sendiri atau dibunuh sinyal): langsung selesai, agar cek yang gagal tetap keluar dengan kode 1
 const call = async (m, p, body, tok) => { const r = await fetch(`http://localhost:${PORT}/api` + p, { method: m, headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, body: body ? JSON.stringify(body) : undefined }); let j = {}; try { j = await r.json(); } catch (e) {} return { s: r.status, j }; };
 const file = async p => (await fetch(`http://localhost:${PORT}` + p)).text();
 // sumber frontend dibaca dari disk: cek teks memindai semua berkas (allJs/allCss) agar tidak bergantung pada letak kode; src() = satu berkas untuk cek bentuk kode (test-map.md)
