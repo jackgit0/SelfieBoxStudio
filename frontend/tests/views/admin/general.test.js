@@ -20,15 +20,23 @@ test("dashboard: memuat sampai pendapatan dan rekap ada", () => {
   assert.match(render(dashboardView(stateWith({ revenue }))), /Memuat…/);
 });
 
-test("dashboard: kartu pendapatan, tabel 7 hari, rekap operasional, periode terpilih, item di-escape, form Tambah", () => {
-  const out = render(dashboardView(stateWith({ revenue, operations })));
-  for (const text of ["Hari ini", "7 hari terakhir", "30 hari terakhir", "Sejak pemesanan pertama", " · mulai 2026-10-01", "Pendapatan 7 hari terakhir", "Rp50.000", "Rekapitulasi Operasional", "Omset bersih", "Rp1.400.000", "Tambah item", ">Tambah</button>"]) assert.ok(out.includes(text), text);
+test("dashboard: kartu pendapatan, tabel 7 hari, rekap operasional, periode terpilih, item di-escape, tombol + Tambah item (form tertutup)", () => {
+  let out = render(dashboardView(stateWith({ revenue, operations })));
+  for (const text of ["Hari ini", "7 hari terakhir", "30 hari terakhir", "Sejak pemesanan pertama", " · mulai 2026-10-01", "Pendapatan 7 hari terakhir", "Rp50.000", "Rekapitulasi Operasional", "Omset bersih", "Rp1.400.000"]) assert.ok(out.includes(text), text);
+  assert.match(out, /data-action="admin:startEdit" data-key="operation"><svg[^]*<\/svg> Tambah item<\/button>/);
+  assert.ok(!out.includes("<form"));
   assert.match(out, /<option value="month" selected>30 hari terakhir<\/option>/);
   assert.match(out, /data-change="admin:setOperationsPeriod"/);
   assert.ok(out.includes("Sewa &lt;b&gt;studio&lt;/b&gt;"));
   assert.match(out, /data-action="admin:editOperation" data-id="4"/);
   assert.match(out, /data-action="admin:deleteOperation" data-id="4"/);
+  assert.match(out, /color:var\(--green\)/);
+  out = render(dashboardView(stateWith({ revenue, operations, editing: "operation" })));
   assert.match(out, /<form[^>]*data-submit="admin:saveOperation"/);
+  assert.ok(out.includes(">Tambah item</h3>"));
+  assert.match(out, /<button class="btn" type="submit">Tambah<\/button><button class="btn ghost" type="button" data-action="admin:cancelOperationEdit">Batal<\/button>/);
+  assert.match(out, /name="label" data-edit-focus/);
+  assert.ok(!out.includes('data-key="operation"'));
   for (const name of ["date", "label", "kind", "amount", "note"]) assert.match(out, new RegExp(`name="${name}"`), name);
   assert.match(out, /color:var\(--green\)/);
 });
@@ -41,12 +49,12 @@ test("dashboard: rekap tanpa item → keadaan kosong; omset bersih negatif merah
 
 test("dashboard: mode ubah mengisi form dari item, tombol Simpan perubahan + Batal; draf yang gagal disimpan menang", () => {
   const editing = operations.items[0];
-  let out = render(dashboardView(stateWith({ revenue, operations, editingOperation: editing })));
+  let out = render(dashboardView(stateWith({ revenue, operations, editing: "operation", editingOperation: editing })));
   assert.ok(out.includes("Ubah item"));
   assert.ok(out.includes("Simpan perubahan"));
   assert.match(out, /data-action="admin:cancelOperationEdit"/);
   assert.match(out, /name="amount"[^>]*value="200000"/);
-  out = render(dashboardView(stateWith({ revenue, operations, editingOperation: editing, drafts: { operation: { date: "2026-11-21", label: "Listrik", kind: "pemasukan", amount: "abc", note: "x" } } })));
+  out = render(dashboardView(stateWith({ revenue, operations, editing: "operation", editingOperation: editing, drafts: { operation: { date: "2026-11-21", label: "Listrik", kind: "pemasukan", amount: "abc", note: "x" } } })));
   assert.match(out, /name="label"[^>]*value="Listrik"/);
   assert.match(out, /<option value="pemasukan" selected>/);
 });

@@ -1,7 +1,9 @@
 // Dashboard admin (/admin): kartu pendapatan, pendapatan 7 hari terakhir dan Rekapitulasi Operasional dengan form tambah/ubah item.
+// Form hanya tampil setelah + Tambah item atau Ubah pada sebuah item (admin.editing = "operation", dev/admin-edit-mode-plan.md).
 // View murni (dulu V.adash di admin.js). Form dikirim lewat data-submit (AdminController.saveOperation); isian yang gagal disimpan
 // dibaca dari admin.drafts.operation.
 import { html } from "../../core/html.js";
+import { icon } from "../../components/icon.js";
 import { formatRupiah, todayIso } from "../../core/format.js";
 import { PERIODS } from "../../models/admin/dashboard.js";
 import { loadingCard, statCard } from "../../components/adminWidgets.js";
@@ -77,6 +79,7 @@ function operationForm(values, editing) {
       /><input
         id="o_label"
         name="label"
+        data-edit-focus
         placeholder="Keterangan (mis. Sewa studio)"
         aria-label="Keterangan"
         value="${values.label || ""}"
@@ -105,12 +108,13 @@ function operationForm(values, editing) {
     </div>
     <div class="row" style="margin-top:10px">
       <button class="btn" type="submit">${editing ? "Simpan perubahan" : "Tambah"}</button
-      >${editing ? html`<button class="btn ghost" type="button" data-action="admin:cancelOperationEdit">Batal</button>` : ""}
+      ><button class="btn ghost" type="button" data-action="admin:cancelOperationEdit">Batal</button>
     </div>
   </form>`;
 }
 
-function operationsSection(operations, editing, draft) {
+// open = form terbuka (editing "operation"); editing = item yang diubah (null = Tambah item)
+function operationsSection(operations, open, editing, draft) {
   const periods = PERIODS.map(
     ([value, label]) => html`<option value="${value}" ${selected(operations.period == value)}>${label}</option>`,
   );
@@ -139,14 +143,18 @@ function operationsSection(operations, editing, draft) {
         ${operationRows(operations.items)}
       </table>
     </div>
-    ${operationForm(draft || editing || {}, Boolean(editing))}
+    ${open
+      ? operationForm(draft || editing || {}, Boolean(editing))
+      : html`<button class="btn sm" type="button" style="margin-top:12px" data-action="admin:startEdit" data-key="operation">
+          ${icon("plus", 16)} Tambah item
+        </button>`}
   </div>`;
 }
 
 export function dashboardView(state) {
-  const { revenue, operations, editingOperation, drafts } = state.admin;
+  const { revenue, operations, editing, editingOperation, drafts } = state.admin;
   if (!revenue || !revenue.today || !operations || !operations.period) {
     return loadingCard();
   }
-  return html`${revenueSection(revenue)} ${operationsSection(operations, editingOperation, drafts.operation)}`;
+  return html`${revenueSection(revenue)} ${operationsSection(operations, editing == "operation", editingOperation, drafts.operation)}`;
 }
