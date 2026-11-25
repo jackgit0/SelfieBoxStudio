@@ -246,5 +246,22 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!old, 'frontend: tidak ada lagi rujukan ke nama global lama' + (old ? ` (masih ada "${old[0]}")` : '')); // kode: diganti di fase 9
   }
 
+  // ===== Fase refactor 3: fallback SPA (rute frontend dengan path history disajikan index.html) =====
+  srv = start('spa'); await up();
+  { const index = fs.readFileSync(path.join(FRONT, 'index.html'), 'utf8');
+    const get = async p => { const r = await fetch(`http://localhost:${PORT}` + p); return { s: r.status, t: r.headers.get('content-type') || '', b: await r.text() }; };
+    // path mentah tanpa normalisasi URL di sisi klien (fetch merapikan "/../")
+    const raw = p => new Promise((ok, no) => require('http').get({ host: 'localhost', port: PORT, path: p }, r => { let b = ''; r.on('data', d => b += d); r.on('end', () => ok({ s: r.statusCode, b })); }).on('error', no));
+    for (const p of ['/bookings/12', '/admin/studios', '/book/pay', '/reset-password']) { const r = await get(p); ok(r.s === 200 && r.t.startsWith('text/html') && r.b === index, `GET ${p} → 200 text/html berisi index.html`); }
+    { const r = await get('/bookings?tab=history'); ok(r.s === 200 && r.b === index, 'GET /bookings?tab=history → index.html (query diabaikan)'); }
+    { const r = await get('/js/missing.js'); ok(r.s === 404 && r.b !== index, 'GET /js/missing.js → 404 (bukan index.html)'); }
+    { const r = await get('/css'); ok(r.s === 404, 'GET /css (folder) tetap 404'); }
+    { const r = await get('/api/nope'); ok(r.s === 404 && r.t.startsWith('application/json') && JSON.parse(r.b).error === 'Endpoint tidak ada', 'GET /api/nope → 404 JSON'); }
+    { const r = await get('/media/nope'); ok(r.s === 404 && r.b !== index, 'GET /media/nope → 404 (bukan index.html)'); }
+    for (const p of ['/../backend/.env', '/../backend/server.js', '/..%2Fbackend%2F.env', '/%2e%2e/backend/.env']) { const r = await raw(p); ok(r.s === 404 && !/JWT_SECRET|createServer/.test(r.b), `GET ${p} tidak membocorkan berkas backend (404)`); }
+    { const r = await get('/js/main.js'); ok(r.s === 200 && r.t.startsWith('text/javascript'), 'berkas yang ada tetap disajikan apa adanya (/js/main.js)'); }
+  }
+  await down(srv);
+
   console.log(`\n${n} tes lulus`); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);
 })().catch(async e => { console.error('✘ GAGAL:', e.message); if (srv) await down(srv); process.exit(1); });

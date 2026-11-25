@@ -372,7 +372,10 @@ http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*'); res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type,X-Staff-Token'); res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   if (!u.pathname.startsWith('/api/')) { // file statis frontend (+ /media = gambar unggahan admin)
-    const isM = u.pathname.startsWith('/media/'), root = isM ? MEDIA : FRONT, f = path.join(root, isM ? path.normalize(u.pathname.slice(7)) : u.pathname === '/' ? 'index.html' : path.normalize(u.pathname)); if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
+    const isM = u.pathname.startsWith('/media/'), root = isM ? MEDIA : FRONT, f = path.join(root, isM ? path.normalize(u.pathname.slice(7)) : u.pathname === '/' ? 'index.html' : path.normalize(u.pathname)); const found = f.startsWith(root) && fs.existsSync(f);
+    // fallback SPA: rute frontend (/bookings/12, /admin/studios) = GET tanpa ekstensi di luar /media/ yang bukan berkas → index.html; folder dan berkas yang tidak ada tetap 404
+    if (!found && !isM && req.method === 'GET' && f.startsWith(root) && !path.posix.basename(u.pathname).includes('.')) { res.writeHead(200, { 'Content-Type': 'text/html' }); return fs.createReadStream(path.join(FRONT, 'index.html')).pipe(res); }
+    if (!found || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
     res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' }); return fs.createReadStream(f).pipe(res); }
   try { const r = R.find(r => r.m === req.method && r.re.test(u.pathname)); if (!r) throw new HttpErr(404, 'Endpoint tidak ada');
     const ctx = { req, res, ip: req.socket.remoteAddress, params: r.re.exec(u.pathname).groups || {}, query: Object.fromEntries(u.searchParams), body: ['GET', 'DELETE'].includes(req.method) ? {} : await readBody(req) };
