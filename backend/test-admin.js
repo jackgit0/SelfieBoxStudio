@@ -1,4 +1,4 @@
-// Tes integrasi fitur baru (reset sandi, invoice email, admin, promo, hapus massal). Jalankan: npm run test:admin
+// Tes integrasi fitur baru (reset sandi, invoice email, admin, diskon, hapus massal). Jalankan: npm run test:admin
 const { spawn } = require('child_process'), assert = require('assert'), os = require('os'), path = require('path'), net = require('net'), fs = require('fs');
 const PORT = 3925, TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'snapia-')), B = `http://localhost:${PORT}/api`, mails = [];
 // SMTP palsu (tanpa TLS) untuk memverifikasi klien SMTP + isi email
@@ -26,25 +26,20 @@ const JPG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////
   ok((await call('POST', '/auth/login', { email: 'ana@x.id', password: 'lama123' })).s === 401, 'sandi lama tidak berlaku'); ok((await call('GET', '/bookings', null, A.token)).s === 401, 'sesi login lama dicabut setelah ganti sandi');
   const A2 = (await call('POST', '/auth/login', { email: 'ana@x.id', password: 'baru1234' })).j; ok(A2.token, 'login dengan sandi baru');
   const Bb = (await call('POST', '/auth/register', { name: 'Budi', email: 'b@x.id', phone: '0822222222', password: 'secret2' })).j;
-  // --- diskon, promo, booking, invoice ---
+  // --- diskon, booking, invoice ---
   ok((await call('GET', '/master')).j.DISC.pct === 0, 'master memuat diskon utama');
   const adm = await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' }); ok(adm.s === 200 && adm.j.token, 'login admin (adminstudio/admin123)'); const AD = adm.j.token;
   ok((await call('POST', '/admin/login', { username: 'adminstudio', password: 'salah' })).s === 401, 'admin password salah ditolak');
   ok((await call('GET', '/admin/customers', null, A2.token)).s === 403, 'customer tidak bisa membuka endpoint admin'); ok((await call('GET', '/bookings', null, AD)).s === 401, 'token admin bukan token customer');
   ok((await call('PUT', '/admin/discount', { pct: 10, label: 'Promo Oktober' }, AD)).s === 200, 'admin mengatur diskon utama 10%');
-  ok((await call('POST', '/admin/promos', { code: 'hemat5k', kind: 'nominal', value: 5000, max_uses: 1 }, AD)).s === 200, 'admin membuat kode promo (nominal, kuota 1)');
-  ok((await call('POST', '/admin/promos', { code: 'HEMAT5K', kind: 'nominal', value: 5000 }, AD)).s === 409, 'kode promo ganda ditolak');
-  const setup = { vibe: 1, bg: 2, acc: [3] }; // add-on 15000
-  const qt = (await call('POST', '/quote', { package_id: 2, setup, code: 'hemat5k' }, A2.token)).j; ok(qt.subtotal === 105000 && qt.mainDisc === 9000 && qt.promoDisc === 5000 && qt.total === 91000, 'perhitungan: 90.000 -10% + add-on 15.000 - promo 5.000 = 91.000');
-  ok((await call('POST', '/quote', { package_id: 2, code: 'NGAWUR' }, A2.token)).s === 400, 'kode promo tidak valid ditolak');
-  const bk = (await call('POST', '/bookings', { package_id: 2, studio_id: 1, date: day + ' 11:00', setup, code: 'HEMAT5K' }, A2.token)).j; ok(bk.amount === 91000 && bk.promo_code === 'HEMAT5K', 'booking memakai harga setelah diskon & promo');
+  const qt = (await call('POST', '/quote', { package_id: 2 }, A2.token)).j; ok(qt.subtotal === 90000 && qt.mainDisc === 9000 && qt.total === 81000, 'perhitungan: 90.000 - diskon utama 10% = 81.000');
+  const bk = (await call('POST', '/bookings', { package_id: 2, studio_id: 1, date: day + ' 11:00' }, A2.token)).j; ok(bk.amount === 81000, 'booking memakai harga setelah diskon utama');
   ok((await call('GET', `/bookings/${bk.id}/invoice`, null, A2.token)).s === 409, 'invoice belum tersedia sebelum bayar'); mails.length = 0;
   ok((await call('POST', `/bookings/${bk.id}/pay`, { method: 'QRIS' }, A2.token)).j.status === 'Terbayar', 'pembayaran berhasil'); await wait(500);
-  const inv = mails.map(decode).find(m => /Invoice INV-/.test(m.subject)); ok(inv && inv.to.includes('ana@x.id') && inv.text.includes('Rp91.000'), 'invoice otomatis terkirim ke email customer (lampiran + total)');
-  const iv = await call('GET', `/bookings/${bk.id}/invoice?dl=1`, null, A2.token); ok(iv.s === 200 && iv.j.text.includes('TOTAL') && iv.j.text.includes('Diskon utama') && iv.j.text.includes('HEMAT5K'), 'invoice dapat diunduh dari Booking Saya (rincian diskon)');
+  const inv = mails.map(decode).find(m => /Invoice INV-/.test(m.subject)); ok(inv && inv.to.includes('ana@x.id') && inv.text.includes('Rp81.000'), 'invoice otomatis terkirim ke email customer (lampiran + total)');
+  const iv = await call('GET', `/bookings/${bk.id}/invoice?dl=1`, null, A2.token); ok(iv.s === 200 && iv.j.text.includes('TOTAL') && iv.j.text.includes('Diskon utama'), 'invoice dapat diunduh dari Booking Saya (rincian diskon)');
   ok((await call('GET', `/bookings/${bk.id}/invoice`, null, Bb.token)).s === 404, 'invoice customer lain tidak bisa dibuka');
   mails.length = 0; ok((await call('POST', `/bookings/${bk.id}/invoice/email`, {}, A2.token)).j.ok, 'kirim ulang invoice ke email'); ok(mails.length === 1, 'email kirim-ulang diterima');
-  ok((await call('POST', '/quote', { package_id: 2, code: 'HEMAT5K' }, Bb.token)).s === 400, 'kuota promo habis setelah dipakai');
   // --- foto: favorit tanpa batas & hapus massal ---
   const se = (await call('POST', `/bookings/${bk.id}/start`, {}, A2.token)).j, ids = []; for (let i = 0; i < 5; i++) ids.push((await call('POST', `/sessions/${se.id}/photos`, { img: JPG }, A2.token)).j.id);
   for (const id of ids) await call('PATCH', `/photos/${id}`, { fav: true }, A2.token); ok((await call('GET', `/sessions/${se.id}`, null, A2.token)).j.photos.every(p => p.fav), 'semua foto dapat difavoritkan (tanpa batas)');
@@ -52,16 +47,16 @@ const JPG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////
   const bd = await call('POST', '/photos/bulk-delete', { ids: ids.slice(0, 4) }, A2.token); ok(bd.j.deleted === 2 && bd.j.skipped_favorites === 2, 'hapus massal: 2 terhapus, 2 favorit dilewati');
   ok((await call('GET', `/sessions/${se.id}`, null, A2.token)).j.photos.length === 3, 'sisa 3 foto (semua favorit tetap ada)'); ok((await call('POST', '/photos/bulk-delete', { ids: [ids[4]] }, Bb.token)).j.deleted === 0, 'hapus massal tidak menyentuh foto customer lain');
   // --- admin: pelanggan, riwayat, foto ---
-  const cl = (await call('GET', '/admin/customers', null, AD)).j; const ana = cl.find(c => c.email === 'ana@x.id'); ok(cl.length === 2 && ana.bookings === 1 && ana.spent === 91000 && ana.photos === 3, 'admin melihat akun customer + ringkasan');
-  const hist = (await call('GET', `/admin/customers/${ana.id}/bookings`, null, AD)).j.bookings; ok(hist[0].package === 'Standard' && hist[0].amount === 91000 && hist[0].promo_code === 'HEMAT5K' && hist[0].method === 'QRIS', 'admin melihat riwayat pembelian customer');
+  const cl = (await call('GET', '/admin/customers', null, AD)).j; const ana = cl.find(c => c.email === 'ana@x.id'); ok(cl.length === 2 && ana.bookings === 1 && ana.spent === 81000 && ana.photos === 3, 'admin melihat akun customer + ringkasan');
+  const hist = (await call('GET', `/admin/customers/${ana.id}/bookings`, null, AD)).j.bookings; ok(hist[0].package === 'Standard' && hist[0].amount === 81000 && hist[0].method === 'QRIS', 'admin melihat riwayat pembelian customer');
   const ph = (await call('GET', `/admin/customers/${ana.id}/photos`, null, AD)).j.photos; ok(ph.length === 3, 'admin melihat daftar foto customer'); ok((await fetch(`${B}/admin/photos/${ph[0].id}/image?t=${AD}`).then(r => r.status)) === 200, 'admin dapat membuka foto customer'); ok((await fetch(`${B}/admin/photos/${ph[0].id}/image?t=${A2.token}`).then(r => r.status)) === 403, 'customer tidak bisa lewat rute foto admin');
   // --- pendapatan ---
-  const rv = (await call('GET', '/admin/revenue', null, AD)).j; ok(rv.today.total === 91000 && rv.week.total === 91000 && rv.month.total === 91000 && rv.all.total === 91000 && rv.first_date && rv.daily.length === 7, 'pendapatan harian/mingguan/bulanan/semua waktu');
+  const rv = (await call('GET', '/admin/revenue', null, AD)).j; ok(rv.today.total === 81000 && rv.week.total === 81000 && rv.month.total === 81000 && rv.all.total === 81000 && rv.first_date && rv.daily.length === 7, 'pendapatan harian/mingguan/bulanan/semua waktu');
   // --- rekap operasional ---
   const today = rv.daily[6].date, o1 = (await call('POST', '/admin/ops', { date: today, label: 'Sewa studio', kind: 'biaya', amount: 30000 }, AD)).j.id, o2 = (await call('POST', '/admin/ops', { date: today, label: 'Jual merchandise', kind: 'pemasukan', amount: 10000 }, AD)).j.id;
-  let ops = (await call('GET', '/admin/ops?period=day', null, AD)).j; ok(ops.gross === 101000 && ops.costs === 30000 && ops.net === 71000, 'omset kotor 101.000, biaya 30.000, omset bersih 71.000');
+  let ops = (await call('GET', '/admin/ops?period=day', null, AD)).j; ok(ops.gross === 91000 && ops.costs === 30000 && ops.net === 61000, 'omset kotor 91.000, biaya 30.000, omset bersih 61.000');
   await call('PATCH', `/admin/ops/${o1}`, { date: today, label: 'Sewa studio', kind: 'biaya', amount: 45000, note: 'naik' }, AD); await call('DELETE', `/admin/ops/${o2}`, null, AD);
-  ops = (await call('GET', '/admin/ops?period=all', null, AD)).j; ok(ops.items.length === 1 && ops.net === 91000 - 45000, 'rekap dapat diubah & dikurangi; omset bersih ikut berubah');
+  ops = (await call('GET', '/admin/ops?period=all', null, AD)).j; ok(ops.items.length === 1 && ops.net === 81000 - 45000, 'rekap dapat diubah & dikurangi; omset bersih ikut berubah');
   ok((await call('POST', '/admin/ops', { date: 'x', label: '', kind: 'biaya', amount: -1 }, AD)).s === 400, 'validasi item rekap');
   // --- paket ---
   const np = (await call('POST', '/admin/packages', { name: 'Mini', price: 30000, photo_count: 2, dur: 5, strip_size: '2x6', strip_material: 'Glossy' }, AD)).j.id; ok(np, 'admin menambah paket baru');
