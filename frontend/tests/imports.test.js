@@ -24,7 +24,9 @@ test("config.js: API_BASE kosong untuk localhost, URL Render untuk domain lain",
   assert.equal(config.apiBaseFor("localhost"), "");
   assert.equal(config.apiBaseFor("127.0.0.1"), "");
   assert.equal(config.apiBaseFor("selfieboxstudio.onrender.com"), "https://selfieboxstudio.onrender.com");
-  assert.equal(config.BRAND, "SelfieBox Studio");
+  // jaringan lokal (mis. HP di Wi-Fi yang sama membuka laptop) = backend yang menyajikan halaman, bukan Render
+  for (const host of ["192.168.1.7", "10.0.0.5", "172.16.0.2", "172.31.255.1", "0.0.0.0"]) assert.equal(config.apiBaseFor(host), "", host);
+  for (const host of ["172.15.0.1", "172.32.0.1", "8.8.8.8", "example.com"]) assert.equal(config.apiBaseFor(host), "https://selfieboxstudio.onrender.com", host);  assert.equal(config.BRAND, "SelfieBox Studio");
   for (const name of ["GOOGLE_CLIENT_ID", "CS_WA", "CS_EMAIL"]) assert.equal(typeof config[name], "string", name);
 });
 
