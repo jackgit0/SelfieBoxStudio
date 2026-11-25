@@ -9,7 +9,7 @@ export function keyValueRows(rows) {
   return html`${rows.map(([label, value, className = ""]) => html`<div class="kv ${className}"><span>${label}</span><b>${value}</b></div>`)}`;
 }
 
-// Studio, Paket, Tanggal, Jam, Lokasi sebuah booking
+// Studio, Paket, Tanggal, Jam sebuah booking
 export function bookingRows(master, booking) {
   const studio = studioOf(master, booking.studio);
   return keyValueRows([
@@ -17,7 +17,6 @@ export function bookingRows(master, booking) {
     ["Paket", packageOf(master, booking.package_id).name],
     ["Tanggal", formatDayMonthYear(parseSlot(booking.date).date)],
     ["Jam", slotRange(booking.date)],
-    ["Lokasi", studio.address || "-"],
   ]);
 }
 

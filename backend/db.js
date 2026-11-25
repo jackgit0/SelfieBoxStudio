@@ -38,20 +38,18 @@ db.prepare(`INSERT OR IGNORE INTO setting(key,value) VALUES('main_discount_pct',
 // ---- akun admin disimpan di database (password di-hash scrypt) ----
 db.exec(`CREATE TABLE IF NOT EXISTS admin(id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT UNIQUE NOT NULL,password TEXT NOT NULL,must_change INTEGER DEFAULT 0,failed INTEGER DEFAULT 0,locked_until INTEGER,pw_changed_at INTEGER,created_at INTEGER)`);
 // ---- migrasi v3 (desain baru): studio, properti, pembatalan & refund ----
-addCol('studio', 'img', 'TEXT'); addCol('studio', 'address', "TEXT DEFAULT 'Jl. Veteran No. 3'"); addCol('studio', 'price', 'INTEGER DEFAULT 0');
+addCol('studio', 'img', 'TEXT'); addCol('studio', 'price', 'INTEGER DEFAULT 0');
 addCol('property', 'category', 'TEXT'); addCol('property', 'qty', 'INTEGER DEFAULT 1'); addCol('property', 'img', 'TEXT');
 addCol('booking', 'studio_fee', 'INTEGER DEFAULT 0'); addCol('booking', 'cancel_reason', 'TEXT'); addCol('booking', 'cancel_detail', 'TEXT'); addCol('booking', 'cancelled_at', 'INTEGER');
 addCol('payment', 'refunded_at', 'INTEGER');
-// ---- migrasi fitur admin: status studio (AVAILABLE/UNAVAILABLE) & soft delete ----
-addCol('studio', 'status', "TEXT DEFAULT 'AVAILABLE'"); addCol('studio', 'deleted_at', 'INTEGER');
-db.prepare(`UPDATE studio SET status='AVAILABLE' WHERE status IS NULL OR status=''`).run();
+// ---- migrasi fitur admin: soft delete studio (status studio tidak disimpan, diturunkan dari slot kosong di server.js) ----
+addCol('studio', 'deleted_at', 'INTEGER');
 // ---- migrasi fitur admin: sesi studio dibuat admin (terpisah dari tabel `session` = runtime sesi foto per booking) ----
 db.exec(`CREATE TABLE IF NOT EXISTS studio_session(id INTEGER PRIMARY KEY AUTOINCREMENT,studio_id INTEGER NOT NULL REFERENCES studio(id),start_time INTEGER NOT NULL,end_time INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'AVAILABLE',deleted_at INTEGER);
 CREATE INDEX IF NOT EXISTS ix_ssess ON studio_session(studio_id,start_time);`);
 addCol('booking', 'studio_session_id', 'INTEGER REFERENCES studio_session(id)');
 const flag = k => db.prepare('SELECT 1 FROM setting WHERE key=?').get(k), setFlag = k => db.prepare('INSERT OR IGNORE INTO setting(key,value) VALUES(?,?)').run(k, '1');
 db.prepare(`UPDATE studio SET img='/img/studio-'||(CASE WHEN id%2=1 THEN 1 ELSE 2 END)||'.jpg' WHERE img IS NULL OR img=''`).run();
-db.prepare(`UPDATE studio SET address='Jl. Veteran No. 3' WHERE address IS NULL`).run();
 db.prepare(`UPDATE property SET qty=1 WHERE qty IS NULL`).run();
 db.prepare(`UPDATE property SET category=CASE WHEN type='background' THEN 'Background' WHEN name LIKE 'Topi%' OR name LIKE 'Mahkota%' THEN 'Topi' WHEN name LIKE 'Kacamata%' THEN 'Kacamata' ELSE 'Lainnya' END WHERE category IS NULL`).run();
 if (!flag('seed_design_v1')) { // properti contoh dari desain (foto di frontend/img)
@@ -70,4 +68,9 @@ if (!flag('drop_addons_promo_v1')) { // lingkup IMK: properti hanya tampilan (ta
 INSERT INTO property_new(id,name,type,img_url,extra,category,qty,img) SELECT id,name,type,img_url,extra,category,qty,img FROM property; DROP TABLE property; ALTER TABLE property_new RENAME TO property;`);
     db.exec('DROP TABLE IF EXISTS promo; DROP TABLE IF EXISTS vibe;');
     setFlag('drop_addons_promo_v1'); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } finally { db.exec('PRAGMA foreign_keys=ON'); } }
+const hasCol = (t, c) => db.prepare(`PRAGMA table_info(${t})`).all().some(x => x.name === c);
+if (!flag('drop_studio_address_v1')) { // studio tanpa alamat (satu lokasi usaha, ditampilkan dari config.js di frontend)
+  db.exec('BEGIN'); try { if (hasCol('studio', 'address')) db.exec('ALTER TABLE studio DROP COLUMN address'); setFlag('drop_studio_address_v1'); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } }
+if (!flag('drop_studio_status_v1')) { // status studio tidak lagi diatur admin: dihitung dari slot kosong 14 hari (server.js studioStatus)
+  db.exec('BEGIN'); try { if (hasCol('studio', 'status')) db.exec('ALTER TABLE studio DROP COLUMN status'); setFlag('drop_studio_status_v1'); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } }
 module.exports = db;

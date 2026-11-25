@@ -135,8 +135,8 @@ import * as adminModels from "../../js/models/admin/index.js";
 import { flat } from "../helpers/markup.js";
 
 const masterAnswer = { body: { PKG: [], ALLPKG: [], FAV_PKG: null, DISC: { pct: 0, label: "" }, PEOPLE: [], BUDGET: [], STUDIOS: [{ id: 1, name: "Baru" }], ALLSTUDIOS: [{ id: 1, name: "Baru" }], PROP: [], POSES: {}, POLICY: {} } };
-const studioRow = (overrides = {}) => ({ id: 3, name: "Melati", status: "AVAILABLE", description: "", address: "", price: 0, people_range_id: 1, budget_range_id: 1, img: "/media/m.jpg", sessions: 2, bookings: 1, active_bookings: 1, impact: { sessions: 2, active_bookings: 1, paid_bookings: 0, refund_total: 0 }, ...overrides });
-const newForm = overrides => ({ name: "Studio Senja", status: "AVAILABLE", description: "Cahaya", address: "Jl. A", price: "0", people_range_id: "1", budget_range_id: "1", ...overrides });
+const studioRow = (overrides = {}) => ({ id: 3, name: "Melati", status: "AVAILABLE", description: "", price: 0, people_range_id: 1, budget_range_id: 1, img: "/media/m.jpg", sessions: 2, bookings: 1, active_bookings: 1, impact: { sessions: 2, active_bookings: 1, paid_bookings: 0, refund_total: 0 }, ...overrides });
+const newForm = overrides => ({ name: "Studio Senja", description: "Cahaya", price: "0", people_range_id: "1", budget_range_id: "1", ...overrides });
 const apiFailure = (status, error, extra = {}) => ({ status, body: { error, ...extra } });
 
 function setupStudioAdmin({ admin = {}, responses = {}, modalAnswers = [], readImage = async file => "data:image/jpeg;base64," + file.name } = {}) {
@@ -184,7 +184,7 @@ test("admin review: isian valid + gambar → langkah Ringkasan Studio, belum ada
   controller.review(newForm());
   assert.equal(admin().studioSummary, true);
   assert.equal(admin().studioErrors, null);
-  assert.deepEqual(admin().newStudio, { name: "Studio Senja", status: "AVAILABLE", description: "Cahaya", address: "Jl. A", price: 0, people_range_id: 1, budget_range_id: 1 });
+  assert.deepEqual(admin().newStudio, { name: "Studio Senja", description: "Cahaya", price: 0, people_range_id: 1, budget_range_id: 1 });
   assert.equal(api.calls.length, 0);
 });
 
@@ -195,10 +195,10 @@ test("admin save: tanpa Ringkasan Studio tidak mengirim apa pun (test-map 221)",
 });
 
 test("admin save dari Ringkasan: POST dengan nama dirapikan + gambar, studio baru terbuka, kartu Berhasil, daftar dan master dimuat ulang", async () => {
-  const { controller, admin, api, requests, toast, store } = setupStudioAdmin({ admin: { studios: [studioRow()], openStudios: { new: true }, images: { new: "/media/n.jpg" }, newStudio: { name: " Senja ", status: "AVAILABLE", description: "", address: "", price: 0, people_range_id: 1, budget_range_id: 1 }, studioSummary: true }, responses: { "POST /admin/studios": { body: { id: 8 } } } });
+  const { controller, admin, api, requests, toast, store } = setupStudioAdmin({ admin: { studios: [studioRow()], openStudios: { new: true }, images: { new: "/media/n.jpg" }, newStudio: { name: " Senja ", description: "", price: 0, people_range_id: 1, budget_range_id: 1 }, studioSummary: true }, responses: { "POST /admin/studios": { body: { id: 8 } } } });
   await controller.save();
   assert.deepEqual(requests(), ["POST /admin/studios", "GET /master"]);
-  assert.deepEqual(api.calls[0].body, { name: "Senja", status: "AVAILABLE", description: "", address: "", price: 0, people_range_id: 1, budget_range_id: 1, img: "/media/n.jpg" });
+  assert.deepEqual(api.calls[0].body, { name: "Senja", description: "", price: 0, people_range_id: 1, budget_range_id: 1, img: "/media/n.jpg" });
   assert.deepEqual(admin().openStudios, { new: false, 8: true });
   assert.deepEqual(admin().studioDone, { title: "Studio berhasil ditambahkan", text: "Senja tersedia dan tampil di daftar studio pelanggan." });
   assert.equal(admin().studios, null);
@@ -209,14 +209,16 @@ test("admin save dari Ringkasan: POST dengan nama dirapikan + gambar, studio bar
   assert.equal(store.get().master.studios[0].name, "Baru");
 });
 
-test("admin save: status Tidak tersedia → teks kartu Berhasil versi tersembunyi", async () => {
-  const { controller, admin } = setupStudioAdmin({ admin: { studios: [], images: { new: "/media/n.jpg" }, newStudio: { name: "Senja", status: "UNAVAILABLE", price: 0 }, studioSummary: true }, responses: { "POST /admin/studios": { body: { id: 8 } } } });
+test("admin save: status lama di draf tidak dikirim (status diturunkan server dari slot kosong)", async () => {
+  const { controller, admin, api } = setupStudioAdmin({ admin: { studios: [], images: { new: "/media/n.jpg" }, newStudio: { name: "Senja", status: "UNAVAILABLE", price: 0 }, studioSummary: true }, responses: { "POST /admin/studios": { body: { id: 8 } } } });
   await controller.save();
-  assert.equal(admin().studioDone.text, "Senja disimpan dengan status Tidak tersedia, belum tampil di daftar studio pelanggan.");
+  assert.equal(admin().studioDone.text, "Senja tersedia dan tampil di daftar studio pelanggan.");
+  assert.equal(api.calls[0].body.name, "Senja");
+  assert.ok(!("status" in api.calls[0].body));
 });
 
 test("admin save: 409 \"sudah dipakai\" → kembali ke form dengan galat nama ganda dan daftar studio dimuat ulang (test-map 225)", async () => {
-  const { controller, admin, toast } = setupStudioAdmin({ admin: { studios: [studioRow()], images: { new: "/media/n.jpg" }, newStudio: { name: "Melati2", status: "AVAILABLE", price: 0 }, studioSummary: true }, responses: { "POST /admin/studios": apiFailure(409, "Nama studio sudah dipakai") } });
+  const { controller, admin, toast } = setupStudioAdmin({ admin: { studios: [studioRow()], images: { new: "/media/n.jpg" }, newStudio: { name: "Melati2", price: 0 }, studioSummary: true }, responses: { "POST /admin/studios": apiFailure(409, "Nama studio sudah dipakai") } });
   await controller.save();
   assert.deepEqual(admin().studioErrors, { top: "Nama studio sudah digunakan oleh studio lain.", name: "Nama studio sudah digunakan. Gunakan nama lain." });
   assert.equal(admin().studios, null);
@@ -281,7 +283,7 @@ test("admin edit: PATCH dengan gambar baru, biaya tidak valid = 0, draf dan gamb
   const { controller, admin, api, requests, toast } = setupStudioAdmin({ admin: { studios: [studioRow()], images: { 3: "/media/x.jpg" }, drafts: { "studio-3": { name: "lama" } } }, responses: { "PATCH /admin/studios/3": { body: {} } } });
   await controller.edit({ id: "3" }, newForm({ name: "Melati Baru", price: "" }));
   assert.deepEqual(requests(), ["PATCH /admin/studios/3", "GET /master"]);
-  assert.deepEqual(api.calls[0].body, { name: "Melati Baru", status: "AVAILABLE", description: "Cahaya", address: "Jl. A", price: 0, people_range_id: 1, budget_range_id: 1, img: "/media/x.jpg" });
+  assert.deepEqual(api.calls[0].body, { name: "Melati Baru", description: "Cahaya", price: 0, people_range_id: 1, budget_range_id: 1, img: "/media/x.jpg" });
   assert.deepEqual(admin().images, {});
   assert.ok(!("studio-3" in admin().drafts));
   assert.equal(admin().studios, null);
@@ -403,7 +405,7 @@ test("admin addSession: satu sesi → toast singkat; bertabrakan (409) → toast
   assert.deepEqual(clash.admin().drafts["session-new-3"], values);
 });
 
-const session = { id: 7, date: "2026-11-26", start: "09:00", end: "09:50", status: "UNAVAILABLE", past: false, booking: { id: 12, customer: "Budi", status: "Terbayar" }, impact: { active_bookings: 1, paid_bookings: 1, refund_total: 90000, customers: ["Budi"] } };
+const session = { id: 7, date: "2026-11-26", start: "09:00", end: "09:50", past: false, booking: { id: 12, customer: "Budi", status: "Terbayar" }, impact: { active_bookings: 1, paid_bookings: 1, refund_total: 90000, customers: ["Budi"] } };
 
 test("admin saveSession: tanpa dialog awal; 409 needs_confirm → dialog Ubah sesi → ?confirm=1, toast + pelanggan diberi tahu", async () => {
   const { controller, ui, requests, admin, toast, api } = setupStudioAdmin({

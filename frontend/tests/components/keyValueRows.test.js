@@ -12,9 +12,9 @@ test("keyValueRows: teks di-escape, Safe apa adanya, kelas baris ketiga", () => 
   assert.equal(String(markup), '<div class="kv "><span>Nama</span><b>&lt;b&gt;x&lt;/b&gt;</b></div><div class="kv total"><span>Total</span><b><i>Rp1</i></b></div>');
 });
 
-test("bookingRows: Studio, Paket, Tanggal, Jam, Lokasi", () => {
+test("bookingRows: Studio, Paket, Tanggal, Jam (tanpa Lokasi, studio tidak punya alamat)", () => {
   const text = String(bookingRows(sampleMaster(), booking));
-  assert.deepEqual([...text.matchAll(/<span>([^<]*)<\/span><b>([^<]*)<\/b>/g)].map(found => [found[1], found[2]]), [["Studio", "Melati"], ["Paket", "Standard"], ["Tanggal", "27/11/2026"], ["Jam", "10:00 - 10:50"], ["Lokasi", "Jl. Veteran 3"]]);
+  assert.deepEqual([...text.matchAll(/<span>([^<]*)<\/span><b>([^<]*)<\/b>/g)].map(found => [found[1], found[2]]), [["Studio", "Melati"], ["Paket", "Standard"], ["Tanggal", "27/11/2026"], ["Jam", "10:00 - 10:50"]]);
 });
 
 test("paymentDetail: Waktu (WIB), Status, Metode, lalu rincian pembayaran", () => {

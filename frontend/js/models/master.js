@@ -53,7 +53,6 @@ export function studioOf(master, id) {
       id,
       name: "(studio dihapus)",
       img: "",
-      address: "-",
       price: 0,
       description: "",
     }

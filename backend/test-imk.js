@@ -180,7 +180,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     { const r = await B({ date: dayAhead(-2) + ' 10:00' }); ok(r.s === 400 && r.j.error === 'Jadwal sudah lewat', 'booking sesi yang sudah lewat: 400 "Jadwal sudah lewat" (Sesi Tidak Tersedia)'); }
     ok((await B({})).s === 200, 'fixture: customer pertama membooking slot');
     { const r = await B({}, U2); ok(r.s === 409 && r.j.error === 'Jadwal sudah tidak tersedia', 'slot yang sudah diambil: 409 "Jadwal sudah tidak tersedia" (Sesi Sudah Dibooking)'); }
-    ok((await call('PATCH', '/admin/studios/2', { status: 'UNAVAILABLE' }, AD)).s === 200, 'admin menandai studio 2 tidak tersedia');
+    ok((await call('DELETE', '/admin/studios/2?confirm=1', null, AD)).s === 200, 'admin menghapus studio 2 (status tidak lagi diatur manual; studio terhapus = tidak tersedia)');
     { const r = await B({ studio_id: 2 }, U2); ok(r.s === 400 && r.j.error === 'Studio tidak tersedia', 'booking studio tidak tersedia: "Studio tidak tersedia" (Sesi Tidak Tersedia)'); }
     ok((await call('POST', '/quote', { package_id: 1, studio_id: 2 })).j.error === 'Studio tidak tersedia', 'quote studio tidak tersedia: "Studio tidak tersedia"');
     // 3. guard tamu: frontend/tests/core/router.test.js (tabel guard rute × tamu/customer/admin, refactor MVC fase 3)
@@ -204,7 +204,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     const AD = (await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token; ok(U && AD, 'fixture fase 5: customer dan admin masuk');
     // 1. kontrak API yang dipakai dialog dan langkah ringkasan
     for (const [m, p] of [['GET', '/admin/studios'], ['POST', '/admin/studios']]) { const r = await call(m, p, m === 'POST' ? { name: 'Studio Tamu' } : null, U); ok(r.s === 403 && r.j.error === 'Hanya admin', `${m} /api/admin/studios dengan token customer: 403 "Hanya admin" (pemicu Akses Ditolak)`); }
-    const nm = (await call('GET', '/admin/studios', null, AD)).j[0].name, SB = o => ({ status: 'AVAILABLE', description: '', address: '', price: 0, people_range_id: 1, budget_range_id: 1, ...o }); // isi seperti form admin
+    const nm = (await call('GET', '/admin/studios', null, AD)).j[0].name, SB = o => ({ description: '', price: 0, people_range_id: 1, budget_range_id: 1, ...o }); // isi seperti form admin
     { const r = await call('POST', '/admin/studios', SB({ name: ' ' + nm.toUpperCase() + ' ' }), AD); ok(r.s === 409 && r.j.error === 'Nama studio sudah dipakai', 'tambah studio dengan nama yang sudah ada: 409 "Nama studio sudah dipakai"'); }
     { const r = await call('POST', '/admin/studios', SB({ name: '  ' }), AD); ok(r.s === 400 && r.j.error === 'Nama studio wajib diisi', 'tambah studio tanpa nama: 400 "Nama studio wajib diisi"'); }
     { const r = await call('PATCH', '/admin/account', { current_password: 'salah' }, AD); ok(r.s === 403 && r.j.error === 'Password saat ini salah', '403 lain di admin ("Password saat ini salah") bukan Akses Ditolak'); }
@@ -265,6 +265,45 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!fs.existsSync(path.join(FRONT, 'css', 'style.css')), 'css/style.css sudah dipecah (tidak ada lagi)');
   }
 
+
+  // ===== Studio tanpa alamat (imk/dev/studio-fix-plan.md bagian 2) =====
+  srv = start('st'); await up();
+  { const cols = k => { const D = new DatabaseSync(DB(k)); const c = D.prepare('PRAGMA table_info(studio)').all().map(r => r.name); D.close(); return c; };
+    const AD = (await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token; ok(AD, 'fixture studio: admin masuk');
+    ok(!cols('st').includes('address'), 'database baru: tabel studio tanpa kolom address');
+    ok((await call('GET', '/master')).j.STUDIOS.every(s => !('address' in s)), 'GET /api/master: studio tanpa address');
+    ok((await call('GET', '/admin/studios', null, AD)).j.every(s => !('address' in s)), 'GET /api/admin/studios: studio tanpa address');
+    { const r = await call('POST', '/admin/studios', { name: 'Studio Alamat', address: 'Jl. Lama 1', price: 0, people_range_id: 1, budget_range_id: 1 }, AD); ok(r.s === 200 && r.j.id, 'tambah studio dengan address (klien lama): diterima, address diabaikan');
+      const s = (await call('GET', '/admin/studios', null, AD)).j.find(x => x.id === r.j.id); ok(s && !('address' in s), 'studio baru tersimpan tanpa address'); }
+    { const r = await call('PATCH', '/admin/studios/1', { address: 'Jl. Lama 2' }, AD); ok(r.s === 200, 'ubah studio dengan address (klien lama): diterima, address diabaikan'); }
+    await down(srv);
+    // database lama: kolom address dikembalikan + flag dihapus → server menyala menghapusnya sekali
+    { const D = new DatabaseSync(DB('st')); D.exec("ALTER TABLE studio ADD COLUMN address TEXT DEFAULT 'Jl. Veteran No. 3'"); D.exec("DELETE FROM setting WHERE key='drop_studio_address_v1'"); D.close(); }
+    srv = start('st'); await up(); await down(srv);
+    { const D = new DatabaseSync(DB('st')); const f = D.prepare("SELECT 1 FROM setting WHERE key='drop_studio_address_v1'").get(), n = D.prepare('SELECT COUNT(*) c FROM studio').get().c; D.close();
+      ok(!cols('st').includes('address') && f && n >= 4, 'database lama: kolom address dihapus, flag drop_studio_address_v1 tercatat, data studio tetap'); }
+    srv = start('st'); await up(); ok(!cols('st').includes('address'), 'menyala kedua kali: tetap tanpa address (migrasi sekali)');
+    { const JS = allJs(); for (const s of ['Alamat / Lokasi', 'name="address"', 'studio.address', '"Lokasi"']) ok(!JS.includes(s), `frontend tanpa "${s}"`); }
+  }
+  await down(srv);
+
+  // ===== Status studio diturunkan dari slot kosong (imk/dev/studio-fix-plan.md bagian 3) =====
+  srv = start('ss'); await up();
+  { const cols = () => { const D = new DatabaseSync(DB('ss')); const c = D.prepare('PRAGMA table_info(studio)').all().map(r => r.name); D.close(); return c; };
+    const AD = (await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token;
+    ok(!cols().includes('status'), 'database baru: tabel studio tanpa kolom status');
+    { const L = (await call('GET', '/admin/studios', null, AD)).j; ok(L.length >= 3 && L.every(s => s.status === 'AVAILABLE' && s.free_slots > 0), 'GET /api/admin/studios: status AVAILABLE + free_slots dari slot kosong'); }
+    { const m = (await call('GET', '/master')).j; ok(m.STUDIOS.every(s => s.status === 'AVAILABLE' && s.free_slots > 0) && m.ALLSTUDIOS.every(s => 'status' in s), 'GET /api/master: STUDIOS hanya yang tersedia, ALLSTUDIOS membawa status turunan'); }
+    await down(srv);
+    // database lama: kolom status (dengan studio yang dulu disembunyikan admin) + flag dihapus → kolom dihapus sekali, studio itu tampil lagi bila punya slot kosong
+    { const D = new DatabaseSync(DB('ss')); D.exec("ALTER TABLE studio ADD COLUMN status TEXT DEFAULT 'AVAILABLE'"); D.exec("UPDATE studio SET status='UNAVAILABLE' WHERE id=1"); D.exec("DELETE FROM setting WHERE key='drop_studio_status_v1'"); D.close(); }
+    srv = start('ss'); await up();
+    { const D = new DatabaseSync(DB('ss')); const f = D.prepare("SELECT 1 FROM setting WHERE key='drop_studio_status_v1'").get(); D.close(); ok(!cols().includes('status') && f, 'database lama: kolom status dihapus, flag drop_studio_status_v1 tercatat'); }
+    ok((await call('GET', '/master')).j.STUDIOS.some(s => s.id === 1), 'studio yang dulu UNAVAILABLE (manual) tampil lagi karena punya slot kosong');
+    { const JS = allJs(); for (const s of ['STATUS_OPTIONS', 'disimpan dengan status Tidak tersedia', 'status Tidak\n        tersedia menyembunyikan']) ok(!JS.includes(s), `frontend tanpa "${s.replace(/\s+/g, ' ')}"`);
+      ok(JS.includes('slot kosong'), 'frontend menjelaskan status dari slot kosong'); }
+  }
+  await down(srv);
 
   // ===== Fase refactor 3: fallback SPA (rute frontend dengan path history disajikan index.html) =====
   srv = start('spa'); await up();

@@ -77,9 +77,6 @@ export function studioView(state, match) {
               </button>
             </div>
             <p class="desc" style="-webkit-line-clamp:6">${studio.description}</p>
-            <div class="row" style="margin-top:6px;color:var(--muted-2);font-size:12px">
-              ${icon("pin", 14)} ${studio.address || "-"}
-            </div>
             <div class="row sp" style="margin-top:12px">
               <button class="btn" data-action="booking:start" data-id="${studio.id}">Book Now</button>
               <div class="meta" style="margin:0">

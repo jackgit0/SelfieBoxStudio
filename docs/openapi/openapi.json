@@ -4120,12 +4120,6 @@
               "null"
             ]
           },
-          "address": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "price": {
             "type": "integer",
             "minimum": 0,
@@ -4151,7 +4145,13 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/StudioStatus"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StudioStatus"
+              }
+            ],
+            "readOnly": true,
+            "description": "Tidak disimpan: AVAILABLE bila ada minimal satu slot per jam yang kosong dan belum lewat dalam 14 hari ke depan (studio terhapus = UNAVAILABLE). Dikirim admin = diabaikan."
           },
           "deleted_at": {
             "type": [
@@ -4160,31 +4160,37 @@
             ],
             "format": "int64",
             "description": "Waktu soft delete"
+          },
+          "free_slots": {
+            "type": "integer",
+            "minimum": 0,
+            "readOnly": true,
+            "description": "Jumlah slot kosong dari sekarang sampai akhir hari ini + 13 hari."
           }
         },
         "required": [
           "id",
           "name",
           "description",
-          "address",
           "price",
           "img",
           "people_range_id",
           "budget_range_id",
           "status",
+          "free_slots",
           "deleted_at"
         ],
         "example": {
           "id": 1,
           "name": "Studio Mawar",
           "description": "Intim, cocok 1-2 orang",
-          "address": "Jl. Veteran No. 3",
           "price": 0,
           "img": "/img/studio-1.jpg",
           "people_range_id": 1,
           "budget_range_id": 1,
           "status": "AVAILABLE",
-          "deleted_at": null
+          "deleted_at": null,
+          "free_slots": 150
         }
       },
       "AdminStudio": {
@@ -4231,10 +4237,6 @@
             "type": "string",
             "maxLength": 500
           },
-          "address": {
-            "type": "string",
-            "maxLength": 200
-          },
           "price": {
             "type": "integer",
             "minimum": 0
@@ -4254,9 +4256,6 @@
             ],
             "pattern": "^(\\/(img|media)\\/[\\w.\\-]+|https?:\\/\\/[^\\s'\"()<>\\\\]+)$",
             "description": "Tanpa nilai: `/img/studio-2.jpg`"
-          },
-          "status": {
-            "$ref": "#/components/schemas/StudioStatus"
           }
         },
         "required": [
@@ -4276,10 +4275,6 @@
             "type": "string",
             "maxLength": 500
           },
-          "address": {
-            "type": "string",
-            "maxLength": 200
-          },
           "price": {
             "type": "integer",
             "minimum": 0
@@ -4298,9 +4293,6 @@
               "null"
             ],
             "description": "Kosong/null = gambar lama dipertahankan"
-          },
-          "status": {
-            "$ref": "#/components/schemas/StudioStatus"
           }
         },
         "description": "Field yang tidak dikirim memakai nilai lama. `UNAVAILABLE` menyembunyikan studio dari customer; booking lama tidak diubah."

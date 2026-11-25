@@ -10,10 +10,8 @@ import { icon } from "../../components/icon.js";
 import { loadingCard, selectField } from "../../components/adminWidgets.js";
 import { sessionPanel } from "./sessions.js";
 
-const STATUS_OPTIONS = [
-  ["AVAILABLE", "Tersedia"],
-  ["UNAVAILABLE", "Tidak tersedia"],
-];
+// status tidak diisi admin: server menurunkannya dari slot kosong 14 hari ke depan (status + free_slots di baris daftar)
+const STATUS_RULE = "Status dihitung otomatis: Tersedia bila masih ada slot kosong dalam 14 hari ke depan.";
 const isAvailable = studio => studio.status != "UNAVAILABLE";
 
 const fieldError = (errors, field) =>
@@ -51,8 +49,8 @@ function studioForm({ studio, values, image, errors, master }) {
   const note = isNew
     ? ""
     : html`<p class="sm m" style="margin-top:8px">
-        ${studio.active_bookings} booking aktif dari ${studio.bookings} booking (tanpa yang batal) · status Tidak
-        tersedia menyembunyikan studio dari customer tanpa mengubah booking yang sudah ada
+        ${studio.active_bookings} booking aktif dari ${studio.bookings} booking (tanpa yang batal) · ${STATUS_RULE}
+        Studio tanpa slot kosong disembunyikan dari customer.
       </p>`;
   const submit = isNew ? html`data-submit="studio:review"` : html`data-submit="studio:edit" data-id="${studio.id}"`;
   return html`<form class="spanel" novalidate ${submit}>
@@ -68,13 +66,8 @@ function studioForm({ studio, values, image, errors, master }) {
           placeholder="Contoh: Studio Kreatif"
           value="${values.name || ""}"
           ${invalidAttributes(errors, "name")}
-        />${fieldError(errors, "name")}<label for="st${id}s">Status</label
-        >${selectField({ id: `st${id}s`, name: "status", options: STATUS_OPTIONS, current: values.status || "AVAILABLE" })}<label
-          for="st${id}d"
-          >Deskripsi</label
-        ><textarea id="st${id}d" name="description">${values.description || ""}</textarea
-        ><label for="st${id}a">Alamat / Lokasi</label
-        ><input id="st${id}a" name="address" value="${values.address || "Jl. Veteran No. 3"}" />
+        />${fieldError(errors, "name")}<label for="st${id}d">Deskripsi</label
+        ><textarea id="st${id}d" name="description">${values.description || ""}</textarea>
         <div class="row" style="flex-wrap:nowrap">
           <div class="grow">
             <label for="st${id}p">Biaya sewa studio (Rp)</label
@@ -137,7 +130,7 @@ function summaryCard(values, image, master) {
       </p>
       <div class="sgrid">
         <dl class="sumdl">
-          ${row("Nama", name)}${row("Deskripsi", values.description || "-")}${row("Status", isAvailable(values) ? "Tersedia" : "Tidak tersedia")}${row("Alamat / Lokasi", values.address || "-")}${row("Biaya sewa studio", formatRupiah(values.price))}${row("Kapasitas", capacity ? capacity.range + " orang" : "-")}${row("Rentang budget", budget ? budget.budget : "-")}
+          ${row("Nama", name)}${row("Deskripsi", values.description || "-")}${row("Status", "Otomatis dari slot kosong (14 hari ke depan)")}${row("Biaya sewa studio", formatRupiah(values.price))}${row("Kapasitas", capacity ? capacity.range + " orang" : "-")}${row("Rentang budget", budget ? budget.budget : "-")}
         </dl>
         <div><div class="thumb" style="${backgroundImage(image)}" role="img" aria-label="Gambar ${name}"></div></div>
       </div>
@@ -151,8 +144,8 @@ function summaryCard(values, image, master) {
 
 function studioRow(studio, admin, master, today) {
   const open = Boolean(admin.openStudios[studio.id]);
-  const meta =
-    formatRupiah(studio.price || 0) + ` · ${studio.sessions} sesi` + (studio.address ? " · " + studio.address : "");
+  const free = Number.isInteger(studio.free_slots) ? ` · ${studio.free_slots} slot kosong (14 hari)` : "";
+  const meta = formatRupiah(studio.price || 0) + ` · ${studio.sessions} sesi` + free;
   const body = open
     ? html`<div class="body one">
         ${studioForm({ studio, values: admin.drafts["studio-" + studio.id] || studio, image: admin.images[studio.id] || studio.img || "", errors: null, master })}${sessionPanel(admin, studio, today)}
@@ -225,7 +218,7 @@ export function studiosView(state, match, now = new Date()) {
   }
   const today = isoDate(now);
   const rows = admin.studios
-    .filter(studio => matchesQuery(admin.query, studio.name, studio.description, studio.address))
+    .filter(studio => matchesQuery(admin.query, studio.name, studio.description))
     .map(studio => studioRow(studio, admin, state.master, today));
   return html`${doneCard(admin.studioDone)}${rows} ${newStudioSection(admin, state.master)}`;
 }
