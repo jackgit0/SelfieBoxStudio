@@ -1,11 +1,12 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
-import { API, BK, D, M, R, S, V, save } from "./state.js";
+import { API, BK, D, M, R, ROUTER, S, V, save } from "./state.js";
 import { BRAND, CS_EMAIL, CS_WA } from "../config.js";
 import { esc } from "../core/html.js";
 import { SESSION_HOURS as HRS, formatRupiah as rp, todayIso as todayS } from "../core/format.js";
 import * as masterModel from "../models/master.js";
+import { legacyPath } from "../core/router.js";
 import { resumeDraft } from "./customer.js";
-import { stopSessionTimers } from "./session.js";
+import { P, stopSessionTimers } from "./session.js";
 import { AD, adminReset, adminShell } from "./admin.js";
 const $ = s => document.querySelector(s);
 const me = () => S.user;
@@ -40,20 +41,26 @@ const ic = (n, s = 20) => `<svg class="ic" width="${s}" height="${s}" viewBox="0
 const icf = (n, s = 20) => ic(n, s).replace('fill="none"', 'fill="currentColor"');
 
 // ---------- navigasi ----------
-// tamu (belum login) boleh melihat studio, paket dan mengisi form booking; login diminta saat Check Out (keputusan 34–35)
-const GUEST_VIEWS = ["auth", "landing", "home", "packages", "studio", "time", "pay"];
-const ADMIN_VIEWS = ["adash", "acust", "astudio", "abook", "aprop", "apose", "atrx", "apkg", "aacct"];
-const TITLES = { home: "Browse", packages: "Pilihan Paket", studio: "Studio", time: "Pilih Waktu", pay: "Pembayaran", my: "Booking Saya", bdetail: "Detail Booking", cancel: "Pembatalan", refund: "Refund", success: "Booking", rescheduled: "Reschedule", gallery: "Galeri", session: "Sesi Foto", account: "Akun" };
-const TABGROUP = { home: ["home", "packages", "studio", "time", "pay", "success", "rescheduled"], my: ["my", "bdetail", "cancel", "refund"], gallery: ["gallery", "session"] };
-function go(v, p = {}, push = true) {
-  S.view = v; S.p = p; R.toast.message = R.toast.error = ""; R.availability = {}; save();
-  if (push) { try { history.pushState({ v, p }, "", location.pathname + location.search); } catch (e) {} }
-  window.scrollTo({ top: 0, behavior: "instant" }); render();
+// halaman = rute di core/router.js (path history); tamu boleh melihat studio, paket dan mengisi form booking, login diminta saat Check Out (keputusan 34–35).
+// go(view, params) lama tetap dipakai atribut onclick (lewat jembatan window): kunci view lama → path lewat legacyPath(); fase 4–8b menggantinya dengan data-route / router.navigate
+const activeSessionId = () => P.session || (D.sessions.filter(x => x.user_id == S.me && x.status == "Aktif").pop() || {}).id;
+function go(v, p = {}) {
+  R.toast.message = R.toast.error = ""; R.availability = {}; save();
+  const path = legacyPath(v, p, { rescheduleId: BK.rescheduleId, loginMode: R.auth.mode, sessionId: v === "session" ? activeSessionId() : null });
+  window.scrollTo({ top: 0, behavior: "instant" }); ROUTER.navigate(path);
 }
-window.addEventListener("popstate", e => { const st = e.state; if (st && st.v) { S.view = st.v; S.p = st.p || {}; R.toast.message = R.toast.error = ""; render(); } });
+// rute aktif setelah guard → R.route (id angka seperti S.p.id lama); mode form masuk, tab Booking Saya dan tab Akun mengikuti URL
+const numeric = params => Object.fromEntries(Object.entries(params).map(([k, v]) => [k, /^\d+$/.test(v) ? +v : v]));
+function syncRoute() {
+  const m = ROUTER.resolve(), r = m.route;
+  R.route = { name: r.name, path: m.path, params: numeric(m.params), query: m.query, title: r.title, tab: r.tab };
+  if (r.name === "auth") R.auth.mode = r.params.mode;
+  if (r.name === "my") S.myTab = m.query.tab === "history" ? "hist" : "up";
+  if (r.name === "account") S.acct = r.params.tab;
+}
 document.addEventListener("click", () => { const m = $("#menu"); if (m) m.hidden = true; });
 const toggleMenu = e => { e.stopPropagation(); const m = $("#menu"); m.hidden = !m.hidden; };
-const openAcct = tab => { S.acct = tab; go("account"); };
+const openAcct = tab => go("account", { tab });
 // dialog bersama (Figma "Konfirmasi …" dan popup error): resolve dengan value tombol yang ditekan, null bila ditutup (Escape / klik di luar).
 // body = HTML yang sudah di-escape pemanggil; buttons = [{ label, value, style ("ghost"/"soft"/"danger"), icon }]; kicker = HTML di atas judul; cls = kelas tambahan .mbox;
 // tombol di dalam body dengan atribut data-v="…" juga menutup dialog dan resolve dengan string itu
@@ -73,8 +80,8 @@ const acctMenu = () => `<div class="usr">${S.staff ? '<span class="tag warn">Sta
 // tab Booking/Galeri untuk tamu membuka halaman Masuk
 const navGo = k => S.me || k === "home" ? `go('${k}')` : "openAuth('login')";
 function shell(inner) {
-  const nav = [["home", "Beranda", "home"], ["my", "Booking", "calendar"], ["gallery", "Galeri", "images"]], on = k => (TABGROUP[k] || []).includes(S.view);
-  return `<header class="top"><div class="brand">${esc(BRAND)}</div><div class="mtitle">${TITLES[S.view] || ""}</div>
+  const nav = [["home", "Beranda", "home"], ["my", "Booking", "calendar"], ["gallery", "Galeri", "images"]], on = k => R.route.tab === k;
+  return `<header class="top"><div class="brand">${esc(BRAND)}</div><div class="mtitle">${R.route.title}</div>
 <nav class="tabs">${nav.map(n => `<button class="tab ${on(n[0]) ? "on" : ""}" onclick="${navGo(n[0])}">${ic(n[2], 18)}<span>${n[1]}</span></button>`).join("")}</nav>
 ${S.me ? acctMenu() : `<div class="usr"><button class="btn ghost sm" onclick="openAuth('login')">Masuk</button><button class="btn sm" onclick="openAuth('register')">Daftar</button></div>`}</header>
 <main class="page">${toasts()}${inner}</main>
@@ -84,33 +91,30 @@ ${S.me ? acctMenu() : `<div class="usr"><button class="btn ghost sm" onclick="op
 async function refreshMaster() { try { const m = await masterModel.loadMaster(API); if (m.json === M.json) return; Object.assign(M, m); render(); } catch (e) {} }
 V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
 function render() {
-  if (!S.me && !GUEST_VIEWS.includes(S.view)) S.view = "landing";
-  if (S.view !== "landing") window.onscroll = null;
-  if (S.admin && !ADMIN_VIEWS.includes(S.view)) S.view = "adash";
-  if (S.admin && typeof AD !== "undefined" && AD.me && AD.me.must_change && S.view !== "aacct") S.view = "aacct"; // password bawaan: hanya halaman Akun Admin yang terbuka
-  if (!S.admin && ADMIN_VIEWS.includes(S.view)) S.view = S.me ? "home" : "auth";
-  if (S.view !== "session" && typeof stopSessionTimers === "function") stopSessionTimers();
-  const f = V[S.view] || V.auth, inner = f();
-  $("#app").innerHTML = S.view === "landing" ? inner : S.view === "auth" ? `<div class="authwrap">${inner}</div>` : S.admin ? adminShell(inner) : shell(inner);
-  if (V[S.view + "_after"]) V[S.view + "_after"]();
-  if (["home", "time"].includes(S.view)) prefetch();
+  syncRoute(); const view = R.route.name;
+  if (view !== "landing") window.onscroll = null;
+  if (view !== "session" && typeof stopSessionTimers === "function") stopSessionTimers();
+  const f = V[view] || V.auth, inner = f();
+  $("#app").innerHTML = view === "landing" ? inner : view === "auth" ? `<div class="authwrap">${inner}</div>` : S.admin ? adminShell(inner) : shell(inner);
+  if (V[view + "_after"]) V[view + "_after"]();
+  if (["home", "time"].includes(view)) prefetch();
 }
 async function prefetch() {
-  const home = S.view === "home", d = home ? (S.hDate || todayS()) : (BK.date || todayS()), ids = home ? M.studios.map(s => s.id) : (BK.studio ? [BK.studio] : []); let ch = 0;
+  const home = R.route.name === "home", d = home ? (S.hDate || todayS()) : (BK.date || todayS()), ids = home ? M.studios.map(s => s.id) : (BK.studio ? [BK.studio] : []); let ch = 0;
   for (const id of ids) { const k = id + "|" + d; if (R.availability[k]) continue; try { R.availability[k] = (await API.get(`/availability?studio_id=${id}&date=${d}`)).free; ch = 1; } catch (e) { if (e.status == 400) { R.availability[k] = []; ch = 1; } } } // studio ditolak (mis. tidak tersedia): tidak ada slot
-  if (ch && ["home", "time"].includes(S.view)) render();
+  if (ch && ["home", "time"].includes(R.route.name)) render();
 }
 
 // ---------- autentikasi ----------
 V.auth = () => {
-  const tabs = `<div class="seg">${[["login", "Masuk"], ["register", "Daftar"]].map(t => `<button class="${R.auth.mode == t[0] ? "on" : ""}" onclick="R.auth.mode='${t[0]}';R.toast.message=R.toast.error='';render()">${t[1]}</button>`).join("")}</div>`;
+  const tabs = `<div class="seg">${[["login", "Masuk"], ["register", "Daftar"]].map(t => `<button class="${R.auth.mode == t[0] ? "on" : ""}" onclick="go('auth',{mode:'${t[0]}'})">${t[1]}</button>`).join("")}</div>`;
   const draft = S.draft && ["login", "register"].includes(R.auth.mode), back = draft && BK.slot && BK.quote; // datang dari popup Belum Login (Figma 585:4400)
   const wrap = h => `<div class="authcard"><button class="back" onclick="${back ? "go('pay')" : "go('landing')"}">${ic("left", 16)} ${back ? "Kembali ke booking" : "Beranda"}</button><div class="brand">${esc(BRAND)}</div><p class="sub center" style="margin-bottom:14px">Sesi foto self-service, tinggal pilih dan datang.</p>${toasts()}${draft ? `<h2 class="h3">Masuk untuk melanjutkan booking</h2><div class="mnote" style="margin:8px 0 14px">${ic("info", 16)} Kamu belum login. Silakan masuk terlebih dahulu untuk membooking sesi.</div>` : ""}${h}</div>`;
   const key = 'onkeydown="if(event.key===\'Enter\')';
   if (R.auth.mode == "reset") return wrap(`<h2 class="h2">Buat Sandi Baru</h2><label>Password baru</label><input id="pw" type="password" autocomplete="new-password"><label>Ulangi password</label><input id="pw2" type="password" autocomplete="new-password" ${key}doReset()"><div style="margin-top:18px"><button class="btn block" onclick="doReset()">Simpan Sandi</button></div>`);
-  if (R.auth.mode == "forgot") return wrap(`<h2 class="h2">Lupa Sandi</h2><p class="m sm">Masukkan email akun Anda. Tautan untuk membuat sandi baru akan dikirim ke email tersebut.</p><label>Email</label><input id="e" type="email" ${key}forgot()"><div class="row" style="margin-top:18px"><button class="btn grow" onclick="forgot()">Kirim Tautan</button><button class="btn ghost" onclick="R.auth.mode='login';R.toast.message=R.toast.error='';render()">Kembali</button></div>`);
+  if (R.auth.mode == "forgot") return wrap(`<h2 class="h2">Lupa Sandi</h2><p class="m sm">Masukkan email akun Anda. Tautan untuk membuat sandi baru akan dikirim ke email tersebut.</p><label>Email</label><input id="e" type="email" ${key}forgot()"><div class="row" style="margin-top:18px"><button class="btn grow" onclick="forgot()">Kirim Tautan</button><button class="btn ghost" onclick="go('auth',{mode:'login'})">Kembali</button></div>`);
   if (R.auth.mode == "register") return wrap(tabs + `<label>Nama</label><input id="n" autocomplete="name"><label>Telepon</label><input id="p" inputmode="numeric" autocomplete="tel"><label>Email</label><input id="e" type="email" autocomplete="email"><label>Password (min. 6 karakter)</label><input id="pw" type="password" autocomplete="new-password" ${key}reg()"><div style="margin-top:18px"><button class="btn block" onclick="reg()">Daftar</button></div>`);
-  return wrap(tabs + `<label>Email atau username</label><input id="e" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"><label>Password</label><input id="pw" type="password" autocomplete="current-password" ${key}login()"><div class="row sp" style="margin-top:18px"><button class="btn grow" onclick="login()">Masuk</button></div><p class="center sm" style="margin-top:14px"><a href="#" onclick="R.auth.mode='forgot';R.toast.message=R.toast.error='';render();return false">Lupa sandi?</a></p>`);
+  return wrap(tabs + `<label>Email atau username</label><input id="e" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"><label>Password</label><input id="pw" type="password" autocomplete="current-password" ${key}login()"><div class="row sp" style="margin-top:18px"><button class="btn grow" onclick="login()">Masuk</button></div><p class="center sm" style="margin-top:14px"><a href="#" onclick="go('auth',{mode:'forgot'});return false">Lupa sandi?</a></p>`);
 };
 const fixS = s => { s.photos.forEach(p => p.img = p.img || API.imageUrl(p.id)); return s; };
 async function refresh() {
@@ -132,11 +136,11 @@ async function login() {
 }
 async function forgot() {
   const e = $("#e").value.trim(); if (!/\S+@\S+\.\S+/.test(e)) { R.toast.error = "Masukkan email yang valid."; return render(); }
-  try { const r = await API.post("/auth/forgot", { email: e }); R.auth.mode = "login"; R.toast.message = r.message; } catch (x) { R.toast.error = x.message; } render();
+  try { const r = await API.post("/auth/forgot", { email: e }); go("auth", { mode: "login" }); R.toast.message = r.message; } catch (x) { R.toast.error = x.message; } render();
 }
 async function doReset() {
   const a = $("#pw").value, b = $("#pw2").value; if (a.length < 6 || a != b) { R.toast.error = "Password min. 6 karakter dan kedua isian harus sama."; return render(); }
-  try { await API.post("/auth/reset", { token: R.auth.resetToken, password: a }); R.auth.resetToken = ""; R.auth.mode = "login"; R.toast.message = "Sandi berhasil diubah. Silakan masuk dengan sandi baru."; } catch (x) { R.toast.error = x.message; } render();
+  try { await API.post("/auth/reset", { token: R.auth.resetToken, password: a }); R.auth.resetToken = ""; go("auth", { mode: "login" }); R.toast.message = "Sandi berhasil diubah. Silakan masuk dengan sandi baru."; } catch (x) { R.toast.error = x.message; } render();
 }
 async function adminLogin(username, password) {
   const r = await API.post("/admin/login", { username, password }); API.token = r.token; S.admin = true; S.draft = null; S.user = { name: "Admin", id: 0 }; S.me = "admin"; AD.me = r.admin; go(r.admin.must_change ? "aacct" : "adash");

@@ -1,8 +1,9 @@
 // Titik masuk aplikasi (satu-satunya <script type="module"> di index.html).
-// Fase 2: menyiapkan API dan store, membungkus objek state kode lama (js/legacy) dengan store, memasang jembatan window
-// untuk atribut onclick lama, lalu menjalankan isi boot.js lama: muat data master, tautan #reset=, pulihkan login, render pertama.
+// Menyiapkan API, store dan router, membungkus objek state kode lama (js/legacy) dengan store, memasang jembatan window
+// untuk atribut onclick lama, lalu menjalankan isi boot.js lama: muat data master, tautan #reset= (router), pulihkan login, render pertama.
 import { API_BASE } from "./config.js";
 import { createStore } from "./core/store.js";
+import { createRouter } from "./core/router.js";
 import { createApi } from "./models/api.js";
 import { loadMaster } from "./models/master.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
@@ -22,19 +23,30 @@ function browserStorage() {
   }
 }
 
-function replaceUrlState(state) {
-  try {
-    history.replaceState(state, "", location.pathname + location.search);
-  } catch (error) {
-    // history tidak tersedia (mis. halaman dari berkas lokal)
-  }
-}
-
 async function start() {
   const storage = browserStorage();
   const api = createApi({ base: API_BASE, storage });
   const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: P, admin: AD }, { storage, persistKey: "snapia" });
-  connectLegacy({ api, store });
+  const router = createRouter({
+    history: window.history,
+    location: window.location,
+    events: window,
+    getSession: () => ({ loggedIn: Boolean(S.me), admin: Boolean(S.admin), mustChange: Boolean(S.admin && AD.me && AD.me.must_change) }),
+    onChange: cause => {
+      if (cause === "popstate") {
+        R.toast.message = R.toast.error = "";
+      }
+      render();
+    },
+    // tautan "buat sandi baru" dari email (/#reset=<token>): login yang tersimpan dilepas
+    onResetLink: token => {
+      R.auth.resetToken = token;
+      api.token = "";
+      S.user = S.me = null;
+      S.admin = false;
+    },
+  });
+  connectLegacy({ api, store, router });
   installLegacyBridge();
 
   try {
@@ -44,16 +56,8 @@ async function start() {
     return;
   }
 
-  // tautan "buat sandi baru" dari email: /#reset=<token>; login yang tersimpan dilepas
-  const resetMatch = /#reset=([a-f0-9]{64})/.exec(location.hash);
-  if (resetMatch) {
-    R.auth.resetToken = resetMatch[1];
-    R.auth.mode = "reset";
-    replaceUrlState(null);
-    api.token = "";
-    S.user = S.me = null;
-    S.admin = false;
-  }
+  // back/forward dan tautan #reset= (diubah menjadi /reset-password)
+  router.start();
 
   // pulihkan login (Mode Staf tidak ikut dipulihkan)
   S.staff = false;
@@ -75,10 +79,6 @@ async function start() {
   } else {
     S.me = null;
   }
-  if (!S.me) {
-    S.view = resetMatch ? "auth" : "landing";
-  }
-  replaceUrlState({ v: S.view, p: S.p });
   render();
 }
 

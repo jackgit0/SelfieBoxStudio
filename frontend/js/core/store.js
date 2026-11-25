@@ -5,8 +5,8 @@
 
 const PERSISTED = "persisted";
 // kunci state lama yang dibuang saat dimuat: kuis rekomendasi paket dan pilihan properti (fitur sudah dihapus),
-// serta booking dan sesi foto (dulu disimpan di state, kini di slice data)
-const DROPPED_KEYS = ["quiz", "setup", "bookings", "sessions"];
+// booking dan sesi foto (dulu disimpan di state, kini di slice data), serta halaman aktif view/p (sejak fase 3 dari URL lewat router)
+const DROPPED_KEYS = ["quiz", "setup", "bookings", "sessions", "view", "p"];
 
 export function migrateSaved(saved) {
   if (!saved || typeof saved !== "object" || Array.isArray(saved)) {

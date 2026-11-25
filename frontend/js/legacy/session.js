@@ -75,7 +75,7 @@ async function delPhoto(sid,pid){
   if(p.driveId&&P.drive.token)fetch("https://www.googleapis.com/drive/v3/files/"+p.driveId,{method:"DELETE",headers:{Authorization:"Bearer "+P.drive.token}}).catch(()=>{});
   s.photos=s.photos.filter(x=>x.id!=pid);if(p.sel)s.confirmed=false;
  }catch(e){return alert(e.message)}
- if(S.view=="session")upd(s);else{R.toast.message="Foto dihapus.";render()}
+ if(R.route.name=="session")upd(s);else{R.toast.message="Foto dihapus.";render()}
 }
 const toggleDel=()=>{P.deleteMode=!P.deleteMode;P.deleteSelection=new Set();R.toast.message=R.toast.error="";render()};
 function togDel(sid,pid){const p=ph(sid,pid);if(p.fav){R.toast.message="Foto favorit tidak dapat dihapus massal. Hilangkan bintangnya dulu bila ingin menghapusnya.";return render()}R.toast.message="";P.deleteSelection.has(pid)?P.deleteSelection.delete(pid):P.deleteSelection.add(pid);render()}

@@ -6,7 +6,7 @@ import { SESSION_HOURS as HRS, padTwo as pad, formatRupiahShort as rpk } from ".
 import { $, capLabel, eff, go, ic, priceRange, render } from "./core.js";
 import { bgi, pkgCards } from "./customer.js";
 const LSECS = [["home", "Home"], ["about", "About"], ["fasilitas", "Fasilitas"], ["keterangan", "Keterangan"], ["kontak", "Contact Us"]];
-const openAuth = mode => { if (S.view === "landing") S.draft = null; R.auth.mode = mode; go("auth"); }; // dari landing: draf booking lama tidak dilanjutkan
+const openAuth = mode => { if (R.route.name === "landing") S.draft = null; R.auth.mode = mode; go("auth"); }; // dari landing: draf booking lama tidak dilanjutkan
 function toSec(id) { const m = $("#lmenu"); if (m) m.hidden = true; const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }
 const lpMenu = () => { const m = $("#lmenu"); if (m) m.hidden = !m.hidden; };
 function lpSpy() { // sorot menu sesuai bagian yang sedang dilihat

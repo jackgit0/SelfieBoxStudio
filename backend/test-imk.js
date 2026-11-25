@@ -183,12 +183,8 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok((await call('PATCH', '/admin/studios/2', { status: 'UNAVAILABLE' }, AD)).s === 200, 'admin menandai studio 2 tidak tersedia');
     { const r = await B({ studio_id: 2 }, U2); ok(r.s === 400 && r.j.error === 'Studio tidak tersedia', 'booking studio tidak tersedia: "Studio tidak tersedia" (Sesi Tidak Tersedia)'); }
     ok((await call('POST', '/quote', { package_id: 1, studio_id: 2 })).j.error === 'Studio tidak tersedia', 'quote studio tidak tersedia: "Studio tidak tersedia"');
-    // 3. guard tamu di core.js
+    // 3. guard tamu: frontend/tests/core/router.test.js (tabel guard rute × tamu/customer/admin, refactor MVC fase 3)
     const JS = allJs(), core = src('js/legacy/core.js'), cj = src('js/legacy/customer.js'), lj = src('js/legacy/landing.js');
-    const gv = (core.match(/const GUEST_VIEWS = \[([^\]]*)\]/) || [])[1] || ''; // kode: diganti di fase 3 (test-map.md), dua baris di bawah
-    for (const v of ['home', 'studio', 'packages', 'time', 'pay', 'auth', 'landing']) ok(gv.includes(`"${v}"`), `core.js: tamu boleh membuka "${v}"`);
-    for (const v of ['account', 'my', 'bdetail', 'gallery', 'session', 'success', 'cancel', 'refund']) ok(!gv.includes(`"${v}"`), `core.js: "${v}" tetap hanya untuk yang sudah login`);
-    ok(/if \(!S\.me && !GUEST_VIEWS\.includes\(S\.view\)\) S\.view = "landing"/.test(core), 'core.js: render() mengirim tamu ke landing hanya di luar GUEST_VIEWS'); // kode: diganti di fase 3 (test-map.md)
     ok(/\$\{S\.me \? acctMenu\(\) : /.test(core) && (core.match(/esc\(me\(\)\.name\)/g) || []).length === 1 && /const acctMenu = [^\n]*esc\(me\(\)\.name\)/.test(core), 'core.js: navbar membaca me().name hanya di menu akun (bukan untuk tamu)'); // kode: diganti di fase 4 (test-map.md)
     ok(core.includes("openAuth('login')") && core.includes("openAuth('register')"), 'core.js: navbar tamu punya tombol Masuk dan Daftar'); // kode: diganti di fase 4 (test-map.md)
     ok(/async function afterAuth[^\n]*S\.draft/.test(core), 'core.js: afterAuth melanjutkan draf booking (kembali ke Paket & Pembayaran)'); // kode: diganti di fase 6 (test-map.md)
@@ -226,7 +222,6 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     for (const f of ['async function aLoad', 'async function aDo', 'async function sessLoad']) ok(/aAuthErr\(/.test(aj.slice(aj.indexOf(f), aj.indexOf('\n', aj.indexOf(f) + f.length + 200))), `admin.js: ${f.split(' ').pop()} memakai aAuthErr`); // kode: diganti di fase 8a (aLoad, aDo) dan 8b (sessLoad) (test-map.md)
     ok(/e\.status == 403 && \/Ganti password\/\.test\(e\.message\)\) \{ AD\.loading\[k\] = 0; if \(AD\.me\) AD\.me\.must_change = true; return go\('aacct'\); \}/.test(aj), 'admin.js: alur 403 ganti password bawaan tetap ke Akun Admin'); // kode: diganti di fase 8a (test-map.md)
     ok(/studioSave = id =>/.test(aj) && /stSummary|AD\.stsum/.test(aj), 'admin.js: tambah studio lewat langkah ringkasan'); // kode: diganti di fase 8b (test-map.md)
-    ok(/if \(!S\.admin && ADMIN_VIEWS\.includes\(S\.view\)\) S\.view = S\.me \? "home" : "auth";/.test(core), 'core.js: customer tetap dialihkan diam-diam dari halaman admin'); // kode: diganti di fase 3 (test-map.md)
     ok(/aDenied/.test(boot), 'main.js (dulu boot.js): sesi admin dengan token bukan admin juga memunculkan Akses Ditolak'); // kode: diganti di fase 6 (test-map.md)
     ok(/if \(key === "sN"\) AD\.sterr = null;/.test(aj), 'admin.js: unggah gambar studio baru menghapus tanda galat lama (dicek ulang di Lihat Ringkasan)'); // kode: diganti di fase 8b (test-map.md)
     ok(/sudah dipakai\/\.test\(e\.message\)\) \{ AD\.sterr = \{ top: ST_DUP, name: ST_DUPF \}; AD\.studios = null;/.test(aj), 'admin.js: nama ganda dari server memuat ulang daftar studio'); // kode: diganti di fase 8b (test-map.md)

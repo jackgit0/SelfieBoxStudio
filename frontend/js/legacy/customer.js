@@ -74,8 +74,8 @@ async function onPkgErr(e, next) { if (e.status != 400 || !/^Paket(\/studio)? ti
 // studio yang tidak tersedia/dihapus tidak bisa dibuka untuk dipesan (riwayat booking tetap memakai studioOf)
 const shown = id => isStudioShown(M, id), noStudio = (edit = false) => `<div class="panel"><div class="card center"><h1 class="h1">Studio tidak tersedia</h1><p class="sub">Studio ini sedang tidak dapat dipesan.</p><div style="margin-top:12px"><button class="btn" onclick="${edit && BK.rescheduleId ? `go('bdetail',{id:${BK.rescheduleId}})` : "go('home')"}">${edit && BK.rescheduleId ? "Kembali ke booking" : "Cari studio lain"}</button></div></div></div>`;
 V.studio = () => {
-  if (!shown(S.p.id)) return noStudio();
-  const s = studioOf(S.p.id), cat = S.pCat || "Semua", cats = ["Semua", ...new Set(M.properties.map(p => p.category || "Lainnya"))], list = M.properties.filter(p => cat === "Semua" || (p.category || "Lainnya") === cat);
+  if (!shown(R.route.params.id)) return noStudio();
+  const s = studioOf(R.route.params.id), cat = S.pCat || "Semua", cats = ["Semua", ...new Set(M.properties.map(p => p.category || "Lainnya"))], list = M.properties.filter(p => cat === "Semua" || (p.category || "Lainnya") === cat);
   const on = S.bm.includes(s.id);
   return `<button class="back" onclick="go('home')">${ic("left", 16)} Kembali</button>
 <div class="sdet"><div class="left stack"><div class="bigcard"><div class="simg" style="${bgi(s.img)}"></div><div class="sbody"><div class="row sp" style="flex-wrap:nowrap"><h1 class="h2">${esc(s.name)}</h1><button class="star ${on ? "on" : ""}" aria-label="Favorit" onclick="toggleBm(${s.id})">${icf("star", 20)}</button></div>
@@ -127,10 +127,10 @@ async function bookingErr(e, next) {
 }
 const mIcon = (n, cls = "no") => `<div class="mico ${cls}">${ic(n, 28)}</div>`;
 // kembali ke langkah Pilih Tanggal & Waktu dengan sesi dikosongkan dan ketersediaan dimuat ulang
-function backToTime() { BK.slot = null; BK.quote = null; R.availability = {}; if (S.view === "time") { render(); prefetch(); } else go("time"); }
+function backToTime() { BK.slot = null; BK.quote = null; R.availability = {}; if (R.route.name === "time") { render(); prefetch(); } else go("time"); }
 async function inputInvalid() {
   await modal({ title: "Input Tidak Valid", cls: "center", kicker: mIcon("alert"), body: "<p>Input booking tidak lengkap atau tidak valid. Pilih tanggal dan sesi terlebih dahulu.</p>", buttons: [{ label: "Pilih Tanggal & Sesi", value: 1, icon: "calendar" }] });
-  if (S.view !== "time") backToTime();
+  if (R.route.name !== "time") backToTime();
 }
 async function sesiGone() {
   const lbl = BK.slot ? slotLabel(parseSlot(BK.slot).h) : ""; await refreshMaster(); const st = shown(BK.studio);
@@ -190,7 +190,7 @@ function payRows(b) {
 const kvs = rows => rows.map(r => `<div class="kv ${r[2] || ""}"><span>${r[0]}</span><b>${r[1]}</b></div>`).join("");
 const bookRows = b => { const s = studioOf(b.studio), pt = parseSlot(b.date); return kvs([["Studio", esc(s.name)], ["Paket", esc(pkOf(b.package_id).name)], ["Tanggal", fmtDMY(pt.date)], ["Jam", slotRange(b.date)], ["Lokasi", esc(s.address || "-")]]); };
 const payDetail = b => kvs([["Waktu", fmtTime(b.paid_at)], ["Status", PAYLBL[b.pay_status] || b.pay_status], ["Metode", esc(b.method || "-")], ...payRows(b)]);
-const bookOf = () => D.bookings.find(x => x.id == (S.p && S.p.id));
+const bookOf = () => D.bookings.find(x => x.id == R.route.params.id);
 V.success = () => {
   const b = bookOf(); if (!b) return `<div class="card">Memuat…</div>`;
   return `<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Studio Berhasil Direservasi</h1><img class="ill" src="/img/ill-booking.png" alt="">
@@ -211,7 +211,7 @@ V.my = () => {
   const tab = S.myTab || "up"; D.bookings.forEach(b => { if (b.status == "Menunggu Pembayaran" && Date.now() > b.expire_at) b.status = "Dibatalkan"; });
   let L = D.bookings.filter(b => b.user_id == S.me && (tab == "up" ? UPCOMING.includes(b.status) : !UPCOMING.includes(b.status))); L.sort((a, b) => tab == "up" ? (a.date < b.date ? -1 : 1) : (a.date < b.date ? 1 : -1));
   const groups = {}; L.forEach(b => (groups[parseSlot(b.date).date] = groups[parseSlot(b.date).date] || []).push(b));
-  return `<div class="panel"><h1 class="h1">Booking Saya</h1><div class="seg"><button class="${tab == "up" ? "on" : ""}" onclick="S.myTab='up';render()">Mendatang</button><button class="${tab == "hist" ? "on" : ""}" onclick="S.myTab='hist';render()">Riwayat</button></div>
+  return `<div class="panel"><h1 class="h1">Booking Saya</h1><div class="seg"><button class="${tab == "up" ? "on" : ""}" onclick="go('my')">Mendatang</button><button class="${tab == "hist" ? "on" : ""}" onclick="go('my',{tab:'hist'})">Riwayat</button></div>
 ${Object.keys(groups).map(d => `<div class="dayh">${fmtDate(d)}</div>${groups[d].map(b => `<button class="brow" onclick="go('bdetail',{id:${b.id}})"><div><b>${esc(studioOf(b.studio).name)}</b><div class="sub">${esc(pkOf(b.package_id).name)} · ${stTag(b)}</div></div><b>${slotRange(b.date)}</b></button>`).join("")}`).join("") || `<div class="card center m" style="margin-top:12px">${tab == "up" ? "Belum ada booking mendatang." : "Belum ada riwayat booking."}<div style="margin-top:12px"><button class="btn" onclick="go('home')">Cari studio</button></div></div>`}</div>`;
 };
 const canChange = b => ["Menunggu Pembayaran", "Terbayar"].includes(b.status);
@@ -260,7 +260,7 @@ V.account = () => {
   if (tab == "pay") { const L = D.bookings.filter(b => b.pay_status && !["pending", "batal"].includes(b.pay_status)).sort((a, b) => (b.paid_at || 0) - (a.paid_at || 0));
     body = `<div class="card"><h3 class="h3">Riwayat Pembayaran</h3>${L.length ? `<div class="tbl"><table><tr><th>Waktu</th><th>Studio</th><th>Paket</th><th>Total</th><th>Status</th><th></th></tr>${L.map(b => `<tr><td>${fmtTime(b.paid_at)}</td><td>${esc(studioOf(b.studio).name)}</td><td>${esc(pkOf(b.package_id).name)}</td><td>${rp(b.amount)}</td><td><span class="tag ${b.pay_status == "paid" ? "ok" : b.pay_status == "refunded" ? "" : "no"}">${PAYLBL[b.pay_status]}</span></td>
 <td>${b.paid && b.status != "Dibatalkan" ? `<a class="btn sm ghost" href="${API.invoiceUrl(b.id, 0)}" target="_blank" rel="noopener">${ic("receipt", 14)} Kwitansi Digital</a>` : ""}</td></tr>`).join("")}</table></div>` : `<p class="m" style="margin-top:8px">Belum ada transaksi.</p>`}</div>`; }
-  return `<div class="panel"><h1 class="h1">Pengaturan Akun</h1><div class="seg">${tabs.map(t => `<button class="${t[0] == tab ? "on" : ""}" onclick="S.acct='${t[0]}';R.toast.message=R.toast.error='';render()">${t[1]}</button>`).join("")}</div>${body}<div style="margin-top:18px"><button class="btn ghost" onclick="logout()">${ic("logout", 16)} Keluar</button></div></div>`;
+  return `<div class="panel"><h1 class="h1">Pengaturan Akun</h1><div class="seg">${tabs.map(t => `<button class="${t[0] == tab ? "on" : ""}" onclick="go('account',{tab:'${t[0]}'})">${t[1]}</button>`).join("")}</div>${body}<div style="margin-top:18px"><button class="btn ghost" onclick="logout()">${ic("logout", 16)} Keluar</button></div></div>`;
 };
 async function saveProfile() { R.toast.message = R.toast.error = ""; try { const r = await API.patch("/me", { name: $("#pn").value, phone: $("#pp").value }); S.user = { ...S.user, ...r }; save(); R.toast.message = "Profil disimpan."; } catch (e) { R.toast.error = e.message; } render(); }
 export { PAYLBL, bgi, calNav, calPick, choosePkg, confirmPay, doCancel, kvs, mailInv, nextTime, openCancel, payNow, pkgCards, qr, quickBook, resumeDraft, saveProfile, selectPkg, startBook, startReschedule, toggleBm };
