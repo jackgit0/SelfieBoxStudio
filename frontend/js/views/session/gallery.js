@@ -1,5 +1,5 @@
 // Galeri (/gallery): pilih sesi, pilih foto untuk dicetak sesuai kuota, favorit, mode hapus, konfirmasi pilihan, unduh (dulu V.gallery di legacy/session.js).
-// View murni; aksi ditangani GalleryController. Sesi yang tampil: pilihan di slice photo (gallerySession), selain itu sesi terbaru user.
+// View murni; aksi ditangani GalleryController. Sesi yang tampil: yang dipilih customer di daftar sesi (photo.gallerySession), selain itu sesi terbaru user.
 import { html } from "../../core/html.js";
 import { packageOf } from "../../models/master.js";
 import { groupSimilar } from "../../models/gallery.js";

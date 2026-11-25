@@ -3,7 +3,7 @@
 // fitur teman sekelompok, perilaku dipertahankan kecuali yang dicatat di Progress fase 7).
 // Foto di slice data diubah di tempat seperti kode lama. drive: { fetch } (hapus berkas Drive), files: { download(url, nama) },
 // photoSession: PhotoSessionController (strip layar sesi), refreshData: BookingController.refreshData.
-import { gallerySessionOf, deletePhotoModal, deleteSelectedModal, deleteFailedModal } from "../views/session/gallery.js";
+import { deletePhotoModal, deleteSelectedModal, deleteFailedModal } from "../views/session/gallery.js";
 
 export function createGalleryController({ api, store, ui, models, drive, files, photoSession, refreshData }) {
   const gallery = models.gallery;
@@ -34,14 +34,6 @@ export function createGalleryController({ api, store, ui, models, drive, files, 
   }
 
   return {
-    // kait after() rute /gallery: sesi yang tampil dicatat sebagai pilihan (seperti V.gallery lama)
-    enter() {
-      const session = gallerySessionOf(state());
-      if (session) {
-        photo().gallerySession = session.id;
-      }
-    },
-
     // data-change pada pilihan sesi
     showSession(dataset, event) {
       photo().gallerySession = Number(event.target.value);

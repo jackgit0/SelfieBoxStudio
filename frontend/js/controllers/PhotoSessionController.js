@@ -129,6 +129,7 @@ export function createPhotoSessionController({ api, store, ui, router, models, s
         const created = await sessions.start(api, Number(id));
         await refreshData();
         photo().session = created.id;
+        photo().gallerySession = null; // Galeri membuka sesi terbaru (dulu tetap di sesi yang terakhir dilihat)
       } catch (error) {
         return showToast({ error: error.message });
       }

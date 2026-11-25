@@ -126,7 +126,7 @@ function pagesFor({ studio, payment, landing, photo, gallery }, links) {
     // Sesi Foto (PhotoSessionController): kamera dan timer berjalan selama halaman terbuka, berhenti saat ditinggalkan
     "/sessions/:id": { view: photoSessionView, after: () => photo.enter(), leave: () => photo.stopTimers() },
     // Galeri (GalleryController)
-    "/gallery": { view: galleryView, after: () => gallery.enter() },
+    "/gallery": { view: galleryView },
   };
 }
 

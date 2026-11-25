@@ -278,3 +278,10 @@ test("start: toast Drive tetap tampil di layar sesi (diisi sesudah pindah halama
   assert.equal(store.get().runtime.toast.message, "Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server.");
   assert.equal(log.at(-1), "render");
 });
+
+test("start: sesi lain yang dipilih di Galeri dilepas, jadi Galeri membuka sesi baru", async () => {
+  const { store, controller } = setup({ responses: { "POST /bookings/7/start": { body: { id: 41 } } } });
+  store.get().photo.gallerySession = 12;
+  await controller.start({ id: "7" });
+  assert.equal(store.get().photo.gallerySession, null);
+});

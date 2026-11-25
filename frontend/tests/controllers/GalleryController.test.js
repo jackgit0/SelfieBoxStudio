@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createStore } from "../../js/core/store.js";
 import { createGalleryController } from "../../js/controllers/GalleryController.js";
 import { createPhotoState } from "../../js/controllers/PhotoSessionController.js";
+import { gallerySessionOf } from "../../js/views/session/gallery.js";
 import * as galleryModel from "../../js/models/gallery.js";
 import * as driveModel from "../../js/models/drive.js";
 import { createFakeApi } from "../helpers/fakeApi.js";
@@ -42,11 +43,11 @@ function setup({ responses = {}, modalAnswers = [], route = "gallery", deleteMod
 
 const ids = { session: "41", photo: "2" };
 
-test("enter: sesi yang tampil dicatat (sesi terbaru bila belum ada pilihan)", () => {
-  const { store, log, controller } = setup();
-  controller.enter();
-  assert.equal(store.get().photo.gallerySession, 41);
-  assert.deepEqual(log, []);
+test("Galeri tanpa pilihan: sesi baru tampil setelah kunjungan sebelumnya (tidak terkunci ke sesi lama)", () => {
+  const { store, controller } = setup();
+  if (controller.enter) controller.enter(); // kunjungan pertama (dulu kait after() /gallery mengunci sesi yang tampil)
+  store.get().data.sessions.push({ id: 42, user_id: 5, pkg: 1, photos: [], confirmed: false });
+  assert.equal(gallerySessionOf(store.get()).id, 42);
 });
 
 test("showSession: pilih sesi lain, pilihan hapus dikosongkan, render", () => {
