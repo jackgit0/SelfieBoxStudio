@@ -7,7 +7,7 @@ import { isStudioShown } from "../models/master.js";
 import { modalIcon } from "../components/modal.js";
 import { calendar } from "../components/calendar.js";
 import { $, go, ic, me, modal, pkOf, refresh, render, studioOf } from "./core.js";
-import { freeHours } from "../models/studio.js";
+import { filterDate, freeHours } from "../models/studio.js";
 import { priceTag } from "../components/packageCards.js";
 import { studioUnavailable } from "../views/customer/studio.js";
 import { openAuth } from "./landing.js";
@@ -27,7 +27,7 @@ function calPick(ctx, ds) { BK.date = ds; BK.slot = null; render(); }
 // paket pilihan masih aktif, atau popup Paket Foto Tidak Ditemukan: PackageController.ensureSelected
 const ensurePkg = next => CONTROLLERS.package.ensureSelected(next);
 function quickBook(sid, date, h) { if (!ensurePkg(() => quickBook(sid, date, h))) return; BK.rescheduleId = null; S.draft = null; Object.assign(BK, { studio: sid, date, slot: `${date} ${h}:00` }); go("time"); }
-function startBook(sid) { if (!ensurePkg(() => startBook(sid))) return; BK.rescheduleId = null; S.draft = null; Object.assign(BK, { studio: sid, date: S.hDate || todayS(), slot: null }); go("time"); }
+function startBook(sid) { if (!ensurePkg(() => startBook(sid))) return; BK.rescheduleId = null; S.draft = null; Object.assign(BK, { studio: sid, date: filterDate(S.hDate, todayS()), slot: null }); go("time"); }
 
 
 // ---------- studio tidak tersedia (Detail Studio sendiri: views/customer/studio.js) ----------

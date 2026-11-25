@@ -1,7 +1,7 @@
 // Halaman Browse (/browse): Filter Jadwal (tanggal dan jam), daftar studio dengan jam kosong, strip paket. View murni (dulu V.home).
 import { html } from "../../core/html.js";
 import { SESSION_HOURS, isoDate, padTwo } from "../../core/format.js";
-import { freeHours } from "../../models/studio.js";
+import { filterDate, freeHours } from "../../models/studio.js";
 import { calendar } from "../../components/calendar.js";
 import { icon } from "../../components/icon.js";
 import { studioCard } from "../../components/studioCard.js";
@@ -23,7 +23,7 @@ function shownMonth(runtime, now) {
 export function browseView(state, match, now = new Date()) {
   const { persisted, master, runtime } = state;
   const today = isoDate(now);
-  const date = persisted.hDate || today;
+  const date = filterDate(persisted.hDate, today);
   const from = persisted.hFrom ?? DEFAULT_FROM;
   const to = persisted.hTo ?? DEFAULT_TO;
   const bookmarks = persisted.bm || [];

@@ -30,6 +30,11 @@ export function freeHours(cache, studioId, date, now) {
   return SESSION_HOURS.filter(hour => date > today || hour > now.getHours());
 }
 
+// tanggal Filter Jadwal: yang tersimpan bila hari ini atau nanti; tanggal yang sudah lewat (state tersimpan dari hari sebelumnya) atau kosong = hari ini
+export function filterDate(savedDate, today) {
+  return savedDate && savedDate >= today ? savedDate : today;
+}
+
 // daftar bookmark baru dengan id ditambah atau dihapus (daftar lama tidak diubah)
 export function toggleBookmark(list = [], id) {
   if (list.includes(id)) {

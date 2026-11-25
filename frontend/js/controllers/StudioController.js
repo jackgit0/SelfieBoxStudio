@@ -19,7 +19,7 @@ export function createStudioController({ api, store, router, models, now = () =>
   function availabilityTargets(state) {
     const today = isoDate(now());
     if (state.runtime.route.name === "home") {
-      return { date: state.persisted.hDate || today, studioIds: state.master.studios.map(studio => studio.id) };
+      return { date: studioModel.filterDate(state.persisted.hDate, today), studioIds: state.master.studios.map(studio => studio.id) };
     }
     const studioIds = state.booking.studio ? [state.booking.studio] : [];
     return { date: state.booking.date || today, studioIds };

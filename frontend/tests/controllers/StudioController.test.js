@@ -121,3 +121,10 @@ test("refreshMaster: galat jaringan diabaikan", async () => {
   assert.equal(await controller.refreshMaster(), false);
   assert.equal(renders(), 0);
 });
+
+test("prefetchAvailability: tanggal filter yang sudah lewat diganti hari ini", async () => {
+  const responses = { "GET /availability?studio_id=1&date=2026-11-25": { body: { free: [10] } }, "GET /availability?studio_id=2&date=2026-11-25": { body: { free: [11] } } };
+  const { api, controller } = setup({ state: sampleState({ persisted: { hDate: "2026-11-20" } }), responses });
+  await controller.prefetchAvailability();
+  assert.deepEqual(api.calls.map(call => call.path), ["/availability?studio_id=1&date=2026-11-25", "/availability?studio_id=2&date=2026-11-25"]);
+});

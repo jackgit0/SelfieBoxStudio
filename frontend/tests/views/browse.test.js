@@ -74,3 +74,10 @@ test("strip paket: \"Lihat semua paket\" ke /packages, paket terpilih ditandai, 
   assert.match(text, /<h4>Basic<\/h4><\/div><div class="price"><s class="m">Rp50.000<\/s> Rp45.000<\/div>/);
   assert.doesNotMatch(text, /onclick=|onchange=/);
 });
+
+test("tanggal filter tersimpan yang sudah lewat (dibuka lagi esok hari): kembali ke hari ini", () => {
+  const text = String(browseView(sampleState({ persisted: { hDate: "2026-11-20" } }), match, now));
+  assert.match(text, /<button class="cd on" {2}data-action="calendar:pick" data-context="home" data-date="2026-11-25">25<\/button>/);
+  assert.match(cardOf(text, 1), /data-date="2026-11-25" data-hour="10"/);
+  assert.doesNotMatch(text, /Tidak ada sesi tersedia/);
+});

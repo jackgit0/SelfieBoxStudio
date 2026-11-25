@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { availability, availabilityKey, freeHours, toggleBookmark } from "../../js/models/studio.js";
+import { availability, availabilityKey, filterDate, freeHours, toggleBookmark } from "../../js/models/studio.js";
 import { createFakeApi } from "../helpers/fakeApi.js";
 
 // 25 Nov 2026 pukul 13.20 waktu lokal
@@ -50,4 +50,12 @@ test("toggleBookmark: menambah atau menghapus id, daftar asli tidak diubah", () 
   assert.deepEqual(toggleBookmark(list, 2), []);
   assert.deepEqual(list, [2]);
   assert.deepEqual(toggleBookmark(undefined, 1), [1]);
+});
+
+test("filterDate: tanggal filter tersimpan dipakai bila hari ini atau nanti, tanggal lampau / kosong = hari ini", () => {
+  assert.equal(filterDate("2026-11-27", "2026-11-25"), "2026-11-27");
+  assert.equal(filterDate("2026-11-25", "2026-11-25"), "2026-11-25");
+  assert.equal(filterDate("2026-11-20", "2026-11-25"), "2026-11-25");
+  assert.equal(filterDate(undefined, "2026-11-25"), "2026-11-25");
+  assert.equal(filterDate(null, "2026-11-25"), "2026-11-25");
 });
