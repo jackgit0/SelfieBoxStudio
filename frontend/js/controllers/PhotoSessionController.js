@@ -134,8 +134,9 @@ export function createPhotoSessionController({ api, store, ui, router, models, s
       }
       const token = await models.drive.authorize({ clientId: drive.clientId, google: drive.google() });
       photo().drive.token = token;
-      showToast({ message: token ? "Google Drive terhubung: foto otomatis dikirim ke Drive Anda." : "Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server." }, { silent: true });
+      // toast sesudah pindah halaman: navigasi mengosongkan toast (dulu toast ini tidak pernah terlihat)
       router.navigate(`/sessions/${photo().session}`);
+      showToast({ message: token ? "Google Drive terhubung: foto otomatis dikirim ke Drive Anda." : "Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server." });
     },
 
     // Buka Sesi (Detail Booking): sesi yang sedang dibuka atau sesi aktif user, selain itu Galeri

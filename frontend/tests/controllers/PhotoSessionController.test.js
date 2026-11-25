@@ -58,7 +58,7 @@ function fakeStream(name, log) {
 
 const activeSession = (extra = {}) => ({ id: 41, user_id: 5, pkg: 1, status: "Aktif", left: 62, paused: false, photos: [], ...extra });
 
-function setup({ responses = {}, sessions = [activeSession()], staff = false, modalAnswers = [], cameraFails = false, current = null } = {}) {
+function setup({ responses = {}, sessions = [activeSession()], staff = false, modalAnswers = [], cameraFails = false, current = null, clearToastOnNavigate = false } = {}) {
   const log = [];
   const state = sampleState({ persisted: { me: 5, user: { id: 5, name: "Ana" }, staff, log: [] }, master: { poses: { 1: ["Pose A", "Pose B", "Pose C"] } } });
   state.data.sessions = sessions;
@@ -78,7 +78,13 @@ function setup({ responses = {}, sessions = [activeSession()], staff = false, mo
     },
   };
   const sound = { beep: () => log.push("beep") };
-  const router = { navigate: path => log.push(`navigate ${path}`) };
+  // clearToastOnNavigate: seperti goPath() di aplikasi, pindah halaman mengosongkan toast
+  const router = {
+    navigate: path => {
+      log.push(`navigate ${path}`);
+      if (clearToastOnNavigate) store.update("runtime", { toast: { message: "", error: "" } }, { silent: true });
+    },
+  };
   const refreshData = async () => log.push("refreshData");
   const controller = createPhotoSessionController({
     api, store, ui, router, timers, screen, media, sound, refreshData,
@@ -97,7 +103,7 @@ test("start: POST /bookings/:id/start, muat ulang data, sesi dibuka, toast Drive
   assert.deepEqual(api.calls, [{ method: "POST", path: "/bookings/7/start", body: {} }]);
   assert.equal(store.get().photo.session, 41);
   assert.ok(log.includes("refreshData"));
-  assert.equal(log.at(-1), "navigate /sessions/41");
+  assert.ok(log.indexOf("navigate /sessions/41") > log.indexOf("refreshData"));
   assert.equal(store.get().runtime.toast.message, "Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server.");
 });
 
@@ -262,5 +268,13 @@ test("shoot: sesi dijeda tidak mengambil foto; galat unggah → toast galat, sin
   await controller.shoot();
   assert.equal(store.get().runtime.toast.error, "Kuota foto habis");
   assert.deepEqual(api.calls.map(call => call.path), ["/sessions/41/photos", "/sessions/41"]);
+  assert.equal(log.at(-1), "render");
+});
+
+test("start: toast Drive tetap tampil di layar sesi (diisi sesudah pindah halaman, yang mengosongkan toast)", async () => {
+  const { store, log, controller } = setup({ clearToastOnNavigate: true, responses: { "POST /bookings/7/start": { body: { id: 41 } } } });
+  await controller.start({ id: "7" });
+  assert.ok(log.includes("navigate /sessions/41"));
+  assert.equal(store.get().runtime.toast.message, "Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server.");
   assert.equal(log.at(-1), "render");
 });
