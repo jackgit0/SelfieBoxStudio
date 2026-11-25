@@ -25,10 +25,17 @@ export function modalIcon(name, variant = "no") {
   return html`<div class="mico ${variant}">${icon(name, 28)}</div>`;
 }
 
+// elemen yang menerima fokus lagi setelah dialog ditutup: pembukanya, atau options.returnFocus (selector) bila pembuka ikut tersembunyi
+export function returnFocusTarget(opener, options, documentRef) {
+  const replacement = options.returnFocus ? documentRef.querySelector(options.returnFocus) : null;
+  return replacement || opener;
+}
+
 // Membuka dialog; resolve dengan value tombol yang ditekan, null bila ditutup (Escape / klik di luar).
 // Tombol di dalam body dengan data-v="…" juga menutup dialog dan resolve dengan string itu.
 // Opsi tambahan: enterValue = Enter di sebuah isian menutup dialog dengan nilai ini;
-// read(box) = dibaca tepat sebelum dialog ditutup, lalu Promise resolve dengan { value, data } (mis. isi PIN).
+// read(box) = dibaca tepat sebelum dialog ditutup, lalu Promise resolve dengan { value, data } (mis. isi PIN);
+// initialFocus = selector fokus awal; returnFocus = selector fokus setelah ditutup (lihat returnFocusTarget).
 export function openModal(options) {
   const { buttons = [{ label: "Tutup", value: null }], enterValue, read } = options;
   return new Promise(resolve => {
@@ -42,8 +49,9 @@ export function openModal(options) {
       const data = read ? read(box) : undefined;
       overlay.remove();
       document.removeEventListener("keydown", onKey);
-      if (opener && opener.focus && document.contains(opener)) {
-        opener.focus();
+      const back = returnFocusTarget(opener, options, document);
+      if (back && back.focus && document.contains(back)) {
+        back.focus();
       }
       resolve(read ? { value, data } : value);
     }

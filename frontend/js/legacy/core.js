@@ -109,12 +109,13 @@ async function refresh() {
 }
 async function afterAuth(r) { API.token = r.token; S.admin = false; S.user = r.user; S.me = r.user.id; await refresh(); if (S.draft) return resumeDraft(); go("home"); } // draf booking tamu: kembali ke Paket & Pembayaran
 function logout() { API.token = ""; API.staffToken = ""; S.user = S.me = null; S.staff = false; S.admin = false; S.draft = null; D.bookings = []; D.sessions = []; if (typeof adminReset === "function") adminReset(); R.auth.mode = "login"; go("landing"); }
-// Mode Staf: PIN lewat modal "Masuk Mode Staf" (dulu dialog bawaan browser, decisions.md 4, 27, 41); fokus awal di isian PIN, Enter = Masuk
+// Mode Staf: PIN lewat modal "Masuk Mode Staf" (dulu dialog bawaan browser, decisions.md 4, 27, 41); fokus awal di isian PIN, Enter = Masuk,
+// setelah ditutup fokus ke tombol avatar (item menu yang membukanya sudah tersembunyi)
 const STAFF_PIN_BODY = `<p>Masukkan PIN staf untuk mengaktifkan Mode Staf.</p><label for="staff-pin">PIN staf</label><input id="staff-pin" type="password" inputmode="numeric" autocomplete="off">`;
 async function staffToggle() {
   if (S.staff) { S.staff = false; API.staffToken = ""; }
   else {
-    const answer = await modal({ title: "Masuk Mode Staf", body: STAFF_PIN_BODY, buttons: [{ label: "Batal", value: null, style: "ghost" }, { label: "Masuk", value: "ok" }], initialFocus: "#staff-pin", enterValue: "ok", read: box => box.querySelector("#staff-pin").value.trim() });
+    const answer = await modal({ title: "Masuk Mode Staf", body: STAFF_PIN_BODY, buttons: [{ label: "Batal", value: null, style: "ghost" }, { label: "Masuk", value: "ok" }], initialFocus: "#staff-pin", returnFocus: ".avatar", enterValue: "ok", read: box => box.querySelector("#staff-pin").value.trim() });
     const pin = answer.value === "ok" ? answer.data : ""; if (!pin) return;
     try { API.staffToken = (await API.post("/staff/login", { pin })).token; S.staff = true; } catch (e) { R.toast.error = e.message; }
   }

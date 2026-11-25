@@ -55,3 +55,13 @@ test("focusTarget: initialFocus menggantikan tombol aksi", () => {
 test("raw kicker tetap utuh", () => {
   assert.match(String(renderModal({ title: "T", kicker: raw('<span class="tag no mkick">X</span>') })), /aria-labelledby="mdl-t"><span class="tag no mkick">X<\/span><h3/);
 });
+
+test("returnFocusTarget: elemen pembuka, atau returnFocus bila pembuka ikut tersembunyi (mis. item menu akun)", async () => {
+  const { returnFocusTarget } = await import("../../js/components/modal.js");
+  const opener = { id: "item" };
+  const avatar = { id: "avatar" };
+  const documentRef = { querySelector: selector => (selector === ".avatar" ? avatar : null) };
+  assert.equal(returnFocusTarget(opener, {}, documentRef), opener);
+  assert.equal(returnFocusTarget(opener, { returnFocus: ".avatar" }, documentRef), avatar);
+  assert.equal(returnFocusTarget(opener, { returnFocus: ".tidak-ada" }, documentRef), opener);
+});
