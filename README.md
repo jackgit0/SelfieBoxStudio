@@ -34,7 +34,7 @@ npm run seed:demo                # buat/perbarui akun admin + customer demo di d
 ```
 Boleh dijalankan berulang (akun yang ada diperbarui, password diatur ulang, kunci akun dibuka). Admin demo tidak diminta mengganti password. Jika dijalankan sebelum server pertama kali menyala, akun bawaan `adminstudio`/`admin123` tidak dibuat.
 
-Dengan `DEMO_DATA=1` ikut dibuat: 4 customer contoh (`@selfiebox.test`, password sama dengan customer demo), kode promo `DEMO10` dan `HEMAT20K`, booking di setiap status (Terbayar, Menunggu Pembayaran, Selesai, Dibatalkan dengan refund berhasil / gagal / kedaluwarsa / oleh admin) dengan tanggal relatif ke hari ini, preferensi customer demo, 3 item keuangan, dan sesi studio contoh tiap jam 09.00-17.50 untuk hari ini sampai 6 hari ke depan di setiap studio (booking aktif yang jadwalnya cocok ditautkan ke sesinya). Booking milik akun-akun demo itu dihapus lalu dibuat ulang setiap kali dijalankan; data customer lain tidak disentuh. Booking "Menunggu Pembayaran" otomatis batal 15 menit setelah seed, jadi jalankan ulang tepat sebelum demo.
+Dengan `DEMO_DATA=1` ikut dibuat: 4 customer contoh (`@selfiebox.test`, password sama dengan customer demo), kode promo `DEMO10` dan `HEMAT20K`, booking di setiap status (Terbayar, Menunggu Pembayaran, Selesai, Dibatalkan dengan refund berhasil / gagal / kedaluwarsa / oleh admin) dengan tanggal relatif ke hari ini, 3 item keuangan, dan sesi studio contoh tiap jam 09.00-17.50 untuk hari ini sampai 6 hari ke depan di setiap studio (booking aktif yang jadwalnya cocok ditautkan ke sesinya). Booking milik akun-akun demo itu dihapus lalu dibuat ulang setiap kali dijalankan; data customer lain tidak disentuh. Booking "Menunggu Pembayaran" otomatis batal 15 menit setelah seed, jadi jalankan ulang tepat sebelum demo.
 
 ### Reset database (lokal)
 ```
@@ -48,7 +48,7 @@ Matikan server dulu (script menolak jika server masih jalan di `PORT`). Semua cu
 ## UI (mengikuti file Figma IMK)
 Font Poppins, warna biru `#506fce` + oranye `#f28800`. Desktop: navbar atas (Beranda · Booking · Galeri). Mobile: top bar + bottom bar.
 Alur customer: Beranda (Browse + Filter Jadwal) -> Studio (Properti) -> Pilih Tanggal & Waktu (1/2) -> Paket & Pembayaran (2/2) -> Booking Berhasil.
-Booking Saya (Mendatang/Riwayat) -> Detail -> Reschedule / Batalkan -> Refund Berhasil / Gagal. Akun: Edit Profil, Preferensi, Riwayat Pembayaran (Kwitansi Digital), Keluar.
+Booking Saya (Mendatang/Riwayat) -> Detail -> Reschedule / Batalkan -> Refund Berhasil / Gagal. Akun: Edit Profil, Riwayat Pembayaran (Kwitansi Digital), Keluar.
 Admin: Dashboard, Pengguna, Studio (Detail Studio + Detail Sesi), Booking (daftar + panel Detail Booking), Properti, Pose, Transaksi, Paket & Diskon.
 
 ## Konfigurasi frontend (`frontend/js/config.js`)

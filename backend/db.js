@@ -11,8 +11,6 @@ CREATE TABLE IF NOT EXISTS package(id INTEGER PRIMARY KEY,name TEXT UNIQUE,price
 CREATE TABLE IF NOT EXISTS studio(id INTEGER PRIMARY KEY,name TEXT,description TEXT,budget_range_id INTEGER REFERENCES budget_range(id),people_range_id INTEGER REFERENCES people_range(id));
 CREATE TABLE IF NOT EXISTS property(id INTEGER PRIMARY KEY,name TEXT,type TEXT,img_url TEXT,vibe_id INTEGER REFERENCES vibe(id),price INTEGER DEFAULT 0,used_count INTEGER DEFAULT 0,extra TEXT);
 CREATE TABLE IF NOT EXISTS pose(id INTEGER PRIMARY KEY AUTOINCREMENT,nama TEXT,img_url TEXT,people_range_id INTEGER REFERENCES people_range(id));
-CREATE TABLE IF NOT EXISTS schedule_preference(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER REFERENCES user(id),people INTEGER,budget INTEGER,schedule TEXT);
-CREATE TABLE IF NOT EXISTS setup_preference(user_id INTEGER PRIMARY KEY REFERENCES user(id),vibe INTEGER,property TEXT);
 CREATE TABLE IF NOT EXISTS booking(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL REFERENCES user(id),package_id INTEGER NOT NULL REFERENCES package(id),status TEXT NOT NULL,setup_json TEXT,amount INTEGER NOT NULL,created_at INTEGER);
 CREATE TABLE IF NOT EXISTS payment(id INTEGER PRIMARY KEY AUTOINCREMENT,booking_id INTEGER NOT NULL REFERENCES booking(id),amount INTEGER,status TEXT,method TEXT,expire_at INTEGER);
 CREATE TABLE IF NOT EXISTS session(id INTEGER PRIMARY KEY AUTOINCREMENT,booking_id INTEGER NOT NULL REFERENCES booking(id),studio_id INTEGER NOT NULL REFERENCES studio(id),slot TEXT NOT NULL,start_time INTEGER,end_time INTEGER,paused_at INTEGER,status TEXT NOT NULL,confirmed INTEGER DEFAULT 0);
@@ -64,4 +62,6 @@ if (!flag('seed_design_v1')) { // properti contoh dari desain (foto di frontend/
   ip.run('Topi Sport', 'accessory', 1, 5000, 1, 'Topi', '/img/prop-topi-sport.jpg'); ip.run('Kacamata Aviator', 'accessory', 1, 0, 2, 'Kacamata', '/img/prop-kacamata.jpg'); setFlag('seed_design_v1'); }
 if (!flag('mig_refund_v1')) { // sebelum fitur refund: booking terbayar yang dibatalkan dianggap sudah dikembalikan
   db.prepare(`UPDATE payment SET status='refunded' WHERE status='paid' AND booking_id IN (SELECT id FROM booking WHERE status='Dibatalkan')`).run(); setFlag('mig_refund_v1'); }
+if (!flag('drop_onboarding_v1')) { // lingkup IMK: onboarding (preferensi untuk rekomendasi paket) dihapus beserta tabelnya
+  db.exec('BEGIN'); try { db.exec('DROP TABLE IF EXISTS schedule_preference; DROP TABLE IF EXISTS setup_preference;'); setFlag('drop_onboarding_v1'); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } }
 module.exports = db;

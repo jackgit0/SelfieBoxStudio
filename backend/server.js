@@ -88,9 +88,6 @@ route('POST', '/api/auth/login', 0, ({ body, ip }) => { if (limited(ip)) bad('Te
 route('GET', '/api/master', 0, () => ({ PKG: q('SELECT * FROM package WHERE active!=0 ORDER BY price,id'), ALLPKG: q('SELECT * FROM package'), DISC: { pct: +getSet('main_discount_pct') || 0, label: getSet('main_discount_label') || '' }, POLICY: { refund_hours: REFUND_H }, PEOPLE: q('SELECT * FROM people_range'), BUDGET: q('SELECT * FROM budget_range'), STUDIOS: q(`SELECT * FROM studio WHERE status='AVAILABLE' AND deleted_at IS NULL`), ALLSTUDIOS: q('SELECT * FROM studio'), VIBES: q('SELECT * FROM vibe'),
   PROP: q('SELECT * FROM property ORDER BY img IS NULL,id').map(p => ({ id: p.id, vibe_id: p.vibe_id, type: p.type, name: p.name, price: p.price, category: p.category, qty: p.qty, img: p.img, [p.type === 'background' ? 'bg' : 'e']: p.extra })),
   POSES: q('SELECT * FROM pose').reduce((a, p) => ((a[p.people_range_id] = a[p.people_range_id] || []).push(p.nama), a), {}) }));
-route('GET', '/api/preferences', 1, ({ user }) => ({ schedule: one('SELECT people,budget,schedule FROM schedule_preference WHERE user_id=? ORDER BY id DESC', user.sub) || null, setup: one('SELECT vibe,property FROM setup_preference WHERE user_id=?', user.sub) || null }));
-route('PUT', '/api/preferences', 1, ({ body, user }) => { const { people, budget, vibe } = body; if (!one('SELECT 1 FROM people_range WHERE id=?', people) || !(budget > 0) || !one('SELECT 1 FROM vibe WHERE id=?', vibe)) bad('Preferensi tidak valid');
-  run('INSERT INTO schedule_preference(user_id,people,budget) VALUES(?,?,?)', user.sub, people, budget); run('INSERT INTO setup_preference(user_id,vibe) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET vibe=excluded.vibe', user.sub, vibe); return { ok: true }; });
 route('GET', '/api/availability', 0, ({ query }) => { expireStale(); const { studio_id, date } = query, st = one('SELECT * FROM studio WHERE id=?', studio_id); if (!st || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) bad('Parameter tidak valid'); if (!visible(st)) bad('Studio tidak tersedia');
   const used = q(`SELECT slot FROM session WHERE studio_id=? AND slot LIKE ? AND status!='Dibatalkan'`, studio_id, date + ' %').map(r => r.slot);
   return { free: HRS.filter(h => !used.includes(`${date} ${h}:00`) && slotMs(`${date} ${h}:00`) > now()) }; });
@@ -216,7 +213,7 @@ route('DELETE', '/api/admin/customers/:id', 2, ({ params }) => { const u = custO
   const files = q(`SELECT img_url FROM photo WHERE session_id IN ${sub}`, u.id);
   tx(() => { run(`DELETE FROM photo WHERE session_id IN ${sub}`, u.id); run(`DELETE FROM staff_log WHERE session_id IN ${sub}`, u.id); run('DELETE FROM session WHERE booking_id IN (SELECT id FROM booking WHERE user_id=?)', u.id);
     run('DELETE FROM payment WHERE booking_id IN (SELECT id FROM booking WHERE user_id=?)', u.id); run('DELETE FROM booking WHERE user_id=?', u.id);
-    ['schedule_preference', 'setup_preference', 'password_reset'].forEach(t => run(`DELETE FROM ${t} WHERE user_id=?`, u.id)); run('DELETE FROM user WHERE id=?', u.id); });
+    run('DELETE FROM password_reset WHERE user_id=?', u.id); run('DELETE FROM user WHERE id=?', u.id); });
   rmFiles(files); return { ok: true, photos_deleted: files.length }; });
 // rekapitulasi operasional: omset kotor (pendapatan booking + pemasukan lain) dikurangi biaya = omset bersih
 const opsBody = b => { const label = String(b.label || '').trim(), amount = +b.amount; if (!label || !['biaya', 'pemasukan'].includes(b.kind) || !Number.isInteger(amount) || amount < 0 || !/^\d{4}-\d{2}-\d{2}$/.test(b.date || '')) bad('Data rekap tidak valid (tanggal, nama, jenis, nominal)'); return { label, amount, kind: b.kind, date: b.date, note: String(b.note || '').slice(0, 200) }; };

@@ -29,7 +29,7 @@ if (errs.length) { console.error('Isi .env.demo belum benar:\n- ' + errs.join('\
 const db = require('./db'), now = Date.now(); // membuat skema + data awal bila database masih baru
 const hash = pw => { const s = crypto.randomBytes(16).toString('hex'); return s + ':' + crypto.scryptSync(pw, s, 32).toString('hex'); };
 
-// ---- data demo (DEMO_DATA=1): customer contoh, promo, booking di setiap status, preferensi, biaya operasional ----
+// ---- data demo (DEMO_DATA=1): customer contoh, promo, booking di setiap status, biaya operasional ----
 // Booking milik customer demo dihapus lalu dibuat ulang setiap kali dijalankan, tanggalnya relatif ke hari ini.
 const wantData = /^(1|true|ya|yes)$/i.test(e('DEMO_DATA'));
 const TZ = +(process.env.TZ_OFFSET_MIN || 420), D = 864e5, M = 60e3, MARK = 'Data demo', HRS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
@@ -117,10 +117,6 @@ function seedData() {
     if (!ss || get(`SELECT 1 FROM booking WHERE studio_session_id=? AND status IN ('Menunggu Pembayaran','Terbayar','Sesi Berjalan') AND id!=?`, ss.id, b.id)) continue; run('UPDATE booking SET studio_session_id=? WHERE id=?', ss.id, b.id); linked++; }
   run(`UPDATE studio_session SET status=CASE WHEN EXISTS(SELECT 1 FROM booking b WHERE b.studio_session_id=studio_session.id AND b.status IN ('Menunggu Pembayaran','Terbayar','Sesi Berjalan')) THEN 'UNAVAILABLE' ELSE 'AVAILABLE' END WHERE deleted_at IS NULL`); // sama dengan syncSessStatus di server.js
 
-  if (owners[0]) { // preferensi customer demo (kuis rekomendasi paket)
-    run('DELETE FROM schedule_preference WHERE user_id=?', owners[0]); run('INSERT INTO schedule_preference(user_id,people,budget) VALUES(?,?,?)', owners[0], 1, 150000);
-    run('INSERT INTO setup_preference(user_id,vibe) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET vibe=excluded.vibe', owners[0], 2);
-  }
   run('DELETE FROM ops_item WHERE note=?', MARK); // pemasukan & biaya lain di laporan keuangan admin
   [[-14, 'Listrik & internet', 'biaya', 450000], [-7, 'Kertas & tinta cetak', 'biaya', 300000], [-3, 'Sewa studio untuk acara kampus', 'pemasukan', 500000]]
     .forEach(([off, label, kind, amount]) => run('INSERT INTO ops_item(date,label,kind,amount,note) VALUES(?,?,?,?,?)', day(off), label, kind, amount, MARK));
