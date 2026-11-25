@@ -197,5 +197,34 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!/gradient/i.test(cj) && !/gradient/i.test(core), 'customer.js dan core.js tetap tanpa gradient'); }
   await down(srv);
 
+  // ===== Fase 5: admin Ringkasan Studio + dialog Akses Ditolak =====
+  srv = start('e'); await up();
+  { const U = (await call('POST', '/auth/register', { name: 'Fani', email: 'fani@x.id', phone: '0816666666', password: 'secret1' })).j.token;
+    const AD = (await call('POST', '/admin/login', { username: 'adminstudio', password: 'Admin#12345' })).j.token; ok(U && AD, 'fixture fase 5: customer dan admin masuk');
+    // 1. kontrak API yang dipakai dialog dan langkah ringkasan
+    for (const [m, p] of [['GET', '/admin/studios'], ['POST', '/admin/studios']]) { const r = await call(m, p, m === 'POST' ? { name: 'Studio Tamu' } : null, U); ok(r.s === 403 && r.j.error === 'Hanya admin', `${m} /api/admin/studios dengan token customer: 403 "Hanya admin" (pemicu Akses Ditolak)`); }
+    const nm = (await call('GET', '/admin/studios', null, AD)).j[0].name, SB = o => ({ status: 'AVAILABLE', description: '', address: '', price: 0, people_range_id: 1, budget_range_id: 1, ...o }); // isi seperti form admin
+    { const r = await call('POST', '/admin/studios', SB({ name: ' ' + nm.toUpperCase() + ' ' }), AD); ok(r.s === 409 && r.j.error === 'Nama studio sudah dipakai', 'tambah studio dengan nama yang sudah ada: 409 "Nama studio sudah dipakai"'); }
+    { const r = await call('POST', '/admin/studios', SB({ name: '  ' }), AD); ok(r.s === 400 && r.j.error === 'Nama studio wajib diisi', 'tambah studio tanpa nama: 400 "Nama studio wajib diisi"'); }
+    { const r = await call('PATCH', '/admin/account', { current_password: 'salah' }, AD); ok(r.s === 403 && r.j.error === 'Password saat ini salah', '403 lain di admin ("Password saat ini salah") bukan Akses Ditolak'); }
+    { const r = await call('POST', '/admin/studios', SB({ name: 'Studio Senja', description: 'Cahaya alami' }), AD); ok(r.s === 200 && r.j.id, 'fixture: admin menambah Studio Senja'); }
+    // 2. frontend admin.js: teks Figma
+    const aj = await file('/js/admin.js'), core = await file('/js/core.js'), boot = await file('/js/boot.js');
+    for (const s of ['Ringkasan Studio', 'Detail Studio Baru', 'Isi data studio. Nama dan gambar wajib diisi, dan nama tidak boleh sama dengan studio lain.', 'Simpan Studio', 'Ubah',
+      'Input studio tidak valid. Periksa field yang ditandai.', 'Nama studio wajib diisi.', 'Gambar studio wajib diunggah.', 'Nama studio sudah digunakan oleh studio lain.', 'Nama studio sudah digunakan. Gunakan nama lain.',
+      'Studio berhasil ditambahkan', 'tersedia dan tampil di daftar studio pelanggan.',
+      'Akses ditolak', 'Hanya admin yang dapat menambahkan studio.', 'Akun yang sedang masuk adalah akun pelanggan. Masuk dengan akun admin untuk melanjutkan.', 'Kembali ke Beranda', 'Masuk sebagai Admin']) ok(aj.includes(s), `admin.js memuat "${s}"`);
+    ok((aj.match(/function aDenied\(/g) || []).length === 1 && /Hanya admin/.test(aj.match(/const aAuthErr[^\n]*/)?.[0] || ''), 'admin.js: satu dialog aDenied(), dipicu oleh 403 "Hanya admin" lewat aAuthErr');
+    ok(!/e\.status == 401 \|\| e\.status == 403\)/.test(aj), 'admin.js: 403 tidak lagi langsung logout tanpa pemberitahuan (aLoad, aDo, sessLoad)');
+    for (const f of ['async function aLoad', 'async function aDo', 'async function sessLoad']) ok(/aAuthErr\(/.test(aj.slice(aj.indexOf(f), aj.indexOf('\n', aj.indexOf(f) + f.length + 200))), `admin.js: ${f.split(' ').pop()} memakai aAuthErr`);
+    ok(/e\.status == 403 && \/Ganti password\/\.test\(e\.message\)\) \{ AD\.loading\[k\] = 0; if \(AD\.me\) AD\.me\.must_change = true; return go\('aacct'\); \}/.test(aj), 'admin.js: alur 403 ganti password bawaan tetap ke Akun Admin');
+    ok(/studioSave = id =>/.test(aj) && /stSummary|AD\.stsum/.test(aj), 'admin.js: tambah studio lewat langkah ringkasan');
+    ok(/if \(!S\.admin && ADMIN_VIEWS\.includes\(S\.view\)\) S\.view = S\.me \? "home" : "auth";/.test(core), 'core.js: customer tetap dialihkan diam-diam dari halaman admin');
+    ok(/aDenied/.test(boot), 'boot.js: sesi admin dengan token bukan admin juga memunculkan Akses Ditolak');
+    ok(/if \(key === "sN"\) AD\.sterr = null;/.test(aj), 'admin.js: unggah gambar studio baru menghapus tanda galat lama (dicek ulang di Lihat Ringkasan)');
+    ok(/sudah dipakai\/\.test\(e\.message\)\) \{ AD\.sterr = \{ top: ST_DUP, name: ST_DUPF \}; AD\.studios = null;/.test(aj), 'admin.js: nama ganda dari server memuat ulang daftar studio');
+    ok(!/gradient/i.test(aj), 'admin.js tanpa gradient'); }
+  await down(srv);
+
   console.log(`\n${n} tes lulus`); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);
 })().catch(async e => { console.error('✘ GAGAL:', e.message); if (srv) await down(srv); process.exit(1); });
