@@ -259,11 +259,11 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(!/gradient/i.test(JS), 'frontend (JS): tanpa gradient sama sekali, juga foto simulasi canvas di sesi foto (decisions.md 64)');
     for (const s of ['Konfirmasi Hentikan Sesi', 'Hentikan sesi?', 'Konfirmasi Hapus Foto', 'Hapus foto ini secara permanen?', 'foto terpilih secara permanen? Foto favorit tidak ikut terhapus.', 'Foto Gagal Dihapus']) ok(JS.includes(s), `frontend memuat "${s}"`);
   }
-  // ===== Refactor MVC fase 8a: halaman admin umum tanpa confirm() bawaan browser (decisions.md 4, 27) =====
-  { const JS = allJs(), aj = src('js/legacy/admin.js');
+  // ===== Refactor MVC fase 8a–8b: panel admin tanpa confirm() bawaan browser (decisions.md 4, 27) =====
+  { const JS = allJs();
     ok(!/confirm\(["'`](Hapus item rekap|Hapus akun|Hapus paket)/.test(JS), 'frontend: hapus item rekap, akun pelanggan dan paket tanpa confirm() bawaan browser');
-    ok((aj.match(/\bconfirm\(["'`]/g) || []).length <= 2, 'admin.js: confirm() bawaan hanya tersisa untuk properti dan pose (fase 8b)'); // kode: diganti di fase 9 (semua berkas)
-    for (const s of ['Konfirmasi Hapus Item Rekap', 'Hapus item rekap ini?', 'Konfirmasi Hapus Akun', 'beserta SELURUH booking, pembayaran, dan foto miliknya?', 'Tindakan ini tidak dapat dibatalkan.', 'Konfirmasi Hapus Paket', 'Hapus paket ini? (Jika pernah dibeli, paket hanya dinonaktifkan.)']) ok(JS.includes(s), `frontend memuat "${s}"`);
+    ok(!/\bconfirm\(["'`]/.test(JS), 'frontend: tanpa confirm() bawaan browser sama sekali (properti dan pose lewat modal, fase 8b)');
+    for (const s of ['Konfirmasi Hapus Item Rekap', 'Hapus item rekap ini?', 'Konfirmasi Hapus Akun', 'beserta SELURUH booking, pembayaran, dan foto miliknya?', 'Tindakan ini tidak dapat dibatalkan.', 'Konfirmasi Hapus Paket', 'Hapus paket ini? (Jika pernah dibeli, paket hanya dinonaktifkan.)', 'Konfirmasi Hapus Properti', 'Hapus properti ini?', 'Ya, Hapus Properti', 'Konfirmasi Hapus Pose', 'Hapus pose ini?', 'Ya, Hapus Pose']) ok(JS.includes(s), `frontend memuat "${s}"`);
   }
 
 

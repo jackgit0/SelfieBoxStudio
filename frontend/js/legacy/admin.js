@@ -46,13 +46,15 @@ V.aprop_after = () => aLoad("properties", () => API.get("/admin/properties"), []
 const propBody = id => { const n = id || "N", b = { name: val(`pr${n}n`), category: val(`pr${n}c`), qty: +val(`pr${n}q`) }; if (AD.images["p" + n]) b.img = AD.images["p" + n]; return b; };
 const propReload = async () => { AD.properties = null; M.properties = (await API.get("/master")).PROP; };
 const propSave = id => aDo(async () => { const b = propBody(id); if (id) await API.patch("/admin/properties/" + id, b); else await API.post("/admin/properties", b); delete AD.images["p" + (id || "N")]; await propReload(); }, "Properti disimpan.");
-const propDel = id => confirm("Hapus properti ini?") && aDo(async () => { await API.del("/admin/properties/" + id); await propReload(); }, "Properti dihapus.");
+// hapus lewat modal bersama (dulu confirm() bawaan browser, decisions.md 4, 27)
+const aConfirm = (title, text, okLabel) => CONTROLLERS.admin.confirm({ title, body: raw(`<p>${text}</p>`), okLabel });
+const propDel = async id => { if (await aConfirm("Konfirmasi Hapus Properti", "Hapus properti ini?", "Ya, Hapus Properti")) aDo(async () => { await API.del("/admin/properties/" + id); await propReload(); }, "Properti dihapus."); };
 
 // ---------- Pose ----------
 const poseRow = p => { const id = p.id || "N"; return `<tr><td><input id="po${id}n" value="${esc(p.nama || "")}" placeholder="Nama / deskripsi pose" style="min-width:260px"></td><td>${sel("po" + id + "r", M.peopleRanges.map(x => [x.id, x.range + " orang"]), p.people_range_id || 1)}</td><td style="white-space:nowrap"><button class="btn sm" onclick="poseSave(${p.id || 0})">${p.id ? "Simpan" : "+ Tambah"}</button>${p.id ? ` <button class="btn sm ghost" onclick="poseDel(${p.id})">Hapus</button>` : ""}</td></tr>`; };
 V.apose = () => { const L = AD.poses; if (!L) return loading; return `<div class="card"><div class="tbl"><table><tr><th>Pose</th><th>Jumlah orang</th><th></th></tr>${L.filter(p => match(p.nama)).map(poseRow).join("")}${poseRow({})}</table></div></div>`; };
 V.apose_after = () => aLoad("poses", () => API.get("/admin/poses"), []);
 const poseSave = id => aDo(async () => { const n = id || "N", b = { nama: val(`po${n}n`), people_range_id: +val(`po${n}r`) }; if (id) await API.patch("/admin/poses/" + id, b); else await API.post("/admin/poses", b); AD.poses = null; }, "Pose disimpan.");
-const poseDel = id => confirm("Hapus pose ini?") && aDo(async () => { await API.del("/admin/poses/" + id); AD.poses = null; }, "Pose dihapus.");
+const poseDel = async id => { if (await aConfirm("Konfirmasi Hapus Pose", "Hapus pose ini?", "Ya, Hapus Pose")) aDo(async () => { await API.del("/admin/poses/" + id); AD.poses = null; }, "Pose dihapus."); };
 
 export { AD, loading, poseDel, poseSave, propDel, propSave, pthumb, sel, upImg };
