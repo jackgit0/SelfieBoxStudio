@@ -86,11 +86,13 @@ export function createEvents({ navigate = null, logger = console } = {}) {
   return { registerActions, startEvents };
 }
 
-// isi form sebagai objek biasa { name: value } untuk controller (decisions.md 54): isian bernama yang tidak disabled
+// isi form sebagai objek biasa { name: value } untuk controller (decisions.md 54): isian bernama yang tidak disabled;
+// radio dan checkbox hanya yang dipilih
 export function formValues(form) {
   const values = {};
   for (const field of form.elements) {
-    if (field.name && !field.disabled) {
+    const choice = field.type === "radio" || field.type === "checkbox";
+    if (field.name && !field.disabled && (!choice || field.checked)) {
       values[field.name] = field.value;
     }
   }

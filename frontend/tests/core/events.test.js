@@ -195,3 +195,13 @@ test("tautan <a href> dengan data-action menjalankan aksinya tanpa mengikuti hre
   root.fire("click", button);
   assert.equal(button.defaultPrevented, false);
 });
+
+test("formValues: radio dan checkbox hanya yang dipilih (status Ubah Booking admin)", () => {
+  const form = { elements: [
+    { name: "status", type: "radio", value: "Menunggu Pembayaran", checked: true },
+    { name: "status", type: "radio", value: "Dibatalkan", checked: false },
+    { name: "agree", type: "checkbox", value: "on", checked: false },
+    { name: "package_id", type: "select-one", value: "2" },
+  ] };
+  assert.deepEqual(formValues(form), { status: "Menunggu Pembayaran", package_id: "2" });
+});
