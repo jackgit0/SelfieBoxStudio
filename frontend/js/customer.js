@@ -4,13 +4,13 @@ const propVisual = p => p.img ? `<div class="pimg" style="${bgi(p.img)}"></div>`
 
 // ---------- kalender ----------
 function calHTML(ctx, sel) {
-  const t = new Date(), c = CAL[ctx] || (CAL[ctx] = { y: t.getFullYear(), m: t.getMonth() }), first = (new Date(c.y, c.m, 1).getDay() + 6) % 7, dim = new Date(c.y, c.m + 1, 0).getDate(), today = todayS();
+  const t = new Date(), c = R.calendar[ctx] || (R.calendar[ctx] = { y: t.getFullYear(), m: t.getMonth() }), first = (new Date(c.y, c.m, 1).getDay() + 6) % 7, dim = new Date(c.y, c.m + 1, 0).getDate(), today = todayS();
   let cells = "<i></i>".repeat(first);
   for (let d = 1; d <= dim; d++) { const ds = iso(new Date(c.y, c.m, d)); cells += `<button class="cd ${ds == sel ? "on" : ""}" ${ds < today ? "disabled" : ""} onclick="calPick('${ctx}','${ds}')">${d}</button>`; }
   return `<div class="cal"><div class="calh"><button class="ib" aria-label="Bulan sebelumnya" onclick="calNav('${ctx}',-1)">${ic("left", 16)}</button><b>${new Date(c.y, c.m, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" })}</b><button class="ib" aria-label="Bulan berikutnya" onclick="calNav('${ctx}',1)">${ic("right", 16)}</button></div>
 <div class="calg">${["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"].map(x => `<small>${x}</small>`).join("")}${cells}</div></div>`;
 }
-function calNav(ctx, dir) { const t = new Date(), c = CAL[ctx] || (CAL[ctx] = { y: t.getFullYear(), m: t.getMonth() }); let m = c.m + dir, y = c.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } if (y * 12 + m < t.getFullYear() * 12 + t.getMonth()) return; c.y = y; c.m = m; render(); }
+function calNav(ctx, dir) { const t = new Date(), c = R.calendar[ctx] || (R.calendar[ctx] = { y: t.getFullYear(), m: t.getMonth() }); let m = c.m + dir, y = c.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } if (y * 12 + m < t.getFullYear() * 12 + t.getMonth()) return; c.y = y; c.m = m; render(); }
 function calPick(ctx, ds) { if (ctx === "home") S.hDate = ds; else { BK.date = ds; BK.slot = null; } render(); }
 
 // ---------- beranda (Browse) ----------
@@ -46,7 +46,7 @@ V.packages = () => `<div class="pkpage"><div class="row" style="margin-bottom:16
 <div class="pkl">${M.packages.map(p => { const fav = p.id == M.favouritePackageId; return `<article class="pkc ${fav ? "fav" : ""}">${fav ? '<span class="badge">Paling Favorit</span>' : ""}<div class="row sp" style="flex-wrap:nowrap"><h3>Paket ${esc(p.name)}</h3>${p.id == S.pkg ? '<span class="tag">Dipilih</span>' : ""}</div><p class="pd">${pkgDesc(p)}</p>
 <div class="pp">${M.discount.pct ? `<s>${rp(p.price)}</s> ` : ""}${rp(eff(p))} <small>/ sesi</small></div><ul>${pkgFeat(p).map(f => `<li>${ic("check", 16)}<span>${f}</span></li>`).join("")}</ul>
 <button class="btn block ${fav ? "" : "ghost"}" onclick="choosePkg(${p.id})">Pilih Paket Ini</button></article>`; }).join("")}</div></div></div>`;
-function choosePkg(id) { const p = M.packages.find(x => x.id == id); if (!p) return pkgMissing(); S.pkg = p.id; go("home"); msg = `Paket ${p.name} dipilih. Pilih studio untuk melanjutkan.`; render(); }
+function choosePkg(id) { const p = M.packages.find(x => x.id == id); if (!p) return pkgMissing(); S.pkg = p.id; go("home"); R.toast.message = `Paket ${p.name} dipilih. Pilih studio untuk melanjutkan.`; render(); }
 
 // ---------- popup Paket Foto Tidak Ditemukan (Figma 660:5538) ----------
 // next: lanjutkan alur semula setelah customer memilih paket lain langsung dari daftar di popup
@@ -120,7 +120,7 @@ async function bookingErr(e, next) {
 }
 const mIcon = (n, cls = "no") => `<div class="mico ${cls}">${ic(n, 28)}</div>`;
 // kembali ke langkah Pilih Tanggal & Waktu dengan sesi dikosongkan dan ketersediaan dimuat ulang
-function backToTime() { BK.slot = null; BK.quote = null; AV = {}; if (S.view === "time") { render(); prefetch(); } else go("time"); }
+function backToTime() { BK.slot = null; BK.quote = null; R.availability = {}; if (S.view === "time") { render(); prefetch(); } else go("time"); }
 async function inputInvalid() {
   await modal({ title: "Input Tidak Valid", cls: "center", kicker: mIcon("alert"), body: "<p>Input booking tidak lengkap atau tidak valid. Pilih tanggal dan sesi terlebih dahulu.</p>", buttons: [{ label: "Pilih Tanggal & Sesi", value: 1, icon: "calendar" }] });
   if (S.view !== "time") backToTime();
@@ -151,7 +151,7 @@ function qr() {
     if (fx ? (x % 6 == 0 || y % 6 == 0 || x == 14 || x == 20 || y == 14 || y == 20 || (x % 6 > 1 && x % 6 < 5 && y % 6 > 1 && y % 6 < 5)) : h % 2) r += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }
   return `<svg viewBox="0 0 21 21" width="160" fill="#1c2748" style="background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line-2)">${r}</svg>`;
 }
-async function selectPkg(id) { S.pkg = id; save(); msg = err = ""; try { await loadQuote(); } catch (e) { return bookingErr(e, () => selectPkg(S.pkg)); } render(); }
+async function selectPkg(id) { S.pkg = id; save(); R.toast.message = R.toast.error = ""; try { await loadQuote(); } catch (e) { return bookingErr(e, () => selectPkg(S.pkg)); } render(); }
 V.pay = () => {
   if (!BK.slot || !BK.quote) return `<div class="card">Pilih jadwal terlebih dahulu.</div>`; if (!shown(BK.studio)) return noStudio();
   if (!M.packages.find(x => x.id == S.pkg)) return `<div class="panel"><button class="back" onclick="go('time')">${ic("left", 16)} Kembali</button><div class="card"><h2 class="h2">Pilih Paket</h2><p class="sub">Paket sebelumnya tidak tersedia. Pilih paket lain untuk melanjutkan.</p><div class="pkpick" style="margin-top:12px">${M.packages.map(x => `<button class="pill" onclick="selectPkg(${x.id})">${esc(x.name)}</button>`).join("")}</div></div></div>`;
@@ -171,7 +171,7 @@ async function confirmPay() {
   if (!S.me) return needLogin(); // tamu: login dulu sebelum booking dibuat (keputusan 35)
   try { const b = await API.post("/bookings", { package_id: S.pkg, studio_id: BK.studio, date: BK.slot }); await API.post(`/bookings/${b.id}/pay`, { method: S.method || "QRIS" });
     BK.slot = null; BK.quote = null; await refresh(); S.payOpen = false; go("success", { id: b.id }); }
-  catch (e) { AV = {}; bookingErr(e, () => selectPkg(S.pkg)); }
+  catch (e) { R.availability = {}; bookingErr(e, () => selectPkg(S.pkg)); }
 }
 
 // ---------- halaman hasil: sukses, reschedule ----------
@@ -195,7 +195,7 @@ V.rescheduled = () => {
   const b = bookOf(); if (!b) return `<div class="card">Memuat…</div>`;
   return `<div class="panel" style="max-width:640px"><div class="card center"><h1 class="h1">Reschedule Berhasil</h1><img class="ill" src="img/ill-reschedule.png" alt=""><div style="text-align:left">${bookRows(b)}</div><button class="btn block" style="margin-top:18px" onclick="go('home')">Kembali ke Beranda</button></div></div>`;
 };
-async function mailInv(id) { msg = err = ""; try { const r = await API.post(`/bookings/${id}/invoice/email`); msg = r.dev ? "Mode pengembangan: SMTP belum diatur, email disimpan di folder backend/outbox." : "Invoice dikirim ke email Anda."; } catch (e) { err = e.message; } render(); }
+async function mailInv(id) { R.toast.message = R.toast.error = ""; try { const r = await API.post(`/bookings/${id}/invoice/email`); R.toast.message = r.dev ? "Mode pengembangan: SMTP belum diatur, email disimpan di folder backend/outbox." : "Invoice dikirim ke email Anda."; } catch (e) { R.toast.error = e.message; } render(); }
 
 // ---------- Booking Saya ----------
 const UPCOMING = ["Menunggu Pembayaran", "Terbayar", "Sesi Berjalan"];
@@ -209,7 +209,7 @@ ${Object.keys(groups).map(d => `<div class="dayh">${fmtDate(d)}</div>${groups[d]
 };
 const canChange = b => ["Menunggu Pembayaran", "Terbayar"].includes(b.status);
 function startReschedule(id) { const b = S.bookings.find(x => x.id == id); BK.rescheduleId = id; Object.assign(BK, { studio: b.studio, date: parseSlot(b.date).date, slot: null }); go("time"); }
-async function payNow(id) { if (!confirm("Bayar sekarang via QRIS (simulasi)?")) return; try { await API.post(`/bookings/${id}/pay`, { method: "QRIS" }); await refresh(); S.payOpen = false; go("success", { id }); } catch (e) { err = e.message; render(); } }
+async function payNow(id) { if (!confirm("Bayar sekarang via QRIS (simulasi)?")) return; try { await API.post(`/bookings/${id}/pay`, { method: "QRIS" }); await refresh(); S.payOpen = false; go("success", { id }); } catch (e) { R.toast.error = e.message; render(); } }
 V.bdetail = () => {
   const b = bookOf(); if (!b) return `<div class="panel"><button class="back" onclick="go('my')">${ic("left", 16)} Kembali</button><div class="card">Booking tidak ditemukan.</div></div>`;
   const s = studioOf(b.studio), pt = parseSlot(b.date), pending = b.status == "Menunggu Pembayaran";
@@ -222,19 +222,19 @@ ${b.paid && b.status != "Dibatalkan" ? `<div class="row" style="margin-top:12px"
 };
 
 // ---------- pembatalan & refund ----------
-const REASONS = ["Tidak ada waktu", "Penggunaan dana lain", "Pemesanan ganda", "Pembatalan lainnya"]; let CR = "", CD = "";
-function openCancel(id) { CR = ""; CD = ""; go("cancel", { id }); }
+const REASONS = ["Tidak ada waktu", "Penggunaan dana lain", "Pemesanan ganda", "Pembatalan lainnya"];
+function openCancel(id) { R.cancel.reason = ""; R.cancel.detail = ""; go("cancel", { id }); }
 V.cancel = () => {
   const b = bookOf(); if (!b) return `<div class="card">Booking tidak ditemukan.</div>`; const paid = b.paid;
   return `<div class="panel"><button class="back" onclick="go('bdetail',{id:${b.id}})">${ic("left", 16)} Kembali</button><h1 class="h1">Pembatalan Booking</h1><p class="sub">${esc(studioOf(b.studio).name)} · ${fmtDate(parseSlot(b.date).date)} · ${slotRange(b.date)}</p>
-<div class="card" style="margin-top:16px"><h3 class="h3">Alasan Pembatalan</h3><div class="reasons">${REASONS.map(r => `<button class="reason ${CR == r ? "on" : ""}" onclick="CR='${r}';render()"><i></i>${r}</button>`).join("")}</div>
-${CR == "Pembatalan lainnya" ? `<textarea placeholder="Tuliskan alasan pembatalan kamu" oninput="CD=this.value">${esc(CD)}</textarea>` : ""}
+<div class="card" style="margin-top:16px"><h3 class="h3">Alasan Pembatalan</h3><div class="reasons">${REASONS.map(r => `<button class="reason ${R.cancel.reason == r ? "on" : ""}" onclick="R.cancel.reason='${r}';render()"><i></i>${r}</button>`).join("")}</div>
+${R.cancel.reason == "Pembatalan lainnya" ? `<textarea placeholder="Tuliskan alasan pembatalan kamu" oninput="R.cancel.detail=this.value">${esc(R.cancel.detail)}</textarea>` : ""}
 ${paid ? `<p class="sm m" style="margin:10px 0">${ic("clock", 14)} Refund diproses otomatis jika pembatalan dilakukan minimal ${M.policy.refund_hours} jam sebelum sesi dimulai.</p>` : ""}
-<button class="btn block" style="margin-top:8px" ${CR ? "" : "disabled"} onclick="doCancel(${b.id})">${paid ? "Refund" : "Batalkan Booking"}</button></div></div>`;
+<button class="btn block" style="margin-top:8px" ${R.cancel.reason ? "" : "disabled"} onclick="doCancel(${b.id})">${paid ? "Refund" : "Batalkan Booking"}</button></div></div>`;
 };
 async function doCancel(id) {
   if (!confirm("Yakin membatalkan booking ini?")) return;
-  try { const r = await API.post(`/bookings/${id}/cancel`, { reason: CR, detail: CD }); S.cancelRes = r; await refresh(); go("refund", { id }); } catch (e) { err = e.message; render(); }
+  try { const r = await API.post(`/bookings/${id}/cancel`, { reason: R.cancel.reason, detail: R.cancel.detail }); S.cancelRes = r; await refresh(); go("refund", { id }); } catch (e) { R.toast.error = e.message; render(); }
 }
 V.refund = () => {
   const r = S.cancelRes, b = bookOf(); if (!r || !b) return `<div class="panel"><div class="card center">Booking dibatalkan.<div style="margin-top:12px"><button class="btn" onclick="go('home')">Kembali ke Beranda</button></div></div></div>`;
@@ -253,6 +253,6 @@ V.account = () => {
   if (tab == "pay") { const L = S.bookings.filter(b => b.pay_status && !["pending", "batal"].includes(b.pay_status)).sort((a, b) => (b.paid_at || 0) - (a.paid_at || 0));
     body = `<div class="card"><h3 class="h3">Riwayat Pembayaran</h3>${L.length ? `<div class="tbl"><table><tr><th>Waktu</th><th>Studio</th><th>Paket</th><th>Total</th><th>Status</th><th></th></tr>${L.map(b => `<tr><td>${fmtTime(b.paid_at)}</td><td>${esc(studioOf(b.studio).name)}</td><td>${esc(pkOf(b.package_id).name)}</td><td>${rp(b.amount)}</td><td><span class="tag ${b.pay_status == "paid" ? "ok" : b.pay_status == "refunded" ? "" : "no"}">${PAYLBL[b.pay_status]}</span></td>
 <td>${b.paid && b.status != "Dibatalkan" ? `<a class="btn sm ghost" href="${API.invUrl(b.id, 0)}" target="_blank" rel="noopener">${ic("receipt", 14)} Kwitansi Digital</a>` : ""}</td></tr>`).join("")}</table></div>` : `<p class="m" style="margin-top:8px">Belum ada transaksi.</p>`}</div>`; }
-  return `<div class="panel"><h1 class="h1">Pengaturan Akun</h1><div class="seg">${tabs.map(t => `<button class="${t[0] == tab ? "on" : ""}" onclick="S.acct='${t[0]}';msg=err='';render()">${t[1]}</button>`).join("")}</div>${body}<div style="margin-top:18px"><button class="btn ghost" onclick="logout()">${ic("logout", 16)} Keluar</button></div></div>`;
+  return `<div class="panel"><h1 class="h1">Pengaturan Akun</h1><div class="seg">${tabs.map(t => `<button class="${t[0] == tab ? "on" : ""}" onclick="S.acct='${t[0]}';R.toast.message=R.toast.error='';render()">${t[1]}</button>`).join("")}</div>${body}<div style="margin-top:18px"><button class="btn ghost" onclick="logout()">${ic("logout", 16)} Keluar</button></div></div>`;
 };
-async function saveProfile() { msg = err = ""; try { const r = await API.patch("/me", { name: $("#pn").value, phone: $("#pp").value }); S.user = { ...S.user, ...r }; save(); msg = "Profil disimpan."; } catch (e) { err = e.message; } render(); }
+async function saveProfile() { R.toast.message = R.toast.error = ""; try { const r = await API.patch("/me", { name: $("#pn").value, phone: $("#pp").value }); S.user = { ...S.user, ...r }; save(); R.toast.message = "Profil disimpan."; } catch (e) { R.toast.error = e.message; } render(); }

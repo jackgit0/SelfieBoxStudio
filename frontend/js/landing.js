@@ -1,7 +1,6 @@
 // ===== LANDING PAGE (sebelum login): Home, About, Fasilitas, Keterangan, Join Sekarang, Contact Us =====
-const LP = { n: "", e: "", m: "", ok: "", err: "", busy: false };
 const LSECS = [["home", "Home"], ["about", "About"], ["fasilitas", "Fasilitas"], ["keterangan", "Keterangan"], ["kontak", "Contact Us"]];
-const openAuth = mode => { if (S.view === "landing") S.draft = null; authMode = mode; go("auth"); }; // dari landing: draf booking lama tidak dilanjutkan
+const openAuth = mode => { if (S.view === "landing") S.draft = null; R.auth.mode = mode; go("auth"); }; // dari landing: draf booking lama tidak dilanjutkan
 function toSec(id) { const m = $("#lmenu"); if (m) m.hidden = true; const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }
 const lpMenu = () => { const m = $("#lmenu"); if (m) m.hidden = !m.hidden; };
 function lpSpy() { // sorot menu sesuai bagian yang sedang dilihat
@@ -11,9 +10,9 @@ function lpSpy() { // sorot menu sesuai bagian yang sedang dilihat
   const n = $(".lnav"); if (n) n.classList.toggle("sc", window.scrollY > 8);
 }
 async function sendContact() {
-  if (LP.busy) return; LP.ok = LP.err = ""; LP.busy = true; render();
-  try { const r = await API.post("/contact", { name: LP.n, email: LP.e, message: LP.m }); LP.ok = r.message; LP.n = LP.e = LP.m = ""; } catch (e) { LP.err = e.message; }
-  LP.busy = false; render(); setTimeout(() => toSec("kontak"), 30);
+  if (R.contact.busy) return; R.contact.ok = R.contact.err = ""; R.contact.busy = true; render();
+  try { const r = await API.post("/contact", { name: R.contact.n, email: R.contact.e, message: R.contact.m }); R.contact.ok = r.message; R.contact.n = R.contact.e = R.contact.m = ""; } catch (e) { R.contact.err = e.message; }
+  R.contact.busy = false; render(); setTimeout(() => toSec("kontak"), 30);
 }
 const FAC = [
   ["studio", "Studio Privat", () => `${M.studios.length} studio dengan kapasitas berbeda — dari sesi solo sampai rombongan.`],
@@ -70,9 +69,9 @@ ${propImgs.length ? `<h3 class="h2" style="margin:44px 0 6px">Properti & backgro
 <div class="citem">${ic("pin", 20)}<div><b>Alamat</b><p>${esc(addr)}</p></div></div><div class="citem">${ic("clock", 20)}<div><b>Jam operasional</b><p>Setiap hari ${pad(first)}.00 – ${pad(last)}.50 WIB</p></div></div>
 <div class="citem">${ic("users", 20)}<div><b>WhatsApp</b><p>${wa ? `<a href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">+${esc(wa)}</a>` : "Hubungi kami lewat formulir."}</p></div></div>
 <div class="citem">${ic("mail", 20)}<div><b>Email</b><p>${mail ? `<a href="mailto:${esc(mail)}">${esc(mail)}</a>` : "Kirim pesan lewat formulir di samping."}</p></div></div></div>
-<form class="card" onsubmit="event.preventDefault();sendContact()"><h3 class="h3">Kirim pesan</h3>${LP.ok ? `<div class="toast" style="margin-top:10px">${esc(LP.ok)}</div>` : ""}${LP.err ? `<div class="toast err" style="margin-top:10px">${esc(LP.err)}</div>` : ""}
-<label>Nama</label><input value="${esc(LP.n)}" oninput="LP.n=this.value" maxlength="80" autocomplete="name"><label>Email</label><input type="email" value="${esc(LP.e)}" oninput="LP.e=this.value" autocomplete="email"><label>Pesan</label><textarea oninput="LP.m=this.value" maxlength="1000">${esc(LP.m)}</textarea>
-<button class="btn block" style="margin-top:16px" ${LP.busy ? "disabled" : ""}>${LP.busy ? "Mengirim…" : "Kirim Pesan"}</button></form></div></div></section>
+<form class="card" onsubmit="event.preventDefault();sendContact()"><h3 class="h3">Kirim pesan</h3>${R.contact.ok ? `<div class="toast" style="margin-top:10px">${esc(R.contact.ok)}</div>` : ""}${R.contact.err ? `<div class="toast err" style="margin-top:10px">${esc(R.contact.err)}</div>` : ""}
+<label>Nama</label><input value="${esc(R.contact.n)}" oninput="R.contact.n=this.value" maxlength="80" autocomplete="name"><label>Email</label><input type="email" value="${esc(R.contact.e)}" oninput="R.contact.e=this.value" autocomplete="email"><label>Pesan</label><textarea oninput="R.contact.m=this.value" maxlength="1000">${esc(R.contact.m)}</textarea>
+<button class="btn block" style="margin-top:16px" ${R.contact.busy ? "disabled" : ""}>${R.contact.busy ? "Mengirim…" : "Kirim Pesan"}</button></form></div></div></section>
 
 <footer class="lfoot"><div class="lw lfoot-in"><b>${esc(BRAND)}</b><div class="llinks2">${LSECS.map(l => `<a href="#" onclick="toSec('${l[0]}');return false">${l[1]}</a>`).join("")}<a href="#" onclick="openAuth('login');return false">Masuk</a></div><span class="m sm">© ${new Date().getFullYear()} ${esc(BRAND)}. Semua hak dilindungi.</span></div></footer></div>`;
 };

@@ -36,13 +36,13 @@ async function uploadDrive(ph){if(!drive.token)return"lokal";try{const folder=aw
  if(r.ok){ph.driveId=(await r.json()).id;return"drive"}return"gagal"}catch(e){return"gagal"}}
 // ===== SESI (US-13..21) =====
 const sesOf=()=>S.sessions.find(s=>s.id==curSes);
-async function startSession(id){try{const s=await API.post(`/bookings/${id}/start`);await refresh();curSes=s.id}catch(e){err=e.message;return render()}
- driveAuth().then(ok=>{msg=ok?"Google Drive terhubung: foto otomatis dikirim ke Drive Anda.":"Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server.";go("session")})}
+async function startSession(id){try{const s=await API.post(`/bookings/${id}/start`);await refresh();curSes=s.id}catch(e){R.toast.error=e.message;return render()}
+ driveAuth().then(ok=>{R.toast.message=ok?"Google Drive terhubung: foto otomatis dikirim ke Drive Anda.":"Drive belum terhubung (isi GOOGLE_CLIENT_ID). Foto disimpan di server.";go("session")})}
 V.session_after=()=>{const s=sesOf();if(!s)return;
  if(s.status=="Aktif"&&navigator.mediaDevices)navigator.mediaDevices.getUserMedia({video:true}).then(m=>{stream=m;const v=$("#v");if(v)v.srcObject=m}).catch(()=>{const v=$("#v");if(v)v.outerHTML='<div class="m">Kamera tidak tersedia — foto simulasi digunakan.</div>'});
  nextPose(0);clearInterval(poseT);poseT=setInterval(()=>nextPose(1),8000);
  let n=0;clearInterval(tick);tick=setInterval(()=>{if(s.status=="Aktif"&&!s.paused){s.left--;if(s.left==60)warn();if(s.left<=0)syncS(s)}upd(s);if(++n%5==0&&s.status=="Aktif")syncS(s)},1000);upd(s)};
-async function syncS(s){try{const r=await API.get("/sessions/"+s.id),was=s.status;s.left=r.left;s.paused=r.paused;s.status=r.status;if(was=="Aktif"&&r.status!="Aktif"){stopCam();msg="Sesi telah berakhir.";render()}else upd(s)}catch(e){}}
+async function syncS(s){try{const r=await API.get("/sessions/"+s.id),was=s.status;s.left=r.left;s.paused=r.paused;s.status=r.status;if(was=="Aktif"&&r.status!="Aktif"){stopCam();R.toast.message="Sesi telah berakhir.";render()}else upd(s)}catch(e){}}
 function upd(s){const t=$("#tm");if(!t)return;const m=Math.max(0,s.left);t.textContent=String(m/60|0).padStart(2,"0")+":"+String(m%60).padStart(2,"0");t.classList.toggle("warn",s.left<=60&&s.status=="Aktif");
  const p=pkOf(s.pkg);$("#cnt").textContent=`Foto: ${s.photos.length}/${p.photo_count*2} · sisa ${p.photo_count*2-s.photos.length}`;
  $("#shot").disabled=s.status!="Aktif"||s.paused||s.photos.length>=p.photo_count*2;
@@ -55,13 +55,13 @@ async function shoot(){const s=sesOf();if(s.status!="Aktif"||s.paused)return;con
  if(v&&v.videoWidth){x.drawImage(v,0,0,W,H)}else{const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,"hsl("+Math.random()*360+",70%,60%)");g.addColorStop(1,"#222");x.fillStyle=g;x.fillRect(0,0,W,H);x.font="90px serif";x.fillText("😄",W/2-45,H/2+30)}
  const st=s.setup;if(st){x.font="40px serif";st.acc.forEach((id,i)=>x.fillText((M.properties.find(p=>p.id==id)||{}).e||"",20+i*50,50))}
 try{const data=c.toDataURL("image/jpeg",.8),r=await API.post(`/sessions/${s.id}/photos`,{img:data}),ph={id:r.id,t:r.t,fav:false,sel:false,drive:"…",img:data};s.photos.push(ph);upd(s);
-  ph.drive=await uploadDrive(ph);API.patch("/photos/"+ph.id,{drive:ph.drive}).catch(()=>{})}catch(e){err=e.message;await syncS(s);render()}}
+  ph.drive=await uploadDrive(ph);API.patch("/photos/"+ph.id,{drive:ph.drive}).catch(()=>{})}catch(e){R.toast.error=e.message;await syncS(s);render()}}
 async function staffAct(a){const s=sesOf();if(!S.staff||!s)return;if(a=="stop"&&!confirm("Hentikan sesi?"))return;
- try{const r=await API.post(`/sessions/${s.id}/control`,{action:a});S.log.push(a+" "+new Date().toLocaleTimeString());s.left=r.left;s.paused=r.paused;s.status=r.status;if(r.status!="Aktif"){stopCam();msg="Sesi dihentikan staf."}}catch(e){err=e.message}render()}
+ try{const r=await API.post(`/sessions/${s.id}/control`,{action:a});S.log.push(a+" "+new Date().toLocaleTimeString());s.left=r.left;s.paused=r.paused;s.status=r.status;if(r.status!="Aktif"){stopCam();R.toast.message="Sesi dihentikan staf."}}catch(e){R.toast.error=e.message}render()}
 function stopCam(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
 // ===== GALERI (US-22..24) =====
 const ph=(sid,pid)=>S.sessions.find(s=>s.id==sid).photos.find(p=>p.id==pid);
-function selPh(sid,pid){if(dMode)return togDel(sid,pid);const s=S.sessions.find(s=>s.id==sid),p=ph(sid,pid);p.sel=!p.sel;s.confirmed=false;render();API.patch("/photos/"+pid,{sel:p.sel}).catch(e=>{err=e.message;render()})}
+function selPh(sid,pid){if(dMode)return togDel(sid,pid);const s=S.sessions.find(s=>s.id==sid),p=ph(sid,pid);p.sel=!p.sel;s.confirmed=false;render();API.patch("/photos/"+pid,{sel:p.sel}).catch(e=>{R.toast.error=e.message;render()})}
 function fav(sid,pid){const p=ph(sid,pid);p.fav=!p.fav;if(p.fav)dSel.delete(pid);render();API.patch("/photos/"+pid,{fav:p.fav}).catch(()=>{})}
 async function delPhoto(sid,pid){
  if(!confirm("Hapus foto ini secara permanen?"))return;
@@ -71,12 +71,12 @@ async function delPhoto(sid,pid){
   if(p.driveId&&drive.token)fetch("https://www.googleapis.com/drive/v3/files/"+p.driveId,{method:"DELETE",headers:{Authorization:"Bearer "+drive.token}}).catch(()=>{});
   s.photos=s.photos.filter(x=>x.id!=pid);if(p.sel)s.confirmed=false;
  }catch(e){return alert(e.message)}
- if(S.view=="session")upd(s);else{msg="Foto dihapus.";render()}
+ if(S.view=="session")upd(s);else{R.toast.message="Foto dihapus.";render()}
 }
-const toggleDel=()=>{dMode=!dMode;dSel=new Set();msg=err="";render()};
-function togDel(sid,pid){const p=ph(sid,pid);if(p.fav){msg="Foto favorit tidak dapat dihapus massal. Hilangkan bintangnya dulu bila ingin menghapusnya.";return render()}msg="";dSel.has(pid)?dSel.delete(pid):dSel.add(pid);render()}
+const toggleDel=()=>{dMode=!dMode;dSel=new Set();R.toast.message=R.toast.error="";render()};
+function togDel(sid,pid){const p=ph(sid,pid);if(p.fav){R.toast.message="Foto favorit tidak dapat dihapus massal. Hilangkan bintangnya dulu bila ingin menghapusnya.";return render()}R.toast.message="";dSel.has(pid)?dSel.delete(pid):dSel.add(pid);render()}
 function selAllNonFav(sid){S.sessions.find(s=>s.id==sid).photos.forEach(p=>{if(!p.fav)dSel.add(p.id)});render()}
-async function bulkDel(){if(!dSel.size||!confirm(`Hapus ${dSel.size} foto terpilih secara permanen? Foto favorit tidak ikut terhapus.`))return;msg=err="";
- try{const r=await API.post("/photos/bulk-delete",{ids:[...dSel]});dSel=new Set();dMode=false;await refresh();msg=`${r.deleted} foto dihapus${r.skipped_favorites?`, ${r.skipped_favorites} foto favorit dilewati`:""}.`}catch(e){err=e.message}render()}
-async function confirmSel(sid){try{await API.post(`/sessions/${sid}/confirm`);S.sessions.find(s=>s.id==sid).confirmed=true;msg="Pilihan dikonfirmasi."}catch(e){err=e.message}render()}
+async function bulkDel(){if(!dSel.size||!confirm(`Hapus ${dSel.size} foto terpilih secara permanen? Foto favorit tidak ikut terhapus.`))return;R.toast.message=R.toast.error="";
+ try{const r=await API.post("/photos/bulk-delete",{ids:[...dSel]});dSel=new Set();dMode=false;await refresh();R.toast.message=`${r.deleted} foto dihapus${r.skipped_favorites?`, ${r.skipped_favorites} foto favorit dilewati`:""}.`}catch(e){R.toast.error=e.message}render()}
+async function confirmSel(sid){try{await API.post(`/sessions/${sid}/confirm`);S.sessions.find(s=>s.id==sid).confirmed=true;R.toast.message="Pilihan dikonfirmasi."}catch(e){R.toast.error=e.message}render()}
 function dl(sid){const s=S.sessions.find(s=>s.id==sid);s.photos.filter(p=>p.sel).forEach(p=>{const a=document.createElement("a");a.href=API.imgUrl(p.id)+"&dl=1";a.download="snapia-"+p.id+".jpg";document.body.appendChild(a);a.click();a.remove()})}
