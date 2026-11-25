@@ -74,7 +74,7 @@ function modal({ title, body = "", buttons = [{ label: "Tutup", value: null }], 
     const key = e => { if (e.key === "Escape") done(null); else if (e.key === "Tab") { e.preventDefault(); const bs = [...d.querySelectorAll("button")], i = bs.indexOf(document.activeElement); bs[(i + (e.shiftKey ? bs.length - 1 : 1)) % bs.length].focus(); } },
       done = v => { d.remove(); document.removeEventListener("keydown", key); if (back && back.focus && document.contains(back)) back.focus(); res(v); };
     d.onclick = e => { const b = e.target.closest("button[data-i], button[data-v]"); if (b) done(b.dataset.i !== undefined ? buttons[b.dataset.i].value : b.dataset.v); else if (e.target === d) done(null); };
-    document.addEventListener("keydown", key); document.body.appendChild(d); d.querySelector("button").focus(); });
+    document.addEventListener("keydown", key); document.body.appendChild(d); d.querySelector(".mbtn button").focus(); });
 }
 const toasts = () => (msg ? `<div class="toast">${esc(msg)}</div>` : "") + (err ? `<div class="toast err">${esc(err)}</div>` : "");
 

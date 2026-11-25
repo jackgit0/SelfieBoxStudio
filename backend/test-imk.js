@@ -149,6 +149,7 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     // 1–2. frontend
     const core = await file('/js/core.js'), aj = await file('/js/admin.js'), cj = await file('/js/customer.js'), boot = await file('/js/boot.js');
     ok(/function modal\(/.test(core) && core.includes('aria-modal="true"') && core.includes('Escape'), 'core.js: dialog bersama modal() dengan aria-modal dan Escape');
+    ok(core.includes('.mbtn button").focus()'), 'core.js: fokus awal dialog di tombol aksi, bukan di tombol dalam isi (mis. daftar paket)');
     ok(!/function aModal\(/.test(aj) && /aModal\s*=.*modal\(/.test(aj), 'admin.js: aModal tidak lagi berdiri sendiri, memakai modal() bersama');
     for (const s of ['V.packages', 'Pilihan Paket', 'Temukan Paket Sesuai Kebutuhanmu', 'Pilih Paket Ini', 'Lihat semua paket', 'Paling Favorit', '/ sesi', 'FAV_PKG', 'Paket Foto Tidak Ditemukan', 'Lihat & Pilih Paket Lain', 'Hubungi Customer Service', 'csContact()', 'Pilih studio untuk melanjutkan']) ok(cj.includes(s), `customer.js memuat "${s}"`);
     ok(!/gradient/i.test(cj) && !/gradient/i.test(core), 'customer.js dan core.js tanpa gradient');
