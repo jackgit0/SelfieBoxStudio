@@ -1,7 +1,7 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
 const $ = s => document.querySelector(s);
 const BRAND = window.BRAND || "SelfieBox Studio";
-let PKG = [], ALLPKG = [], DISC = { pct: 0, label: "" }, PEOPLE = [], BUDGET = [], STUDIOS = [], ALLSTUDIOS = [], PROP = [], POSES = {}, POLICY = { refund_hours: 2 };
+let PKG = [], ALLPKG = [], FAV_PKG = null, DISC = { pct: 0, label: "" }, PEOPLE = [], BUDGET = [], STUDIOS = [], ALLSTUDIOS = [], PROP = [], POSES = {}, POLICY = { refund_hours: 2 };
 const V = {};
 let S; try { S = JSON.parse(localStorage.getItem("snapia")); } catch (e) {}
 S = Object.assign({ user: null, me: null, admin: false, view: "landing", p: {}, pkg: null, bm: [], staff: false, log: [] }, S || {}); delete S.quiz; delete S.setup; // sisa state lama (kuis rekomendasi paket dan pilihan setup properti sudah dihapus)
@@ -54,8 +54,8 @@ const icf = (n, s = 20) => ic(n, s).replace('fill="none"', 'fill="currentColor"'
 
 // ---------- navigasi ----------
 const ADMIN_VIEWS = ["adash", "acust", "astudio", "abook", "aprop", "apose", "atrx", "apkg", "aacct"];
-const TITLES = { home: "Browse", studio: "Studio", time: "Pilih Waktu", pay: "Pembayaran", my: "Booking Saya", bdetail: "Detail Booking", cancel: "Pembatalan", refund: "Refund", success: "Booking", rescheduled: "Reschedule", gallery: "Galeri", session: "Sesi Foto", account: "Akun" };
-const TABGROUP = { home: ["home", "studio", "time", "pay", "success", "rescheduled"], my: ["my", "bdetail", "cancel", "refund"], gallery: ["gallery", "session"] };
+const TITLES = { home: "Browse", packages: "Pilihan Paket", studio: "Studio", time: "Pilih Waktu", pay: "Pembayaran", my: "Booking Saya", bdetail: "Detail Booking", cancel: "Pembatalan", refund: "Refund", success: "Booking", rescheduled: "Reschedule", gallery: "Galeri", session: "Sesi Foto", account: "Akun" };
+const TABGROUP = { home: ["home", "packages", "studio", "time", "pay", "success", "rescheduled"], my: ["my", "bdetail", "cancel", "refund"], gallery: ["gallery", "session"] };
 function go(v, p = {}, push = true) {
   S.view = v; S.p = p; msg = err = ""; AV = {}; save();
   if (push) { try { history.pushState({ v, p }, "", location.pathname + location.search); } catch (e) {} }
@@ -90,7 +90,7 @@ function shell(inner) {
 }
 // muat ulang data master (studio/properti/paket) bila admin mengubahnya; render ulang hanya jika berbeda
 let _mj = "";
-async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, PROP, POSES } = m); ALLSTUDIOS = ALLSTUDIOS || STUDIOS; if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
+async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, FAV_PKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, PROP, POSES } = m); ALLSTUDIOS = ALLSTUDIOS || STUDIOS; if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
 V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
 function render() {
   if (!S.me && !["auth", "landing"].includes(S.view)) S.view = "landing";
