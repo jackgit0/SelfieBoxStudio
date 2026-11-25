@@ -16,12 +16,12 @@ async function sendContact() {
   LP.busy = false; render(); setTimeout(() => toSec("kontak"), 30);
 }
 const FAC = [
-  ["studio", "Studio Privat", () => `${STUDIOS.length} studio dengan kapasitas berbeda — dari sesi solo sampai rombongan.`],
-  ["glasses", "Properti & Background", () => `${PROP.length}+ background dan aksesori siap pakai: topi, kacamata, tirai, dan banyak lagi.`],
+  ["studio", "Studio Privat", () => `${M.studios.length} studio dengan kapasitas berbeda — dari sesi solo sampai rombongan.`],
+  ["glasses", "Properti & Background", () => `${M.properties.length}+ background dan aksesori siap pakai: topi, kacamata, tirai, dan banyak lagi.`],
   ["camera", "Kamera & Pencahayaan", () => "Lighting studio dan kamera siap pakai, kamu tinggal bergaya dan menekan tombol foto."],
   ["run", "Panduan Pose & Timer", () => "Rekomendasi pose berganti otomatis, hitung mundur jelas, dan peringatan sebelum waktu habis."],
   ["images", "Galeri Online", () => "Pilih foto terbaik, tandai favorit, lalu unduh kapan saja. Foto juga bisa terkirim otomatis ke Google Drive."],
-  ["receipt", "Cetak Strip Foto", () => { const sz = [...new Set(PKG.map(p => p.strip_size).filter(Boolean))].join(" / "), mt = [...new Set(PKG.map(p => p.strip_material).filter(Boolean))].join(" / "); return `Hasil strip ${sz || "berkualitas"}${mt ? " dengan bahan " + mt : ""}.`; }],
+  ["receipt", "Cetak Strip Foto", () => { const sz = [...new Set(M.packages.map(p => p.strip_size).filter(Boolean))].join(" / "), mt = [...new Set(M.packages.map(p => p.strip_material).filter(Boolean))].join(" / "); return `Hasil strip ${sz || "berkualitas"}${mt ? " dengan bahan " + mt : ""}.`; }],
   ["card", "Booking & Bayar Online", () => "Reservasi kapan saja, bayar via QRIS atau transfer, invoice langsung ke emailmu."],
   ["users", "Customer Service", () => "Tim kami siap membantu reschedule, refund, dan kendala teknis saat sesi berlangsung."]
 ];
@@ -31,9 +31,9 @@ function lpStudio(s) {
 <div class="row sp" style="margin-top:10px"><span class="m sm">${ic("users", 14)} ${esc(capLabel(s))} orang</span><b class="sm">${priceRange(s)}</b></div></div></article>`;
 }
 V.landing = () => {
-  const min = PKG.length ? Math.min(...PKG.map(eff)) : 0, addr = (STUDIOS[0] || {}).address || "Jl. Veteran No. 3", wa = window.CS_WA, mail = window.CS_EMAIL, first = HRS[0], last = HRS[HRS.length - 1];
+  const min = M.packages.length ? Math.min(...PKG.map(eff)) : 0, addr = (M.studios[0] || {}).address || "Jl. Veteran No. 3", wa = window.CS_WA, mail = window.CS_EMAIL, first = HRS[0], last = HRS[HRS.length - 1];
   const links = LSECS.map(l => `<button data-s="${l[0]}" onclick="toSec('${l[0]}')">${l[1]}</button>`).join("");
-  const propImgs = PROP.filter(p => p.img).slice(0, 4);
+  const propImgs = M.properties.filter(p => p.img).slice(0, 4);
   return `<div class="lp"><header class="lnav"><div class="lnav-in"><a class="brand" href="#" onclick="toSec('home');return false">${esc(BRAND)}</a><nav class="llinks">${links}</nav>
 <div class="lact"><button class="btn ghost sm" onclick="openAuth('login')">Masuk</button><button class="btn sm" onclick="openAuth('register')">Join Sekarang</button><button class="ib lburger" aria-label="Menu" onclick="lpMenu()">${ic("menu", 20)}</button></div></div>
 <div id="lmenu" class="lmenu" hidden>${LSECS.map(l => `<button onclick="toSec('${l[0]}')">${l[1]}</button>`).join("")}<button onclick="go('home')">Lihat Studio</button><button onclick="openAuth('login')">Masuk</button></div></header>
@@ -41,10 +41,10 @@ V.landing = () => {
 <section id="home" class="hero"><div class="lw hero-in"><div><span class="tag">Studio foto self-service</span><h1 class="hero-h">Abadikan momen terbaikmu, <span>tanpa ribet.</span></h1>
 <p class="hero-p">Pilih studio, atur jadwal, lalu bergaya sepuasnya dengan panduan pose dan timer otomatis. Hasil foto bisa langsung kamu pilih, unduh, dan simpan.</p>
 <div class="row" style="margin-top:22px"><button class="btn" onclick="openAuth('register')">Join Sekarang</button><button class="btn ghost" onclick="go('home')">Lihat Studio</button></div>
-<div class="hero-stats"><div><b>${STUDIOS.length}</b><span>Studio</span></div><div><b>${PROP.length}+</b><span>Properti</span></div><div><b>50 mnt</b><span>Per sesi</span></div><div><b>${rpk(min)}</b><span>Mulai dari</span></div></div></div>
-<div class="hero-img"><div class="simg" style="${bgi((STUDIOS[0] || {}).img || "img/studio-1.jpg")}"></div><div class="hero-float">${ic("clock", 18)}<div><b>Buka setiap hari</b><small>${pad(first)}.00 – ${pad(last)}.50 WIB</small></div></div></div></div></section>
+<div class="hero-stats"><div><b>${M.studios.length}</b><span>Studio</span></div><div><b>${M.properties.length}+</b><span>Properti</span></div><div><b>50 mnt</b><span>Per sesi</span></div><div><b>${rpk(min)}</b><span>Mulai dari</span></div></div></div>
+<div class="hero-img"><div class="simg" style="${bgi((M.studios[0] || {}).img || "img/studio-1.jpg")}"></div><div class="hero-float">${ic("clock", 18)}<div><b>Buka setiap hari</b><small>${pad(first)}.00 – ${pad(last)}.50 WIB</small></div></div></div></div></section>
 
-<section id="about" class="sec"><div class="lw about"><div class="about-img"><div class="simg" style="${bgi(((STUDIOS[1] || STUDIOS[0]) || {}).img || "img/studio-2.jpg")}"></div></div>
+<section id="about" class="sec"><div class="lw about"><div class="about-img"><div class="simg" style="${bgi(((M.studios[1] || M.studios[0]) || {}).img || "img/studio-2.jpg")}"></div></div>
 <div><span class="eyebrow">About</span><h2 class="sec-h">Studio foto yang bisa kamu atur sendiri</h2>
 <p class="lead">${esc(BRAND)} adalah studio foto self-service: kamu memesan jadwal secara online, datang, dan mengambil fotomu sendiri dengan bantuan timer, panduan pose, dan properti yang sudah kami siapkan.</p>
 <p class="lead">Cocok untuk foto solo, couple, keluarga, sampai teman satu geng — tanpa fotografer, tanpa antre, dan harga yang jelas sejak awal.</p>
@@ -52,16 +52,16 @@ V.landing = () => {
 
 <section id="fasilitas" class="sec alt"><div class="lw"><span class="eyebrow">Fasilitas</span><h2 class="sec-h">Semua yang kamu butuhkan untuk sesi foto</h2><p class="lead" style="max-width:640px">Dari studio sampai galeri online, semuanya sudah kami siapkan.</p>
 <div class="fgrid">${FAC.map(f => `<div class="fcard"><div class="fic">${ic(f[0], 22)}</div><h3>${f[1]}</h3><p>${esc(f[2]())}</p></div>`).join("")}</div>
-<h3 class="h2" style="margin:44px 0 6px">Studio kami</h3><div class="row sp"><p class="sub">Pilih studio sesuai jumlah orang dan suasana yang kamu mau.</p><button class="btn sm ghost" onclick="go('home')">Lihat Studio & Jadwal ${ic("right", 16)}</button></div><div class="lgrid">${STUDIOS.map(lpStudio).join("")}</div>
+<h3 class="h2" style="margin:44px 0 6px">Studio kami</h3><div class="row sp"><p class="sub">Pilih studio sesuai jumlah orang dan suasana yang kamu mau.</p><button class="btn sm ghost" onclick="go('home')">Lihat Studio & Jadwal ${ic("right", 16)}</button></div><div class="lgrid">${M.studios.map(lpStudio).join("")}</div>
 ${propImgs.length ? `<h3 class="h2" style="margin:44px 0 6px">Properti & background</h3><p class="sub">Sebagian koleksi yang bisa kamu pakai saat sesi.</p><div class="pgal">${propImgs.map(p => `<figure><div class="simg" style="${bgi(p.img)}"></div><figcaption>${esc(p.name)}</figcaption></figure>`).join("")}</div>` : ""}</div></section>
 
 <section id="keterangan" class="sec"><div class="lw"><span class="eyebrow">Keterangan</span><h2 class="sec-h">Cara kerja, paket, dan ketentuan</h2>
 <div class="steps4">${STEPS.map((s, i) => `<div class="stp"><div class="num">${i + 1}</div><div class="fic">${ic(s[0], 22)}</div><h3>${s[1]}</h3><p>${s[2]}</p></div>`).join("")}</div>
-<h3 class="h2" style="margin:44px 0 6px">Paket & harga</h3><p class="sub">${DISC.pct ? `Diskon ${DISC.pct}%${DISC.label ? " — " + esc(DISC.label) : ""} sudah termasuk pada harga di bawah.` : "Pilih paket saat memesan."}</p><div class="pk-grid">${pkgCards()}</div><div style="margin-top:14px"><button class="btn sm ghost" onclick="go('packages')">Lihat semua paket ${ic("right", 16)}</button></div>
+<h3 class="h2" style="margin:44px 0 6px">Paket & harga</h3><p class="sub">${M.discount.pct ? `Diskon ${M.discount.pct}%${M.discount.label ? " — " + esc(M.discount.label) : ""} sudah termasuk pada harga di bawah.` : "Pilih paket saat memesan."}</p><div class="pk-grid">${pkgCards()}</div><div style="margin-top:14px"><button class="btn sm ghost" onclick="go('packages')">Lihat semua paket ${ic("right", 16)}</button></div>
 <h3 class="h2" style="margin:44px 0 12px">Informasi penting</h3><div class="info">
 <div class="card"><h4>${ic("clock", 18)} Jam operasional</h4><p>Setiap hari ${pad(first)}.00 – ${pad(last)}.50 WIB. Satu sesi berlangsung 50 menit.</p></div>
 <div class="card"><h4>${ic("card", 18)} Pembayaran</h4><p>QRIS atau transfer bank. Invoice dikirim ke email dan dapat diunduh dari menu Booking.</p></div>
-<div class="card"><h4>${ic("refresh", 18)} Pembatalan & refund</h4><p>Batalkan dari menu Booking. Refund otomatis jika pembatalan minimal ${POLICY.refund_hours} jam sebelum sesi.</p></div>
+<div class="card"><h4>${ic("refresh", 18)} Pembatalan & refund</h4><p>Batalkan dari menu Booking. Refund otomatis jika pembatalan minimal ${M.policy.refund_hours} jam sebelum sesi.</p></div>
 <div class="card"><h4>${ic("images", 18)} Foto kamu</h4><p>Foto tersimpan di galeri online selama 30 hari, bisa diunduh, dan dapat dikirim otomatis ke Google Drive.</p></div></div></div></section>
 
 <section id="join" class="lw"><div class="cta"><div><h2>Siap bergaya? Join Sekarang!</h2><p>Buat akun gratis dalam semenit, pilih jadwal, dan sesi fotomu siap berjalan.</p></div><div class="row"><button class="btn light" onclick="openAuth('register')">Join Sekarang</button><button class="btn ghost-w" onclick="openAuth('login')">Sudah punya akun? Masuk</button></div></div></section>

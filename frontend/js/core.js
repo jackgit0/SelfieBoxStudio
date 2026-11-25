@@ -1,7 +1,8 @@
 // ===== INTI: state, utilitas, ikon, shell (navbar), navigasi, autentikasi =====
 const $ = s => document.querySelector(s);
 const BRAND = window.BRAND || "SelfieBox Studio";
-let PKG = [], ALLPKG = [], FAV_PKG = null, DISC = { pct: 0, label: "" }, PEOPLE = [], BUDGET = [], STUDIOS = [], ALLSTUDIOS = [], PROP = [], POSES = {}, POLICY = { refund_hours: 2 };
+// data master dari /api/master dalam satu objek (refactor MVC fase 1: field objek, bukan global yang di-assign ulang); json = isi terakhir untuk refreshMaster
+const M = { packages: [], allPackages: [], favouritePackageId: null, discount: { pct: 0, label: "" }, peopleRanges: [], budgetRanges: [], studios: [], allStudios: [], properties: [], poses: {}, policy: { refund_hours: 2 }, json: "" };
 const V = {};
 let S; try { S = JSON.parse(localStorage.getItem("snapia")); } catch (e) {}
 S = Object.assign({ user: null, me: null, admin: false, view: "landing", p: {}, pkg: null, bm: [], staff: false, log: [] }, S || {}); delete S.quiz; delete S.setup; // sisa state lama (kuis rekomendasi paket dan pilihan setup properti sudah dihapus)
@@ -26,13 +27,13 @@ const dObj = d => new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
 const fmtDate = d => dObj(d).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
 const fmtDMY = d => d.split("-").reverse().join("/");
 const fmtTime = ms => ms ? new Date(ms).toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }).replace(/\./g, ":").replace(",", " -") : "-";
-const pkOf = id => ALLPKG.find(p => p.id == id) || { name: "(paket dihapus)", price: 0, photo_count: 1, dur: 1, strip_size: "", strip_material: "" };
-const eff = p => Math.round(p.price * (1 - (DISC.pct || 0) / 100));
-const ptag = p => DISC.pct ? `<s class="m">${rp(p.price)}</s> ${rp(eff(p))}` : rp(p.price);
-const studioOf = id => ALLSTUDIOS.find(s => s.id == id) || { id, name: "(studio dihapus)", img: "", address: "-", price: 0, description: "" };
+const pkOf = id => M.allPackages.find(p => p.id == id) || { name: "(paket dihapus)", price: 0, photo_count: 1, dur: 1, strip_size: "", strip_material: "" };
+const eff = p => Math.round(p.price * (1 - (M.discount.pct || 0) / 100));
+const ptag = p => M.discount.pct ? `<s class="m">${rp(p.price)}</s> ${rp(eff(p))}` : rp(p.price);
+const studioOf = id => M.allStudios.find(s => s.id == id) || { id, name: "(studio dihapus)", img: "", address: "-", price: 0, description: "" };
 const free = (sid, d) => AV[sid + "|" + d] || HRS.filter(h => d > todayS() || h > new Date().getHours());
-const priceRange = s => { if (!PKG.length) return "-"; const v = PKG.map(p => eff(p) + (s.price || 0)); const a = Math.min(...v), b = Math.max(...v); return a === b ? rpk(a) : rpk(a) + " - " + rpk(b); };
-const capLabel = s => ((PEOPLE.find(p => p.id == s.people_range_id) || {}).range || "").replace("-", " - ");
+const priceRange = s => { if (!M.packages.length) return "-"; const v = M.packages.map(p => eff(p) + (s.price || 0)); const a = Math.min(...v), b = Math.max(...v); return a === b ? rpk(a) : rpk(a) + " - " + rpk(b); };
+const capLabel = s => ((M.peopleRanges.find(p => p.id == s.people_range_id) || {}).range || "").replace("-", " - ");
 
 // ---------- ikon (garis, 24px) ----------
 const IC = {
@@ -95,8 +96,7 @@ ${S.me ? acctMenu() : `<div class="usr"><button class="btn ghost sm" onclick="op
 <nav class="bottom">${nav.map(n => `<button class="${on(n[0]) ? "on" : ""}" onclick="${navGo(n[0])}">${ic(n[2], 22)}<span>${n[1]}</span></button>`).join("")}</nav>`;
 }
 // muat ulang data master (studio/properti/paket) bila admin mengubahnya; render ulang hanya jika berbeda
-let _mj = "";
-async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === _mj) return; _mj = j; ({ PKG, ALLPKG, FAV_PKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, PROP, POSES } = m); ALLSTUDIOS = ALLSTUDIOS || STUDIOS; if (m.POLICY) POLICY = m.POLICY; render(); } catch (e) {} }
+async function refreshMaster() { try { const m = await API.get("/master"), j = JSON.stringify(m); if (j === M.json) return; M.json = j; Object.assign(M, { packages: m.PKG, allPackages: m.ALLPKG, favouritePackageId: m.FAV_PKG, discount: m.DISC, peopleRanges: m.PEOPLE, budgetRanges: m.BUDGET, studios: m.STUDIOS, allStudios: m.ALLSTUDIOS || m.STUDIOS, properties: m.PROP, poses: m.POSES }); if (m.POLICY) M.policy = m.POLICY; render(); } catch (e) {} }
 V.home_after = V.studio_after = () => { if (!S.admin) refreshMaster(); };
 function render() {
   if (!S.me && !GUEST_VIEWS.includes(S.view)) S.view = "landing";
@@ -111,7 +111,7 @@ function render() {
   if (["home", "time"].includes(S.view)) prefetch();
 }
 async function prefetch() {
-  const home = S.view === "home", d = home ? (S.hDate || todayS()) : (B.date || todayS()), ids = home ? STUDIOS.map(s => s.id) : (B.studio ? [B.studio] : []); let ch = 0;
+  const home = S.view === "home", d = home ? (S.hDate || todayS()) : (B.date || todayS()), ids = home ? M.studios.map(s => s.id) : (B.studio ? [B.studio] : []); let ch = 0;
   for (const id of ids) { const k = id + "|" + d; if (AV[k]) continue; try { AV[k] = (await API.get(`/availability?studio_id=${id}&date=${d}`)).free; ch = 1; } catch (e) { if (e.status == 400) { AV[k] = []; ch = 1; } } } // studio ditolak (mis. tidak tersedia): tidak ada slot
   if (ch && ["home", "time"].includes(S.view)) render();
 }

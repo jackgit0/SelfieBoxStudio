@@ -23,18 +23,18 @@ function studioCard(s) {
 <div class="chips">${slots.map(h => `<button class="chip" onclick="quickBook(${s.id},'${d}',${h})">${slotLabel(h)}</button>`).join("") || `<span class="chip none">Tidak ada sesi tersedia</span>`}</div></article>`;
 }
 function pkgCards() {
-  return PKG.map(p => `<div class="pk"><div class="row sp"><h4>${esc(p.name)}</h4>${p.id == S.pkg ? '<span class="tag">Dipilih</span>' : ""}</div><div class="price">${ptag(p)}</div>
+  return M.packages.map(p => `<div class="pk"><div class="row sp"><h4>${esc(p.name)}</h4>${p.id == S.pkg ? '<span class="tag">Dipilih</span>' : ""}</div><div class="price">${ptag(p)}</div>
 <ul><li>${p.photo_count} foto · ${p.dur} menit</li><li>Strip ${esc(p.strip_size || "-")} · ${esc(p.strip_material || "-")}</li><li>Galeri online 30 hari</li></ul></div>`).join("");
 }
 V.home = () => {
   const d = S.hDate || (S.hDate = todayS()), from = S.hFrom ?? 8, to = S.hTo ?? 20, opt = (v, sel) => HRS.map(h => `<option value="${h}" ${h == sel ? "selected" : ""}>${pad(h)}:00</option>`).join("");
   return `<div class="home"><aside class="filter card soft"><h3 class="h3">Filter Jadwal</h3><p class="sub" style="margin-bottom:12px">Pilih waktu yang sesuai, kami tampilkan studio yang tersedia.</p>${calHTML("home", d)}
 <div class="trange"><div><label>Dari jam</label><select onchange="S.hFrom=+this.value;render()">${opt(0, from)}</select></div><div><label>Sampai jam</label><select onchange="S.hTo=+this.value;render()">${opt(0, to)}</select></div></div></aside>
-<section style="min-width:0"><h1 class="h1">Browse</h1><p class="sub">Temukan studio yang cocok sama selera kamu.</p><div class="grid3">${STUDIOS.map(studioCard).join("")}</div>
+<section style="min-width:0"><h1 class="h1">Browse</h1><p class="sub">Temukan studio yang cocok sama selera kamu.</p><div class="grid3">${M.studios.map(studioCard).join("")}</div>
 <div class="row sp" style="margin-top:36px"><h2 class="h2">Paket</h2><button class="btn sm ghost" onclick="go('packages')">Lihat semua paket ${ic("right", 16)}</button></div><p class="sub">Pilih paket saat memesan — harga sudah termasuk diskon yang berlaku.</p><div class="pk-grid">${pkgCards()}</div></section></div>`;
 };
 // paket pilihan (dari Pilihan Paket atau pilihan sebelumnya) dipakai bila masih aktif; bila sudah dinonaktifkan/dihapus admin: popup Paket Foto Tidak Ditemukan
-function ensurePkg(next) { if (S.pkg && !PKG.find(p => p.id == S.pkg)) { pkgMissing(next); return false; } if (!S.pkg) S.pkg = PKG[0].id; return true; }
+function ensurePkg(next) { if (S.pkg && !M.packages.find(p => p.id == S.pkg)) { pkgMissing(next); return false; } if (!S.pkg) S.pkg = M.packages[0].id; return true; }
 function quickBook(sid, date, h) { if (!ensurePkg(() => quickBook(sid, date, h))) return; editId = null; S.draft = null; B = { studio: sid, date, slot: `${date} ${h}:00` }; go("time"); }
 function startBook(sid) { if (!ensurePkg(() => startBook(sid))) return; editId = null; S.draft = null; B = { studio: sid, date: S.hDate || todayS(), slot: null }; go("time"); }
 
@@ -43,10 +43,10 @@ const pkgDesc = p => `${p.photo_count} foto · ${p.dur} menit${p.strip_size ? " 
 const pkgFeat = p => [`<b>${p.photo_count} foto</b> cetak strip ${esc(p.strip_size || "")}`, `Kertas foto <b>${esc(p.strip_material || "standar")}</b>`, `Durasi sesi <b>${p.dur} menit</b>`, "Galeri online 30 hari", "Akses semua properti studio"];
 V.packages = () => `<div class="pkpage"><div class="row" style="margin-bottom:16px"><button class="ib" aria-label="Kembali ke Browse" onclick="go('home')">${ic("left", 18)}</button><h1 class="h1">Pilihan Paket</h1></div>
 <div class="pkwrap"><div class="ctr"><h2 class="h2">Temukan Paket Sesuai Kebutuhanmu</h2><p class="m" style="margin-top:8px">Nikmati pengalaman foto studio mandiri dengan hasil cetak berkualitas premium dan fasilitas lengkap.</p></div>
-<div class="pkl">${PKG.map(p => { const fav = p.id == FAV_PKG; return `<article class="pkc ${fav ? "fav" : ""}">${fav ? '<span class="badge">Paling Favorit</span>' : ""}<div class="row sp" style="flex-wrap:nowrap"><h3>Paket ${esc(p.name)}</h3>${p.id == S.pkg ? '<span class="tag">Dipilih</span>' : ""}</div><p class="pd">${pkgDesc(p)}</p>
-<div class="pp">${DISC.pct ? `<s>${rp(p.price)}</s> ` : ""}${rp(eff(p))} <small>/ sesi</small></div><ul>${pkgFeat(p).map(f => `<li>${ic("check", 16)}<span>${f}</span></li>`).join("")}</ul>
+<div class="pkl">${M.packages.map(p => { const fav = p.id == M.favouritePackageId; return `<article class="pkc ${fav ? "fav" : ""}">${fav ? '<span class="badge">Paling Favorit</span>' : ""}<div class="row sp" style="flex-wrap:nowrap"><h3>Paket ${esc(p.name)}</h3>${p.id == S.pkg ? '<span class="tag">Dipilih</span>' : ""}</div><p class="pd">${pkgDesc(p)}</p>
+<div class="pp">${M.discount.pct ? `<s>${rp(p.price)}</s> ` : ""}${rp(eff(p))} <small>/ sesi</small></div><ul>${pkgFeat(p).map(f => `<li>${ic("check", 16)}<span>${f}</span></li>`).join("")}</ul>
 <button class="btn block ${fav ? "" : "ghost"}" onclick="choosePkg(${p.id})">Pilih Paket Ini</button></article>`; }).join("")}</div></div></div>`;
-function choosePkg(id) { const p = PKG.find(x => x.id == id); if (!p) return pkgMissing(); S.pkg = p.id; go("home"); msg = `Paket ${p.name} dipilih. Pilih studio untuk melanjutkan.`; render(); }
+function choosePkg(id) { const p = M.packages.find(x => x.id == id); if (!p) return pkgMissing(); S.pkg = p.id; go("home"); msg = `Paket ${p.name} dipilih. Pilih studio untuk melanjutkan.`; render(); }
 
 // ---------- popup Paket Foto Tidak Ditemukan (Figma 660:5538) ----------
 // next: lanjutkan alur semula setelah customer memilih paket lain langsung dari daftar di popup
@@ -55,20 +55,20 @@ async function pkgMissing(next, booking = false) {
   S.pkg = null; save(); render();
   const v = await modal({ title: booking ? "Paket Tidak Ditemukan" : "Paket Foto Tidak Ditemukan", cls: "wide center", kicker: `<span class="tag no mkick">STATUS PAKET: TIDAK TERSEDIA</span>`,
     body: `<p>${booking ? "Paket tidak ditemukan. Silakan pilih paket lain." : "Maaf, paket foto yang Anda pilih saat ini sudah tidak tersedia atau telah habis kuotanya untuk sesi ini. Rincian paket tidak dapat ditampilkan."}</p><div class="mnote">Jangan khawatir, masih ada berbagai paket foto menarik lainnya yang siap kamu pesan! Silakan cek opsi paket studio di bawah ini.</div>
-<div class="mpk">${PKG.map(p => `<button class="mpkr" data-v="${p.id}"><span><b>Paket ${esc(p.name)}</b><small>${pkgDesc(p)}</small></span><b>${rp(eff(p))}</b></button>`).join("")}</div>`,
+<div class="mpk">${M.packages.map(p => `<button class="mpkr" data-v="${p.id}"><span><b>Paket ${esc(p.name)}</b><small>${pkgDesc(p)}</small></span><b>${rp(eff(p))}</b></button>`).join("")}</div>`,
     buttons: [{ label: "Lihat & Pilih Paket Lain", value: "list", icon: "box" }, { label: "Hubungi Customer Service", value: "cs", style: "soft", icon: "mail" }] });
   if (v === "list") go("packages"); else if (v === "cs") csContact();
-  else if (v && PKG.find(p => p.id == v)) { S.pkg = +v; save(); if (next) next(); else render(); }
+  else if (v && M.packages.find(p => p.id == v)) { S.pkg = +v; save(); if (next) next(); else render(); }
 }
 // error API "Paket tidak valid": muat ulang data master; bila paket memang sudah tidak aktif, tampilkan popup (true), selain itu biarkan pemanggil menampilkan pesan error
-async function onPkgErr(e, next) { if (e.status != 400 || !/^Paket(\/studio)? tidak valid/.test(e.message)) return false; await refreshMaster(); if (PKG.find(p => p.id == S.pkg)) return false; pkgMissing(next, true); return true; }
+async function onPkgErr(e, next) { if (e.status != 400 || !/^Paket(\/studio)? tidak valid/.test(e.message)) return false; await refreshMaster(); if (M.packages.find(p => p.id == S.pkg)) return false; pkgMissing(next, true); return true; }
 
 // ---------- detail studio + properti (hanya tampilan) ----------
 // studio yang tidak tersedia/dihapus tidak bisa dibuka untuk dipesan (riwayat booking tetap memakai studioOf)
-const shown = id => STUDIOS.some(s => s.id == id), noStudio = (edit = false) => `<div class="panel"><div class="card center"><h1 class="h1">Studio tidak tersedia</h1><p class="sub">Studio ini sedang tidak dapat dipesan.</p><div style="margin-top:12px"><button class="btn" onclick="${edit && editId ? `go('bdetail',{id:${editId}})` : "go('home')"}">${edit && editId ? "Kembali ke booking" : "Cari studio lain"}</button></div></div></div>`;
+const shown = id => M.studios.some(s => s.id == id), noStudio = (edit = false) => `<div class="panel"><div class="card center"><h1 class="h1">Studio tidak tersedia</h1><p class="sub">Studio ini sedang tidak dapat dipesan.</p><div style="margin-top:12px"><button class="btn" onclick="${edit && editId ? `go('bdetail',{id:${editId}})` : "go('home')"}">${edit && editId ? "Kembali ke booking" : "Cari studio lain"}</button></div></div></div>`;
 V.studio = () => {
   if (!shown(S.p.id)) return noStudio();
-  const s = studioOf(S.p.id), cat = S.pCat || "Semua", cats = ["Semua", ...new Set(PROP.map(p => p.category || "Lainnya"))], list = PROP.filter(p => cat === "Semua" || (p.category || "Lainnya") === cat);
+  const s = studioOf(S.p.id), cat = S.pCat || "Semua", cats = ["Semua", ...new Set(M.properties.map(p => p.category || "Lainnya"))], list = M.properties.filter(p => cat === "Semua" || (p.category || "Lainnya") === cat);
   const on = S.bm.includes(s.id);
   return `<button class="back" onclick="go('home')">${ic("left", 16)} Kembali</button>
 <div class="sdet"><div class="left stack"><div class="bigcard"><div class="simg" style="${bgi(s.img)}"></div><div class="sbody"><div class="row sp" style="flex-wrap:nowrap"><h1 class="h2">${esc(s.name)}</h1><button class="star ${on ? "on" : ""}" aria-label="Favorit" onclick="toggleBm(${s.id})">${icf("star", 20)}</button></div>
@@ -154,13 +154,13 @@ function qr() {
 async function selectPkg(id) { S.pkg = id; save(); msg = err = ""; try { await loadQuote(); } catch (e) { return bookingErr(e, () => selectPkg(S.pkg)); } render(); }
 V.pay = () => {
   if (!B.slot || !Q) return `<div class="card">Pilih jadwal terlebih dahulu.</div>`; if (!shown(B.studio)) return noStudio();
-  if (!PKG.find(x => x.id == S.pkg)) return `<div class="panel"><button class="back" onclick="go('time')">${ic("left", 16)} Kembali</button><div class="card"><h2 class="h2">Pilih Paket</h2><p class="sub">Paket sebelumnya tidak tersedia. Pilih paket lain untuk melanjutkan.</p><div class="pkpick" style="margin-top:12px">${PKG.map(x => `<button class="pill" onclick="selectPkg(${x.id})">${esc(x.name)}</button>`).join("")}</div></div></div>`;
-  const s = studioOf(B.studio), p = pkOf(S.pkg), col = f => PKG.map(x => `<td class="${x.id == S.pkg ? "sel" : ""}">${f(x)}</td>`).join(""), method = S.method || "QRIS";
+  if (!M.packages.find(x => x.id == S.pkg)) return `<div class="panel"><button class="back" onclick="go('time')">${ic("left", 16)} Kembali</button><div class="card"><h2 class="h2">Pilih Paket</h2><p class="sub">Paket sebelumnya tidak tersedia. Pilih paket lain untuk melanjutkan.</p><div class="pkpick" style="margin-top:12px">${M.packages.map(x => `<button class="pill" onclick="selectPkg(${x.id})">${esc(x.name)}</button>`).join("")}</div></div></div>`;
+  const s = studioOf(B.studio), p = pkOf(S.pkg), col = f => M.packages.map(x => `<td class="${x.id == S.pkg ? "sel" : ""}">${f(x)}</td>`).join(""), method = S.method || "QRIS";
   return `<div class="panel"><button class="back" onclick="go('time')">${ic("left", 16)} Kembali</button><div class="row sp"><h1 class="h1">Paket & Pembayaran</h1><span class="steps">2/2</span></div>
-<div class="card" style="margin-top:16px"><div class="bk"><div><h2 class="h2">Paket</h2><div style="overflow-x:auto;margin-top:8px"><table class="cmp"><tr><th>Fitur</th>${PKG.map(x => `<th>${esc(x.name)}</th>`).join("")}</tr>
+<div class="card" style="margin-top:16px"><div class="bk"><div><h2 class="h2">Paket</h2><div style="overflow-x:auto;margin-top:8px"><table class="cmp"><tr><th>Fitur</th>${M.packages.map(x => `<th>${esc(x.name)}</th>`).join("")}</tr>
 <tr><td>Strip</td>${col(x => x.photo_count + " foto")}</tr><tr><td>Ukuran</td>${col(x => esc(x.strip_size || "-"))}</tr><tr><td>Bahan</td>${col(x => esc(x.strip_material || "-"))}</tr><tr><td>Durasi</td>${col(x => x.dur + " mnt")}</tr><tr><td>Cloud</td>${col(() => "30 hari")}</tr><tr><td>Harga</td>${col(x => ptag(x))}</tr></table></div>
 <p class="sm m" style="margin-top:14px">${ic("calendar", 14)} ${esc(s.name)} · ${fmtDate(parseSlot(B.slot).date)} · ${slotRange(B.slot)}</p></div>
-<div><h3 class="h3">Pilih Paket</h3><div class="pkpick">${PKG.map(x => `<button class="pill ${x.id == S.pkg ? "on" : ""}" onclick="selectPkg(${x.id})">${esc(x.name)}</button>`).join("")}</div>
+<div><h3 class="h3">Pilih Paket</h3><div class="pkpick">${M.packages.map(x => `<button class="pill ${x.id == S.pkg ? "on" : ""}" onclick="selectPkg(${x.id})">${esc(x.name)}</button>`).join("")}</div>
 <h3 class="h3">Rincian Pembayaran</h3><div style="margin-top:6px"><div class="kv"><span>Studio</span><b>${rp(Q.studio_fee)}</b></div><div class="kv"><span>Paket ${esc(p.name)}</span><b>${rp(p.price)}</b></div>
 ${Q.mainDisc ? `<div class="kv disc"><span>Diskon utama (${Q.pct}%)</span><b>-${rp(Q.mainDisc)}</b></div>` : ""}<div class="kv total"><span>Total</span><b>${rp(Q.total)}</b></div></div>
 <label>Metode pembayaran</label><select onchange="S.method=this.value;render()"><option ${method == "QRIS" ? "selected" : ""}>QRIS</option><option ${method == "Transfer Bank" ? "selected" : ""}>Transfer Bank</option></select>
@@ -229,7 +229,7 @@ V.cancel = () => {
   return `<div class="panel"><button class="back" onclick="go('bdetail',{id:${b.id}})">${ic("left", 16)} Kembali</button><h1 class="h1">Pembatalan Booking</h1><p class="sub">${esc(studioOf(b.studio).name)} · ${fmtDate(parseSlot(b.date).date)} · ${slotRange(b.date)}</p>
 <div class="card" style="margin-top:16px"><h3 class="h3">Alasan Pembatalan</h3><div class="reasons">${REASONS.map(r => `<button class="reason ${CR == r ? "on" : ""}" onclick="CR='${r}';render()"><i></i>${r}</button>`).join("")}</div>
 ${CR == "Pembatalan lainnya" ? `<textarea placeholder="Tuliskan alasan pembatalan kamu" oninput="CD=this.value">${esc(CD)}</textarea>` : ""}
-${paid ? `<p class="sm m" style="margin:10px 0">${ic("clock", 14)} Refund diproses otomatis jika pembatalan dilakukan minimal ${POLICY.refund_hours} jam sebelum sesi dimulai.</p>` : ""}
+${paid ? `<p class="sm m" style="margin:10px 0">${ic("clock", 14)} Refund diproses otomatis jika pembatalan dilakukan minimal ${M.policy.refund_hours} jam sebelum sesi dimulai.</p>` : ""}
 <button class="btn block" style="margin-top:8px" ${CR ? "" : "disabled"} onclick="doCancel(${b.id})">${paid ? "Refund" : "Batalkan Booking"}</button></div></div>`;
 };
 async function doCancel(id) {

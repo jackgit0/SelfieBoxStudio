@@ -50,10 +50,10 @@ function upd(s){const t=$("#tm");if(!t)return;const m=Math.max(0,s.left);t.textC
  $("#ds").textContent=s.status!="Aktif"?"Sesi telah berakhir. Silakan pilih foto di Galeri.":s.paused?"Sesi dijeda staf — waktu tidak berkurang.":s.left<=60?"⚠ Waktu hampir habis!":""}
 function beep(){try{const a=new AudioContext(),o=a.createOscillator();o.connect(a.destination);o.frequency.value=880;o.start();o.stop(a.currentTime+.4)}catch(e){}}
 function warn(){beep();setTimeout(beep,600)}
-function nextPose(a){const l=POSES[1];poseI=(poseI+(a===0?0:1))%l.length;const e=$("#pose");if(e)e.textContent="🧍 "+l[poseI]}
+function nextPose(a){const l=M.poses[1];poseI=(poseI+(a===0?0:1))%l.length;const e=$("#pose");if(e)e.textContent="🧍 "+l[poseI]}
 async function shoot(){const s=sesOf();if(s.status!="Aktif"||s.paused)return;const c=$("#cv"),v=$("#v");const W=640,H=(v&&v.videoWidth)?Math.round(W*v.videoHeight/v.videoWidth):480;c.width=W;c.height=H;const x=c.getContext("2d"); // rasio foto = rasio kamera (tidak gepeng)
  if(v&&v.videoWidth){x.drawImage(v,0,0,W,H)}else{const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,"hsl("+Math.random()*360+",70%,60%)");g.addColorStop(1,"#222");x.fillStyle=g;x.fillRect(0,0,W,H);x.font="90px serif";x.fillText("😄",W/2-45,H/2+30)}
- const st=s.setup;if(st){x.font="40px serif";st.acc.forEach((id,i)=>x.fillText((PROP.find(p=>p.id==id)||{}).e||"",20+i*50,50))}
+ const st=s.setup;if(st){x.font="40px serif";st.acc.forEach((id,i)=>x.fillText((M.properties.find(p=>p.id==id)||{}).e||"",20+i*50,50))}
 try{const data=c.toDataURL("image/jpeg",.8),r=await API.post(`/sessions/${s.id}/photos`,{img:data}),ph={id:r.id,t:r.t,fav:false,sel:false,drive:"…",img:data};s.photos.push(ph);upd(s);
   ph.drive=await uploadDrive(ph);API.patch("/photos/"+ph.id,{drive:ph.drive}).catch(()=>{})}catch(e){err=e.message;await syncS(s);render()}}
 async function staffAct(a){const s=sesOf();if(!S.staff||!s)return;if(a=="stop"&&!confirm("Hentikan sesi?"))return;

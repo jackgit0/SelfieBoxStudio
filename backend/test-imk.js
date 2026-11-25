@@ -160,10 +160,10 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(core.includes('.mbtn button").focus()'), 'core.js: fokus awal dialog di tombol aksi, bukan di tombol dalam isi (mis. daftar paket)'); // kode: diganti di fase 4 (test-map.md)
     ok(!/function aModal\(/.test(aj) && /aModal\s*=.*modal\(/.test(aj), 'admin.js: aModal tidak lagi berdiri sendiri, memakai modal() bersama'); // kode: diganti di fase 8a (test-map.md)
     for (const s of ['Pilihan Paket', 'Temukan Paket Sesuai Kebutuhanmu', 'Pilih Paket Ini', 'Lihat semua paket', 'Paling Favorit', '/ sesi', 'Paket Foto Tidak Ditemukan', 'Lihat & Pilih Paket Lain', 'Hubungi Customer Service', 'Pilih studio untuk melanjutkan']) ok(JS.includes(s), `frontend memuat "${s}"`);
-    for (const s of ['V.packages', 'FAV_PKG', 'csContact()']) ok(cj.includes(s), `customer.js memuat "${s}"`); // kode: diganti di fase 5a (test-map.md)
+    for (const s of ['V.packages', 'M.favouritePackageId', 'csContact()']) ok(cj.includes(s), `customer.js memuat "${s}"`); // kode: diganti di fase 5a (test-map.md)
     ok(!uiGradient(JS), 'frontend (JS) tanpa gradient');
-    ok(boot.includes('FAV_PKG') && /FAV_PKG/.test(core.match(/function refreshMaster[^\n]*/)[0]), 'boot.js dan refreshMaster memuat FAV_PKG'); // kode: diganti di fase 2 (test-map.md)
-    ok(!/S\.pkg\s*&&\s*!PKG\.find\(p => p\.id == S\.pkg\)\)\s*S\.pkg = null/.test(boot), 'boot.js tidak diam-diam menghapus paket pilihan yang hilang (popup yang memberi tahu)'); } // kode: diganti di fase 5a (test-map.md)
+    ok(/favouritePackageId: m\.FAV_PKG/.test(boot) && /favouritePackageId: m\.FAV_PKG/.test(core.match(/function refreshMaster[^\n]*/)[0]), 'boot.js dan refreshMaster memuat FAV_PKG ke M.favouritePackageId'); // kode: diganti di fase 2 (test-map.md)
+    ok(!/S\.pkg\s*&&\s*!M\.packages\.find\(p => p\.id == S\.pkg\)\)\s*S\.pkg = null/.test(boot), 'boot.js tidak diam-diam menghapus paket pilihan yang hilang (popup yang memberi tahu)'); } // kode: diganti di fase 5a (test-map.md)
   await down(srv);
 
   // ===== Fase 4: popup galat Create Booking + akses tamu =====
@@ -234,6 +234,12 @@ ALTER TABLE booking ADD COLUMN setup_json TEXT; ALTER TABLE booking ADD COLUMN p
     ok(/sudah dipakai\/\.test\(e\.message\)\) \{ AD\.sterr = \{ top: ST_DUP, name: ST_DUPF \}; AD\.studios = null;/.test(aj), 'admin.js: nama ganda dari server memuat ulang daftar studio'); // kode: diganti di fase 8b (test-map.md)
     ok(!uiGradient(JS), 'frontend (JS) tanpa gradient (admin)'); }
   await down(srv);
+
+  // ===== Refactor MVC fase 1 (imk/dev/frontend-mvc-plan): global yang di-assign ulang dikumpulkan ke objek bernama, agar fase 2 bisa memakai ES module =====
+  // asg(names) = pola penugasan ulang sebuah global (bukan properti: "x.err =" tidak dihitung), termasuk di dalam atribut onclick="…"
+  { const JS = allJs(), asg = names => new RegExp(`(^|[;{(,\\s"'\`])(${names})\\s*=[^=]`, 'm');
+    ok(!asg('PKG|ALLPKG|FAV_PKG|DISC|PEOPLE|BUDGET|STUDIOS|ALLSTUDIOS|PROP|POSES|POLICY|_mj').test(JS) && !/\(\{\s*PKG/.test(JS), 'frontend: data master hanya di objek M (tanpa global PKG/STUDIOS/… yang di-assign ulang)'); // kode: diganti di fase 9
+  }
 
   console.log(`\n${n} tes lulus`); fs.rmSync(TMP, { recursive: true, force: true }); process.exit(0);
 })().catch(async e => { console.error('✘ GAGAL:', e.message); if (srv) await down(srv); process.exit(1); });

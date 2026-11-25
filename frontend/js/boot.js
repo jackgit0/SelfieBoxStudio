@@ -1,6 +1,6 @@
 // ===== BOOT: muat data master, pulihkan sesi login, render =====
 (async () => {
-  try { const m = await API.get("/master"); ({ PKG, ALLPKG, FAV_PKG, DISC, PEOPLE, BUDGET, STUDIOS, ALLSTUDIOS, PROP, POSES } = m); ALLSTUDIOS = ALLSTUDIOS || STUDIOS; if (m.POLICY) POLICY = m.POLICY; _mj = JSON.stringify(m); }
+  try { const m = await API.get("/master"); Object.assign(M, { packages: m.PKG, allPackages: m.ALLPKG, favouritePackageId: m.FAV_PKG, discount: m.DISC, peopleRanges: m.PEOPLE, budgetRanges: m.BUDGET, studios: m.STUDIOS, allStudios: m.ALLSTUDIOS || m.STUDIOS, properties: m.PROP, poses: m.POSES }); if (m.POLICY) M.policy = m.POLICY; M.json = JSON.stringify(m); }
   catch (e) { $("#app").innerHTML = "<p style='padding:24px'>Server API tidak dapat dihubungi. Jalankan backend: <code>cd backend && npm start</code></p>"; return; }
   const hm = /#reset=([a-f0-9]{64})/.exec(location.hash);
   if (hm) { resetTok = hm[1]; authMode = "reset"; try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} API.token = ""; localStorage.removeItem("snapia_t"); S.user = S.me = null; S.admin = false; }
