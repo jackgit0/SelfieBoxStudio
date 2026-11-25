@@ -35,17 +35,20 @@ async function start() {
     events: window,
     getSession: () => ({ loggedIn: Boolean(S.me), admin: Boolean(S.admin), mustChange: Boolean(S.admin && AD.me && AD.me.must_change) }),
     onChange: cause => {
-      if (cause === "popstate") {
-        R.toast.message = R.toast.error = "";
+      if (cause !== "navigate") {
+        R.toast.message = R.toast.error = ""; // back/forward dan tautan reset (go() sudah membersihkannya sendiri)
       }
       render();
     },
     // tautan "buat sandi baru" dari email (/#reset=<token>): login yang tersimpan dilepas
+    // (juga saat tautan dibuka di tab yang sudah memuat aplikasi: data user sebelumnya ikut dibersihkan)
     onResetLink: token => {
       R.auth.resetToken = token;
       api.token = "";
       S.user = S.me = null;
       S.admin = false;
+      D.bookings = [];
+      D.sessions = [];
     },
   });
   connectLegacy({ api, store, router });

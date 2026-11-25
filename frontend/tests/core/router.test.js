@@ -291,3 +291,19 @@ test("#reset= dengan token yang bukan 64 hex diabaikan", () => {
   assert.deepEqual(tokens, []);
   assert.deepEqual(browser.calls, []);
 });
+
+test("#reset= yang dibuka di tab yang sudah memuat aplikasi (hashchange) juga diproses dan merender ulang", () => {
+  const token = "cd".repeat(32);
+  const browser = fakeBrowser("/");
+  const tokens = [];
+  const { router, changes } = routerFor(browser, undefined, { onResetLink: value => tokens.push(value) });
+  router.start();
+  browser.location.hash = "#reset=" + token;
+  browser.events.dispatchEvent(new Event("hashchange"));
+  assert.deepEqual(tokens, [token]);
+  assert.deepEqual(browser.calls, [["replace", "/reset-password"]]);
+  assert.deepEqual(changes, ["reset"]);
+  browser.location.hash = "#lain";
+  browser.events.dispatchEvent(new Event("hashchange")); // hash lain (mis. tautan bagian landing) diabaikan
+  assert.deepEqual(changes, ["reset"]);
+});

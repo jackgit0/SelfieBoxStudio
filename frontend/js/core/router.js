@@ -177,7 +177,7 @@ export function legacyPath(view, params = {}, context = {}) {
 }
 
 // history, location = milik browser (atau tiruan di tes); events = target addEventListener (window);
-// getSession() = { loggedIn, admin, mustChange }; onChange(cause) = render ulang ("navigate", "popstate");
+// getSession() = { loggedIn, admin, mustChange }; onChange(cause) = render ulang ("navigate", "popstate", "reset");
 // onResetLink(token) = simpan token reset dan keluarkan login yang tersimpan (seperti boot.js lama)
 export function createRouter({ routes = ROUTES, history, location, events, getSession, onChange = () => {}, onResetLink = () => {} }) {
   let currentMatch = null;
@@ -229,6 +229,12 @@ export function createRouter({ routes = ROUTES, history, location, events, getSe
   function start() {
     takeResetLink();
     events.addEventListener("popstate", () => onChange("popstate"));
+    // tautan reset dibuka di tab yang sudah memuat aplikasi di "/": browser hanya mengganti hash, tanpa memuat ulang
+    events.addEventListener("hashchange", () => {
+      if (takeResetLink()) {
+        onChange("reset");
+      }
+    });
   }
 
   return {
