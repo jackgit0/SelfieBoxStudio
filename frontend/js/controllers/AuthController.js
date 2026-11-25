@@ -2,14 +2,15 @@
 // (dulu reg, login, adminLogin, afterAuth, forgot, doReset, logout, staffToggle di core.js dan isi boot.js).
 // Metode form menerima isian sebagai objek biasa (main.js: formValues, decisions.md 54); galat tampil sebagai toast di kartu form,
 // dan isian yang diketik (bukan password) tetap ada setelah galat.
-// booking = BookingController (refreshData, resumeDraft, clearBooking); resetAdmin = kosongkan state admin dan accessDenied = dialog
-// Akses Ditolak (js/legacy/admin.js sampai fase 8a).
+// booking = BookingController (refreshData, resumeDraft, clearBooking); accessDenied = dialog Akses ditolak (AdminController.showAccessDenied).
+// Keluar mengosongkan slice admin ke isi awalnya (createAdminState, dulu adminReset di admin.js).
 import { staffPinModal } from "../views/auth/staff.js";
+import { createAdminState } from "./AdminController.js";
 
 const EMAIL = /\S+@\S+\.\S+/;
 const PHONE = /^\d{8,15}$/;
 
-export function createAuthController({ api, store, ui, router, models, booking, resetAdmin = () => {}, accessDenied = () => {} }) {
+export function createAuthController({ api, store, ui, router, models, booking, accessDenied = () => {} }) {
   const auth = models.auth;
   const state = () => store.get();
 
@@ -116,7 +117,7 @@ export function createAuthController({ api, store, ui, router, models, booking, 
       store.update("persisted", { user: null, me: null, staff: false, admin: false, draft: null }, { silent: true });
       store.update("data", { bookings: [], sessions: [] }, { silent: true });
       booking.clearBooking();
-      resetAdmin();
+      store.update("admin", createAdminState(), { silent: true });
       store.update("runtime", { auth: { ...state().runtime.auth, mode: "login", form: null } }, { silent: true });
       router.navigate("/");
     },

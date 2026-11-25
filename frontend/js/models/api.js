@@ -72,6 +72,8 @@ export function createApi({ base = "", fetch: fetchFunction = (...args) => globa
     // tautan invoice (download = unduh berkas, bukan tampil di tab baru) dan gambar foto, dengan token di query
     invoiceUrl: (id, download) => `${base}/api/bookings/${id}/invoice?t=${token}${download ? "&dl=1" : ""}`,
     imageUrl: id => `${base}/api/photos/${id}/image?t=${token}`,
+    // foto pelanggan di panel admin (detail Pengguna)
+    adminPhotoUrl: id => `${base}/api/admin/photos/${id}/image?t=${token}`,
   };
   return api;
 }

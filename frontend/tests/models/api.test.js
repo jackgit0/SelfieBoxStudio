@@ -90,11 +90,12 @@ test("respons 2xx tanpa JSON mengembalikan {}", async () => {
   assert.deepEqual(await api.get("/x"), {});
 });
 
-test("invoiceUrl dan imageUrl menyertakan token", () => {
+test("invoiceUrl, imageUrl dan adminPhotoUrl menyertakan token", () => {
   const api = createApi({ base: "https://be.example", fetch: fakeFetch().fetch, storage: createFakeStorage({ snapia_t: "abc" }) });
   assert.equal(api.invoiceUrl(12), "https://be.example/api/bookings/12/invoice?t=abc");
   assert.equal(api.invoiceUrl(12, 1), "https://be.example/api/bookings/12/invoice?t=abc&dl=1");
   assert.equal(api.imageUrl(5), "https://be.example/api/photos/5/image?t=abc");
+  assert.equal(api.adminPhotoUrl(7), "https://be.example/api/admin/photos/7/image?t=abc");
 });
 
 test("storage yang melempar galat: token tetap di memori", () => {

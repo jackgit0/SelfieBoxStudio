@@ -4,6 +4,7 @@ import { createStore } from "../../js/core/store.js";
 import { createAuthController } from "../../js/controllers/AuthController.js";
 import { createBookingController } from "../../js/controllers/BookingController.js";
 import { createPackageController } from "../../js/controllers/PackageController.js";
+import { createAdminState } from "../../js/controllers/AdminController.js";
 import * as authModel from "../../js/models/auth.js";
 import * as bookingModel from "../../js/models/booking.js";
 import * as photoSessionModel from "../../js/models/photoSession.js";
@@ -18,7 +19,7 @@ const mine = { "GET /bookings": { body: [{ id: 41 }] }, "GET /sessions": { body:
 function setup({ persisted = {}, booking = {}, runtime = {}, admin = {}, responses = {}, modalAnswers = [], token = "" } = {}) {
   const state = sampleState({ persisted, booking, runtime: { auth: { mode: "login", resetToken: "" }, cancel: { reason: "", detail: "" }, ...runtime } });
   state.data = { bookings: [{ id: 1 }], sessions: [{ id: 2 }] };
-  state.admin = { me: null, studios: [{ id: 1 }], ...admin };
+  state.admin = { ...createAdminState(), me: { username: "admin", must_change: false }, studios: [{ id: 1 }], query: "walk", ...admin };
   const storage = createFakeStorage();
   const sessionStorage = createFakeStorage();
   const store = createStore(state, { storage, persistKey: "snapia", session: { storage: sessionStorage, key: "snapia_booking", slices: { booking: ["studio", "date", "slot", "rescheduleId"] } } });
@@ -38,10 +39,9 @@ function setup({ persisted = {}, booking = {}, runtime = {}, admin = {}, respons
   const refreshMaster = async () => false;
   const packages = createPackageController({ store, ui, router, config: { wa: "", email: "" }, refreshMaster });
   const bookingController = createBookingController({ api, store, ui, router, models: { booking: bookingModel, photoSession: photoSessionModel }, packages, refreshMaster });
-  let adminResets = 0;
   let denials = 0;
-  const controller = createAuthController({ api, store, ui, router, models: { auth: authModel }, booking: bookingController, resetAdmin: () => adminResets++, accessDenied: () => denials++ });
-  return { store, api, ui, log, controller, storage, sessionStorage, adminResets: () => adminResets, denials: () => denials };
+  const controller = createAuthController({ api, store, ui, router, models: { auth: authModel }, booking: bookingController, accessDenied: () => denials++ });
+  return { store, api, ui, log, controller, storage, sessionStorage, denials: () => denials };
 }
 
 const paths = api => api.calls.map(call => `${call.method} ${call.path}`);
@@ -132,9 +132,10 @@ test("reset: password pendek / tidak sama → pesan; valid → POST token + pass
 });
 
 test("logout: token dan token staf dibuang, slice user/admin/draf/data/booking berjalan dikosongkan, state admin direset, ke /", () => {
-  const { store, api, log, sessionStorage, controller, adminResets } = setup({ token: "jwt", persisted: { me: 5, user, staff: true, draft: { studio: 1 } }, booking: { studio: 1, date: "2026-11-27", slot: "2026-11-27 10:00" } });
+  const { store, api, log, sessionStorage, controller } = setup({ token: "jwt", persisted: { me: 5, user, staff: true, draft: { studio: 1 } }, booking: { studio: 1, date: "2026-11-27", slot: "2026-11-27 10:00" } });
   api.staffToken = "staf";
   store.persistSession();
+  const adminBefore = store.get().admin;
   controller.logout();
   assert.deepEqual([api.token, api.staffToken], ["", ""]);
   const { persisted, data, booking, runtime } = store.get();
@@ -142,7 +143,8 @@ test("logout: token dan token staf dibuang, slice user/admin/draf/data/booking b
   assert.deepEqual(data, { bookings: [], sessions: [] });
   assert.deepEqual(booking, { studio: null, date: null, slot: null, quote: null, rescheduleId: null });
   assert.equal(runtime.auth.mode, "login");
-  assert.equal(adminResets(), 1);
+  assert.deepEqual(store.get().admin, createAdminState());
+  assert.equal(store.get().admin, adminBefore);
   assert.deepEqual(log, ["navigate:/"]);
   store.persistSession();
   assert.equal(sessionStorage.getItem("snapia_booking"), null);
@@ -185,10 +187,10 @@ test("restoreSession admin: GET /admin/me ke slice admin", async () => {
 });
 
 test("restoreSession admin dengan /admin/me 403 \"Hanya admin\" → Akses Ditolak (dulu test-imk: main.js memanggil aDenied)", async () => {
-  const { controller, denials, adminResets, log } = setup({ token: "pelanggan", persisted: { user: { name: "Admin", id: 0 }, admin: true }, responses: { "GET /admin/me": { status: 403, body: { error: "Hanya admin" } } } });
+  const { controller, denials, store, log } = setup({ token: "pelanggan", persisted: { user: { name: "Admin", id: 0 }, admin: true }, responses: { "GET /admin/me": { status: 403, body: { error: "Hanya admin" } } } });
   assert.equal(await controller.restoreSession(), false);
   assert.equal(denials(), 1);
-  assert.equal(adminResets(), 0);
+  assert.deepEqual(store.get().admin.studios, [{ id: 1 }]);
   assert.deepEqual(log, []);
 });
 

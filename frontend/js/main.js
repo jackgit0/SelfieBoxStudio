@@ -30,6 +30,8 @@ import { createLandingController } from "./controllers/LandingController.js";
 import { landingView } from "./views/landing.js";
 import { createPhotoSessionController, createPhotoState } from "./controllers/PhotoSessionController.js";
 import { createGalleryController } from "./controllers/GalleryController.js";
+import { createAdminController } from "./controllers/AdminController.js";
+import * as adminModels from "./models/admin/index.js";
 import { photoSessionView } from "./views/session/photoSession.js";
 import { galleryView } from "./views/session/gallery.js";
 import { browseView } from "./views/customer/browse.js";
@@ -50,7 +52,7 @@ import { forgotView } from "./views/auth/forgot.js";
 import { resetView } from "./views/auth/reset.js";
 import { S, M, BK, R, D, connectLegacy } from "./legacy/state.js";
 import { $, goPath, render, renderAfter, renderBefore, renderContent, renderShell } from "./legacy/core.js";
-import { AD, aDenied, adminReset } from "./legacy/admin.js";
+import { AD } from "./legacy/admin.js";
 import { installLegacyBridge } from "./legacy-bridge.js";
 import { registerLegacyActions } from "./legacy-actions.js";
 
@@ -131,8 +133,9 @@ function pagesFor({ studio, payment, landing, photo, gallery }, links) {
 }
 
 // aksi data-* milik controller baru; kalender dibagi menurut data-context (home = Filter Jadwal Browse, book = Pilih Waktu)
-function controllerActions({ studio, package: packages, booking, payment, account, auth, landing, photo, gallery }) {
+function controllerActions({ studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin }) {
   return {
+    "admin:search": (dataset, event) => admin.setSearch(event.target.value),
     "gallery:showSession": gallery.showSession,
     "gallery:select": gallery.select,
     "gallery:toggleFavourite": gallery.toggleFavourite,
@@ -194,13 +197,16 @@ async function start() {
   const store = createStore({ persisted: S, master: M, booking: BK, runtime: R, data: D, photo: createPhotoState(), admin: AD }, { storage, persistKey: "snapia", session });
   const ui = createUi(store);
   const navigation = { navigate: path => goPath(path) };
-  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel, contact: contactModel, drive: driveModel, gallery: galleryModel };
+  const models = { master: masterModel, studio: studioModel, booking: bookingModel, payment: paymentModel, photoSession: photoSessionModel, account: accountModel, auth: authModel, contact: contactModel, drive: driveModel, gallery: galleryModel, admin: adminModels };
   const studio = createStudioController({ api, store, ui, router: navigation, models });
   const packages = createPackageController({ store, ui, router: navigation, config: { wa: CS_WA, email: CS_EMAIL }, refreshMaster: studio.refreshMaster });
   const booking = createBookingController({ api, store, ui, router: navigation, models, packages, refreshMaster: studio.refreshMaster });
   const payment = createPaymentController({ api, store, ui, router: navigation, models, booking, refresh: booking.refreshData });
   const account = createAccountController({ api, store, models });
-  const auth = createAuthController({ api, store, ui, router: navigation, models, booking, resetAdmin: () => adminReset(), accessDenied: () => aDenied() });
+  // AuthController dan AdminController saling memakai: keluar (auth.logout) dan dialog Akses ditolak (admin.showAccessDenied)
+  let admin = null;
+  const auth = createAuthController({ api, store, ui, router: navigation, models, booking, accessDenied: () => admin.showAccessDenied() });
+  admin = createAdminController({ api, store, ui, router: navigation, models, logout: () => auth.logout() });
   const landing = createLandingController({ api, store, router: navigation, models, page: createLandingPage({ document, window }), timers: { setTimeout: (callback, delay) => window.setTimeout(callback, delay) } });
   const photo = createPhotoSessionController({
     api,
@@ -217,7 +223,7 @@ async function start() {
     brand: BRAND,
   });
   const gallery = createGalleryController({ api, store, ui, models, drive: { fetch: (...request) => window.fetch(...request) }, files: { download: downloadFile }, photoSession: photo, refreshData: booking.refreshData, brand: BRAND });
-  const controllers = { studio, package: packages, booking, payment, account, auth, landing, photo, gallery };
+  const controllers = { studio, package: packages, booking, payment, account, auth, landing, photo, gallery, admin };
   const pages = pagesFor(controllers, { invoiceUrl: api.invoiceUrl });
   const routes = ROUTES.map(route => ({ ...route, ...pages[route.path] }));
   const router = createRouter({

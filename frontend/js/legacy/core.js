@@ -59,7 +59,7 @@ const renderShell = m => shellMarkup({ layout: layoutNow(), route: m.route, sess
 function renderContent(m, content = null) {
   const layout = layoutNow();
   if (!content) content = raw(V[R.route.name] ? V[R.route.name]() : "");
-  const header = layout === "admin" ? adminHeader({ route: m.route, title: adminTitle(m.route, AD), mustChange: Boolean(AD.me && AD.me.must_change), query: AD.q }) : "";
+  const header = layout === "admin" ? adminHeader({ route: m.route, title: adminTitle(m.route, AD), mustChange: Boolean(AD.me && AD.me.must_change), query: AD.query }) : "";
   return composeOutlet({ layout, content, toast: R.toast, header });
 }
 // jam kosong Browse/Pilih Waktu dan muat ulang data master: kait route.after (main.js, StudioController)
@@ -68,8 +68,4 @@ function renderAfter() {
   if (V[view + "_after"]) V[view + "_after"]();
 }
 
-// ---------- autentikasi ----------
-// views/auth/*, controllers/AuthController.js (Masuk, Daftar, Lupa/Buat Sandi, keluar, Mode Staf, pemulihan login saat dibuka)
-// keluar (AuthController.logout): dipakai admin.js (fase 8a)
-const logout = () => CONTROLLERS.auth.logout();
-export { $, capLabel, eff, go, goPath, ic, icf, logout, me, modal, pkOf, priceRange, render, renderAfter, renderBefore, renderContent, renderShell, studioOf, toasts };
+export { $, capLabel, eff, go, goPath, ic, icf, me, modal, pkOf, priceRange, render, renderAfter, renderBefore, renderContent, renderShell, studioOf, toasts };
